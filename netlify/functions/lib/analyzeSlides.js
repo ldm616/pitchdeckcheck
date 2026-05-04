@@ -3,39 +3,72 @@ const { setDeckStatus } = require('./supabase')
 
 const SLIDE_TYPES = [
   'cover',
+  'investment_highlights',
   'problem',
   'solution',
   'product',
   'market',
-  'business_model',
   'competition',
+  'business_model',
   'traction',
   'team',
   'financials',
   'ask',
-  'investment_highlights',
+  'go_to_market',
+  'roadmap',
+  'contact',
   'other',
 ]
 
-const SYSTEM_PROMPT = `You are an expert at analyzing pitch deck slides. For each slide image, you will:
+const SYSTEM_PROMPT = `You are an expert at analyzing pitch deck slides for investor presentations. For each slide image, you will:
 
 1. Extract ALL visible text from the slide, preserving the structure and hierarchy.
-2. Infer the slide type based on its content.
+2. Infer the slide type based on its content and role in the investor narrative.
 
-Slide types:
-- cover: Title slide with company name/logo
-- problem: Describes the problem being solved
-- solution: Describes the solution offered
-- product: Shows the product, features, or demo
-- market: Market size, TAM/SAM/SOM, market analysis
-- business_model: Revenue model, pricing, unit economics
-- competition: Competitive landscape, differentiation
-- traction: Metrics, growth, milestones, customers
-- team: Team members, advisors, backgrounds
-- financials: Financial projections, runway, use of funds
-- ask: Investment ask, terms, contact info
-- investment_highlights: Summary of key reasons to invest, combining market opportunity, team strength, traction, product differentiation, and raise details
-- other: Anything that doesn't fit the above categories
+CLASSIFICATION RULES:
+- Classify based primarily on the slide's CONTENT and PURPOSE, not just the title.
+- The title is a supporting hint only.
+
+SLIDE TYPES (in order of priority for ambiguous cases):
+
+- cover: Title slide with company name/logo, tagline, or opening branding.
+
+- investment_highlights: Summary slide combining multiple investment reasons across market, product, team, traction, financials, and/or raise. Often titled "Why Invest", "Investment Highlights", "Key Highlights", or similar.
+
+- problem: Describes the problem being solved, pain points, or market gaps.
+
+- solution: Describes the solution offered, value proposition, or how the product solves the problem.
+
+- product: Shows the product itself, features, screenshots, demo, or how it works technically.
+
+- market: Market size, TAM/SAM/SOM, market analysis, industry trends, or addressable opportunity.
+
+- competition: Competitive landscape, differentiation, competitor comparison, or positioning matrix.
+
+- business_model: Revenue model, pricing, unit economics, monetization strategy, or how the company makes money.
+
+- traction: Metrics, growth data, milestones achieved, customer logos, user numbers, revenue figures, or proof of progress.
+
+- team: Team members, founders, advisors, backgrounds, or organizational structure.
+
+- financials: Financial projections, P&L, runway, burn rate, or detailed financial forecasts.
+
+- ask: The fundraise itself - amount being raised, SAFE/equity terms, valuation cap, discount, use of funds breakdown, or committed capital. This is specifically about the investment ask, NOT a general contact slide.
+
+- go_to_market: Customer acquisition strategy, sales channels, launch strategy, growth strategy, distribution, partnerships, marketing approach, or how the company will reach users/customers. Often titled "Growth Strategy", "GTM", "Go-to-Market", "Distribution", or "Customer Acquisition".
+
+- roadmap: Future product/company milestones, rollout plans, timelines, future releases, planned expansion, what's next, or sequencing of future activities. Often titled "Roadmap", "Timeline", "What's Next", or "Milestones".
+
+- contact: Final slide that is primarily a thank-you, closing, contact information, "Let's talk", "I'd love to tell you more", email, phone, website, social links, or call-to-action to connect. NOT an investment ask slide.
+
+- other: Use only if the slide clearly doesn't fit any of the above categories.
+
+DISAMBIGUATION:
+- If a slide has "Growth Strategy" content about reaching customers → go_to_market (not solution)
+- If a slide has "Roadmap" content about future plans → roadmap (not product)
+- If a slide is a final "Thank You" or "Contact" slide → contact (not ask)
+- If a slide asks for money/investment with terms → ask
+- If a slide summarizes why to invest across multiple dimensions → investment_highlights
 
 Respond with valid JSON in this exact format:
 {
@@ -114,7 +147,7 @@ async function analyzeSlides(supabase, deckId) {
               },
               {
                 type: 'text',
-                text: 'Analyze this pitch deck slide. Extract all visible text and infer the slide type.',
+                text: 'Analyze this pitch deck slide. Extract all visible text and infer the slide type based on the content and its role in the investor narrative.',
               },
             ],
           },
