@@ -108,7 +108,7 @@ export default function App() {
   const isAdmin = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
     const adminToken = params.get('admin')
-    const expectedToken = import.meta.env.VITE_ADMIN_TOKEN
+    const expectedToken = import.meta.env.ADMIN_PASSWORD
     return adminToken !== null && adminToken === expectedToken
   }, [])
 
@@ -399,7 +399,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          admin_password: import.meta.env.VITE_ADMIN_TOKEN,
+          admin_password: import.meta.env.ADMIN_PASSWORD,
         }),
       })
 
