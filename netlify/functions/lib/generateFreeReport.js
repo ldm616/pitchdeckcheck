@@ -13,7 +13,7 @@ const {
 
 /**
  * Prompt for investor question evaluation with 0-5 scoring.
- * Each question gets: score, assessment, gap, fix.
+ * Each question gets: score, assessment, gap, fix, confidence.
  */
 const RUBRIC_EVAL_PROMPT = `You are an experienced early-stage startup investor evaluating a pitch deck slide for investor-readiness. You are skeptical by default and evaluate strictly.
 
@@ -22,6 +22,7 @@ You will receive a slide's extracted text and a set of investor questions to eva
 - An assessment (what IS present)
 - A gap (what is MISSING)
 - A fix (conditional guidance on how to address the gap)
+- A confidence level (how reliable is this evaluation)
 
 SCORING SCALE (0-5):
 5 = Fully answers investor expectation with strong, specific evidence
@@ -64,6 +65,20 @@ FIX RULES (CRITICAL - tone matters):
 - If score is 5, fix can be "None needed"
 - Keep to 1-2 sentences
 
+CONFIDENCE RULES (IMPORTANT):
+Confidence indicates how reliable this evaluation is based on available slide content.
+
+- "high": Clear, specific, sufficient content directly answers or addresses the question. You can evaluate with certainty.
+- "medium": Partial evidence exists but is incomplete, somewhat vague, or requires minor interpretation.
+- "low": Very little or no visible content related to the question. Assessment required significant inference or assumption.
+
+Additional confidence rules:
+- If extracted_text is sparse, unclear, or mostly empty, default to "low" confidence
+- If you had to infer or assume information not explicitly stated, use "medium" or "low"
+- Do NOT claim "high" confidence when evidence is weak or absent
+- A score of 0 should typically have "low" confidence (nothing to evaluate)
+- A score of 5 should typically have "high" confidence (strong evidence present)
+
 OUTPUT FORMAT:
 Return ONLY valid JSON matching this structure:
 
@@ -74,15 +89,17 @@ Return ONLY valid JSON matching this structure:
       "score": 3,
       "assessment": "The slide states a $2B TAM but does not show calculation methodology.",
       "gap": "No visible assumptions or bottom-up sizing. Investors need to see how this number was derived.",
-      "fix": "If available, showing bottom-up sizing (e.g. customer count × average spend) would strengthen credibility."
+      "fix": "If available, showing bottom-up sizing (e.g. customer count × average spend) would strengthen credibility.",
+      "confidence": "medium"
     }
   ]
 }
 
 REQUIREMENTS:
 - Answer EVERY question provided
-- Each answer must have question_id, score, assessment, gap, and fix
+- Each answer must have question_id, score, assessment, gap, fix, and confidence
 - Score must be an integer from 0 to 5
+- Confidence must be "high", "medium", or "low"
 - All text fields must be 1-2 sentences, clear and specific`
 
 /**
@@ -151,12 +168,19 @@ Evaluate each question using the 0-5 scale. Provide assessment, gap, and fix for
     // Validate and normalize answers
     const validatedAnswers = result.answers.map((a) => {
       const score = Math.min(5, Math.max(0, Math.round(a.score) || 0))
+      // Validate confidence - default based on score if invalid
+      let confidence = a.confidence
+      if (!['high', 'medium', 'low'].includes(confidence)) {
+        // Default: score 0 = low, score 4-5 = high, else medium
+        confidence = score === 0 ? 'low' : score >= 4 ? 'high' : 'medium'
+      }
       return {
         question_id: a.question_id,
         score,
         assessment: a.assessment || 'Unable to assess.',
         gap: a.gap || 'Unable to determine gap.',
         fix: a.fix || 'Unable to provide guidance.',
+        confidence,
       }
     })
 
@@ -446,6 +470,7 @@ async function generateFreeReport(supabase, deckId) {
         assessment: a.assessment,
         gap: a.gap,
         fix: a.fix,
+        confidence: a.confidence,
       }))
 
       slideEvaluations.push({

@@ -259,6 +259,7 @@ function generateFallbackAnswers(rubric) {
     assessment: 'Unable to evaluate slide content.',
     gap: 'Evaluation failed due to processing error.',
     fix: 'Ensure slide has clear, readable content.',
+    confidence: 'low',
   }))
 }
 
