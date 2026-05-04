@@ -21,30 +21,67 @@ interface DeckStatusResult {
 }
 
 interface ReportStrength {
-  title: string
-  detail: string
+  title?: string
+  detail?: string
+  question?: string
+  score?: number
+  assessment?: string
+  slide_type?: string
 }
 
 interface ReportIssue {
-  title: string
-  detail: string
-  priority: 'high' | 'medium' | 'low'
+  title?: string
+  detail?: string
+  priority?: 'high' | 'medium' | 'low'
+  question?: string
+  score?: number
+  assessment?: string
+  gap?: string
+  slide_type?: string
 }
 
 interface ReportSlideNote {
   slide_number: number
   inferred_type: string
   grade: string
-  note: string
+  note?: string
+  normalized_score?: number
+}
+
+interface SlideQuestion {
+  question: string
+  score: number
+  assessment: string
+  gap: string
+  fix: string
+  confidence: 'high' | 'medium' | 'low'
+}
+
+interface FullReportSlide {
+  slide_number: number
+  type: string
+  grade: string
+  normalized_score: number
+  weighted_score?: number
+  max_score?: number
+  questions: SlideQuestion[]
 }
 
 interface ReportContent {
+  // Common fields
   overall_grade: string
   summary: string
-  strengths: ReportStrength[]
-  biggest_issues: ReportIssue[]
-  slide_notes: ReportSlideNote[]
-  upgrade_teaser: {
+  deck_score?: number
+  rubric_version?: string
+
+  // Full report format
+  slides?: FullReportSlide[]
+
+  // Free report format (legacy)
+  strengths?: ReportStrength[]
+  biggest_issues?: ReportIssue[]
+  slide_notes?: ReportSlideNote[]
+  upgrade_teaser?: {
     title: string
     bullets: string[]
   }
@@ -1042,9 +1079,17 @@ export default function App() {
               <div>
                 <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
                   Overall Grade
+                  {report.deck_score && (
+                    <span style={{ marginLeft: '8px', fontWeight: 500 }}>
+                      ({report.deck_score.toFixed(2)}/5.0)
+                    </span>
+                  )}
                 </p>
                 <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
-                  {slideCount} slides analyzed
+                  {slideCount || report.slides?.length || 0} slides analyzed
+                  {report.rubric_version && (
+                    <span style={{ marginLeft: '8px' }}>• {report.rubric_version}</span>
+                  )}
                 </p>
               </div>
             </div>
@@ -1063,165 +1108,288 @@ export default function App() {
               </p>
             </div>
 
-            {/* Strengths */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3
-                style={{
-                  margin: '0 0 12px 0',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#111827',
-                }}
-              >
-                Strengths
-              </h3>
-              {report.strengths.map((strength, idx) => (
-                <div
-                  key={idx}
+            {/* Full Report: Slide-by-Slide with Questions */}
+            {report.slides && report.slides.length > 0 && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3
                   style={{
-                    padding: '12px 16px',
-                    backgroundColor: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '6px',
-                    marginBottom: '10px',
+                    margin: '0 0 16px 0',
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: '#111827',
                   }}
                 >
-                  <p
-                    style={{
-                      margin: '0 0 4px 0',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: '#166534',
-                    }}
-                  >
-                    {strength.title}
-                  </p>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#15803d', lineHeight: 1.5 }}>
-                    {strength.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
+                  Slide-by-Slide Analysis
+                </h3>
+                {report.slides.map((slide) => {
+                  const slideData = slides.find(s => s.slide_number === slide.slide_number)
+                  const imageUrl = slideData?.image_url
 
-            {/* Biggest Issues */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3
-                style={{
-                  margin: '0 0 12px 0',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#111827',
-                }}
-              >
-                Biggest Issues
-              </h3>
-              {report.biggest_issues.map((issue, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    padding: '12px 16px',
-                    backgroundColor:
-                      issue.priority === 'high'
-                        ? '#fef2f2'
-                        : issue.priority === 'medium'
-                          ? '#fffbeb'
-                          : '#f9fafb',
-                    border: `1px solid ${
-                      issue.priority === 'high'
-                        ? '#fecaca'
-                        : issue.priority === 'medium'
-                          ? '#fde68a'
-                          : '#e5e7eb'
-                    }`,
-                    borderRadius: '6px',
-                    marginBottom: '10px',
-                  }}
-                >
+                  return (
+                    <div
+                      key={slide.slide_number}
+                      style={{
+                        marginBottom: '20px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Slide Header */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '12px 16px',
+                          backgroundColor: '#f9fafb',
+                          borderBottom: '1px solid #e5e7eb',
+                        }}
+                      >
+                        {/* Thumbnail */}
+                        <div
+                          style={{ flexShrink: 0, width: '80px' }}
+                          onMouseEnter={() => imageUrl && setHoveredSlideNumber(slide.slide_number)}
+                          onMouseLeave={() => setHoveredSlideNumber(null)}
+                        >
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={`Slide ${slide.slide_number}`}
+                              style={{
+                                width: '100%',
+                                height: 'auto',
+                                borderRadius: '4px',
+                                border: '1px solid #e5e7eb',
+                                cursor: 'pointer',
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: '100%',
+                                aspectRatio: '16/9',
+                                backgroundColor: '#e5e7eb',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '10px',
+                                color: '#9ca3af',
+                              }}
+                            >
+                              No image
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>
+                              Slide {slide.slide_number}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                padding: '2px 6px',
+                                borderRadius: '3px',
+                                backgroundColor: '#e5e7eb',
+                                color: '#4b5563',
+                              }}
+                            >
+                              {slide.type}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color:
+                                  slide.grade === 'A' ? '#22c55e'
+                                    : slide.grade === 'B' ? '#84cc16'
+                                    : slide.grade === 'C' ? '#eab308'
+                                    : slide.grade === 'D' ? '#f97316'
+                                    : '#ef4444',
+                              }}
+                            >
+                              Grade: {slide.grade}
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                              ({(slide.normalized_score * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Questions */}
+                      <div style={{ padding: '12px 16px' }}>
+                        {slide.questions.map((q, qIdx) => (
+                          <div
+                            key={qIdx}
+                            style={{
+                              padding: '12px',
+                              marginBottom: qIdx < slide.questions.length - 1 ? '12px' : 0,
+                              backgroundColor: q.score >= 4 ? '#f0fdf4' : q.score <= 2 ? '#fef2f2' : '#fffbeb',
+                              border: `1px solid ${q.score >= 4 ? '#bbf7d0' : q.score <= 2 ? '#fecaca' : '#fde68a'}`,
+                              borderRadius: '6px',
+                            }}
+                          >
+                            {/* Question header with score */}
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                              <p style={{ margin: 0, fontSize: '14px', fontWeight: 500, color: '#111827', flex: 1 }}>
+                                {q.question}
+                              </p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                <span
+                                  style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    backgroundColor: q.score >= 4 ? '#22c55e' : q.score <= 2 ? '#ef4444' : '#eab308',
+                                    color: '#ffffff',
+                                  }}
+                                >
+                                  {q.score}/5
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    padding: '2px 6px',
+                                    borderRadius: '3px',
+                                    backgroundColor: q.confidence === 'high' ? '#dcfce7' : q.confidence === 'low' ? '#fee2e2' : '#fef3c7',
+                                    color: q.confidence === 'high' ? '#166534' : q.confidence === 'low' ? '#991b1b' : '#92400e',
+                                    textTransform: 'uppercase',
+                                  }}
+                                >
+                                  {q.confidence}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Assessment */}
+                            <div style={{ marginBottom: '8px' }}>
+                              <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase' }}>
+                                Assessment
+                              </p>
+                              <p style={{ margin: 0, fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>
+                                {q.assessment}
+                              </p>
+                            </div>
+
+                            {/* Gap */}
+                            {q.gap && q.gap !== 'None - fully addressed' && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 500, color: '#dc2626', textTransform: 'uppercase' }}>
+                                  Gap
+                                </p>
+                                <p style={{ margin: 0, fontSize: '13px', color: '#991b1b', lineHeight: 1.5 }}>
+                                  {q.gap}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Fix */}
+                            {q.fix && q.fix !== 'None needed' && (
+                              <div>
+                                <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 500, color: '#2563eb', textTransform: 'uppercase' }}>
+                                  How to Fix
+                                </p>
+                                <p style={{ margin: 0, fontSize: '13px', color: '#1d4ed8', lineHeight: 1.5 }}>
+                                  {q.fix}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Free Report: Strengths (legacy format) */}
+            {report.strengths && report.strengths.length > 0 && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+                  Strengths
+                </h3>
+                {report.strengths.map((strength, idx) => (
                   <div
+                    key={idx}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '4px',
+                      padding: '12px 16px',
+                      backgroundColor: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '6px',
+                      marginBottom: '10px',
                     }}
                   >
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color:
-                          issue.priority === 'high'
-                            ? '#991b1b'
-                            : issue.priority === 'medium'
-                              ? '#92400e'
-                              : '#374151',
-                      }}
-                    >
-                      {issue.title}
+                    <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 500, color: '#166534' }}>
+                      {strength.title || strength.question}
                     </p>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 500,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                        backgroundColor:
-                          issue.priority === 'high'
-                            ? '#fee2e2'
-                            : issue.priority === 'medium'
-                              ? '#fef3c7'
-                              : '#f3f4f6',
-                        color:
-                          issue.priority === 'high'
-                            ? '#dc2626'
-                            : issue.priority === 'medium'
-                              ? '#d97706'
-                              : '#6b7280',
-                      }}
-                    >
-                      {issue.priority}
-                    </span>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#15803d', lineHeight: 1.5 }}>
+                      {strength.detail || strength.assessment}
+                    </p>
                   </div>
-                  <p
+                ))}
+              </div>
+            )}
+
+            {/* Free Report: Biggest Issues (legacy format) */}
+            {report.biggest_issues && report.biggest_issues.length > 0 && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+                  Biggest Issues
+                </h3>
+                {report.biggest_issues.map((issue, idx) => (
+                  <div
+                    key={idx}
                     style={{
-                      margin: 0,
-                      fontSize: '14px',
-                      lineHeight: 1.5,
-                      color:
-                        issue.priority === 'high'
-                          ? '#b91c1c'
-                          : issue.priority === 'medium'
-                            ? '#b45309'
-                            : '#4b5563',
+                      padding: '12px 16px',
+                      backgroundColor: issue.priority === 'high' ? '#fef2f2' : issue.priority === 'medium' ? '#fffbeb' : '#f9fafb',
+                      border: `1px solid ${issue.priority === 'high' ? '#fecaca' : issue.priority === 'medium' ? '#fde68a' : '#e5e7eb'}`,
+                      borderRadius: '6px',
+                      marginBottom: '10px',
                     }}
                   >
-                    {issue.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <p style={{ margin: 0, fontSize: '14px', fontWeight: 500, color: issue.priority === 'high' ? '#991b1b' : issue.priority === 'medium' ? '#92400e' : '#374151' }}>
+                        {issue.title || issue.question}
+                      </p>
+                      {issue.priority && (
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            textTransform: 'uppercase',
+                            backgroundColor: issue.priority === 'high' ? '#fee2e2' : issue.priority === 'medium' ? '#fef3c7' : '#f3f4f6',
+                            color: issue.priority === 'high' ? '#dc2626' : issue.priority === 'medium' ? '#d97706' : '#6b7280',
+                          }}
+                        >
+                          {issue.priority}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '14px', lineHeight: 1.5, color: issue.priority === 'high' ? '#b91c1c' : issue.priority === 'medium' ? '#b45309' : '#4b5563' }}>
+                      {issue.detail || issue.assessment}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* Slide Notes */}
-            <div style={{ marginBottom: '24px' }}>
-              <h3
-                style={{
-                  margin: '0 0 12px 0',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#111827',
-                }}
-              >
-                Slide-by-Slide Notes
-              </h3>
-              {(!report.slide_notes || report.slide_notes.length === 0) ? (
-                <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
-                  No slide-specific notes available.
-                </p>
-              ) : (
-                report.slide_notes.map((note, idx) => {
-                  // Find matching slide data for image
+            {/* Free Report: Slide Notes (legacy format) */}
+            {report.slide_notes && report.slide_notes.length > 0 && !report.slides && (
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+                  Slide-by-Slide Notes
+                </h3>
+                {report.slide_notes.map((note, idx) => {
                   const slideData = slides.find(s => s.slide_number === note.slide_number)
                   const imageUrl = slideData?.image_url
 
@@ -1238,12 +1406,8 @@ export default function App() {
                         marginBottom: '8px',
                       }}
                     >
-                      {/* Thumbnail */}
                       <div
-                        style={{
-                          flexShrink: 0,
-                          width: '120px',
-                        }}
+                        style={{ flexShrink: 0, width: '120px' }}
                         onMouseEnter={() => imageUrl && setHoveredSlideNumber(note.slide_number)}
                         onMouseLeave={() => setHoveredSlideNumber(null)}
                       >
@@ -1251,136 +1415,43 @@ export default function App() {
                           <img
                             src={imageUrl}
                             alt={`Slide ${note.slide_number}`}
-                            style={{
-                              width: '100%',
-                              height: 'auto',
-                              borderRadius: '4px',
-                              border: '1px solid #e5e7eb',
-                              cursor: 'pointer',
-                            }}
+                            style={{ width: '100%', height: 'auto', borderRadius: '4px', border: '1px solid #e5e7eb', cursor: 'pointer' }}
                           />
                         ) : (
-                          <div
-                            style={{
-                              width: '100%',
-                              aspectRatio: '16/9',
-                              backgroundColor: '#f3f4f6',
-                              borderRadius: '4px',
-                              border: '1px solid #e5e7eb',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: '11px',
-                                color: '#9ca3af',
-                                textAlign: 'center',
-                                padding: '4px',
-                              }}
-                            >
-                              Slide image unavailable
-                            </span>
+                          <div style={{ width: '100%', aspectRatio: '16/9', backgroundColor: '#f3f4f6', borderRadius: '4px', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#9ca3af', textAlign: 'center', padding: '4px' }}>Slide image unavailable</span>
                           </div>
                         )}
                       </div>
-
-                      {/* Note content */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            marginBottom: '4px',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#6b7280',
-                            }}
-                          >
-                            Slide {note.slide_number}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              padding: '2px 6px',
-                              borderRadius: '3px',
-                              backgroundColor: '#f3f4f6',
-                              color: '#6b7280',
-                            }}
-                          >
-                            {note.inferred_type}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color:
-                                note.grade === 'A'
-                                  ? '#22c55e'
-                                  : note.grade === 'B'
-                                    ? '#84cc16'
-                                    : note.grade === 'C'
-                                      ? '#eab308'
-                                      : note.grade === 'D'
-                                        ? '#f97316'
-                                        : '#ef4444',
-                            }}
-                          >
-                            {note.grade}
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280' }}>Slide {note.slide_number}</span>
+                          <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '3px', backgroundColor: '#f3f4f6', color: '#6b7280' }}>{note.inferred_type}</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: note.grade === 'A' ? '#22c55e' : note.grade === 'B' ? '#84cc16' : note.grade === 'C' ? '#eab308' : note.grade === 'D' ? '#f97316' : '#ef4444' }}>{note.grade}</span>
                         </div>
-                        <p style={{ margin: 0, fontSize: '14px', color: '#4b5563', lineHeight: 1.5 }}>
-                          {note.note}
-                        </p>
+                        <p style={{ margin: 0, fontSize: '14px', color: '#4b5563', lineHeight: 1.5 }}>{note.note}</p>
                       </div>
                     </div>
                   )
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
 
-            {/* Upgrade Teaser */}
-            <div
-              style={{
-                padding: '20px',
-                backgroundColor: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '8px',
-              }}
-            >
-              <p
-                style={{
-                  margin: '0 0 10px 0',
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  color: '#1e40af',
-                }}
-              >
-                {report.upgrade_teaser.title}
-              </p>
-              <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                {report.upgrade_teaser.bullets.map((bullet, idx) => (
-                  <li
-                    key={idx}
-                    style={{
-                      fontSize: '14px',
-                      color: '#1d4ed8',
-                      marginBottom: '6px',
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {bullet}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {/* Upgrade Teaser (only for free reports) */}
+            {report.upgrade_teaser && (
+              <div style={{ padding: '20px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: 600, color: '#1e40af' }}>
+                  {report.upgrade_teaser.title}
+                </p>
+                <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                  {report.upgrade_teaser.bullets.map((bullet, idx) => (
+                    <li key={idx} style={{ fontSize: '14px', color: '#1d4ed8', marginBottom: '6px', lineHeight: 1.4 }}>
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
