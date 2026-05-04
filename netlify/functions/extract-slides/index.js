@@ -1,54 +1,28 @@
-import type { Handler } from '@netlify/functions'
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { createCanvas, Canvas, SKRSContext2D } from '@napi-rs/canvas'
-
-// Use legacy build for Node.js compatibility (CommonJS)
-// @ts-expect-error - pdfjs-dist CommonJS import
-import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js'
+import { createClient } from '@supabase/supabase-js'
+import { createCanvas } from '@napi-rs/canvas'
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 const TARGET_WIDTH = 1600
 
-interface RequestBody {
-  deck_id: string
-  access_token: string
-}
-
-interface SlideInfo {
-  slide_number: number
-  image_path: string
-}
-
-interface CanvasContext {
-  canvas: Canvas
-  context: SKRSContext2D
-}
-
-// Custom canvas factory for pdfjs-dist using @napi-rs/canvas
 class NodeCanvasFactory {
-  create(width: number, height: number): CanvasContext {
+  create(width, height) {
     const canvas = createCanvas(width, height)
     const context = canvas.getContext('2d')
     return { canvas, context }
   }
 
-  reset(canvasAndContext: CanvasContext, width: number, height: number) {
+  reset(canvasAndContext, width, height) {
     canvasAndContext.canvas.width = width
     canvasAndContext.canvas.height = height
   }
 
-  destroy(canvasAndContext: CanvasContext) {
+  destroy(canvasAndContext) {
     // No explicit cleanup needed for @napi-rs/canvas
   }
 }
 
-async function setDeckStatus(
-  supabase: SupabaseClient,
-  deckId: string,
-  status: string,
-  error: string | null = null,
-  slideCount: number | null = null
-) {
-  const update: Record<string, unknown> = {
+async function setDeckStatus(supabase, deckId, status, error = null, slideCount = null) {
+  const update = {
     processing_status: status,
     processing_error: error,
   }
@@ -58,11 +32,9 @@ async function setDeckStatus(
   await supabase.from('decks').update(update).eq('id', deckId)
 }
 
-async function cleanupExistingSlides(supabase: SupabaseClient, deckId: string) {
-  // Delete existing slide rows
+async function cleanupExistingSlides(supabase, deckId) {
   await supabase.from('slides').delete().eq('deck_id', deckId)
 
-  // List and delete existing slide images
   const { data: existingFiles } = await supabase.storage
     .from('slide-images')
     .list(deckId)
@@ -73,12 +45,11 @@ async function cleanupExistingSlides(supabase: SupabaseClient, deckId: string) {
   }
 }
 
-function padNumber(num: number, size: number): string {
+function padNumber(num, size) {
   return String(num).padStart(size, '0')
 }
 
-export const handler: Handler = async (event) => {
-  // Only allow POST
+export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -87,7 +58,6 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // Check environment variables
   const supabaseUrl = process.env.SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -100,8 +70,7 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // Parse request body
-  let body: RequestBody
+  let body
   try {
     body = JSON.parse(event.body || '{}')
   } catch {
@@ -124,7 +93,6 @@ export const handler: Handler = async (event) => {
 
   const supabase = createClient(supabaseUrl, supabaseKey)
 
-  // Verify deck exists and access_token matches
   const { data: deck, error: deckError } = await supabase
     .from('decks')
     .select('id, file_path, access_token')
@@ -148,11 +116,9 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // Set status to extracting
   await setDeckStatus(supabase, deck_id, 'extracting', null)
 
   try {
-    // Download PDF from storage
     const { data: pdfData, error: downloadError } = await supabase.storage
       .from('deck-pdfs')
       .download(deck.file_path)
@@ -167,11 +133,9 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    // Convert blob to array buffer
     const pdfBuffer = await pdfData.arrayBuffer()
     const pdfUint8Array = new Uint8Array(pdfBuffer)
 
-    // Load PDF document
     const loadingTask = pdfjsLib.getDocument({
       data: pdfUint8Array,
       useSystemFonts: true,
@@ -189,44 +153,34 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    // Cleanup existing slides (idempotent)
     await cleanupExistingSlides(supabase, deck_id)
 
-    const slides: SlideInfo[] = []
+    const slides = []
     const canvasFactory = new NodeCanvasFactory()
 
-    // Process each page
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdfDoc.getPage(pageNum)
 
-      // Calculate scale to achieve target width
       const originalViewport = page.getViewport({ scale: 1 })
       const scale = TARGET_WIDTH / originalViewport.width
       const viewport = page.getViewport({ scale })
 
-      // Create canvas
       const canvasAndContext = canvasFactory.create(
         Math.floor(viewport.width),
         Math.floor(viewport.height)
       )
 
-      // Render page to canvas
-      // Cast context to any because pdfjs expects browser CanvasRenderingContext2D
-      // but @napi-rs/canvas provides SKRSContext2D which is compatible at runtime
       await page.render({
-        canvasContext: canvasAndContext.context as unknown as CanvasRenderingContext2D,
+        canvasContext: canvasAndContext.context,
         viewport,
       }).promise
 
-      // Export to PNG buffer
       const pngBuffer = canvasAndContext.canvas.toBuffer('image/png')
 
-      // Generate filename
       const slideNumber = pageNum
       const filename = `slide-${padNumber(slideNumber, 3)}.png`
       const imagePath = `${deck_id}/${filename}`
 
-      // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('slide-images')
         .upload(imagePath, pngBuffer, {
@@ -244,7 +198,6 @@ export const handler: Handler = async (event) => {
         }
       }
 
-      // Insert slide row
       const { error: insertError } = await supabase.from('slides').insert({
         deck_id,
         slide_number: slideNumber,
@@ -268,11 +221,9 @@ export const handler: Handler = async (event) => {
         image_path: imagePath,
       })
 
-      // Cleanup canvas
       canvasFactory.destroy(canvasAndContext)
     }
 
-    // Update deck with slide count and status
     await setDeckStatus(supabase, deck_id, 'extracted', null, numPages)
 
     return {
