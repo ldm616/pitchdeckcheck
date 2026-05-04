@@ -136,10 +136,11 @@ exports.handler = async (event) => {
     }
   }
 
-  // Extract free_report from content (new format) or use content directly (legacy)
-  const reportContent = report.content?.free_report || report.content
+  // Return full_report for admin review (includes fixes, confidence, full question breakdown)
+  // Falls back to free_report or raw content for legacy reports
+  const reportContent = report.content?.full_report || report.content?.free_report || report.content
 
-  // Return free report content with slides
+  // Return full report content with slides
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
