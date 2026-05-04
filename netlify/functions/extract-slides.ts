@@ -2,8 +2,9 @@ import type { Handler } from '@netlify/functions'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { createCanvas, Canvas, SKRSContext2D } from '@napi-rs/canvas'
 
-// Use legacy build for Node.js compatibility
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
+// Use legacy build for Node.js compatibility (CommonJS)
+// @ts-expect-error - pdfjs-dist CommonJS import
+import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js'
 
 const TARGET_WIDTH = 1600
 
