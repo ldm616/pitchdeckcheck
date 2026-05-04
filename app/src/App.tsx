@@ -108,7 +108,7 @@ export default function App() {
   const isAdmin = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
     const adminToken = params.get('admin')
-    const expectedToken = import.meta.env.VITE_ADMIN_PASSWORD
+    const expectedToken = import.meta.env.VITE_ADMIN_TOKEN
     return adminToken !== null && adminToken === expectedToken
   }, [])
 
@@ -140,7 +140,6 @@ export default function App() {
   const pollStartTimeRef = useRef<number | null>(null)
 
   // Admin delete state
-  const [showAdmin, setShowAdmin] = useState(false)
   const [deleteDeckId, setDeleteDeckId] = useState('')
   const [adminPassword, setAdminPassword] = useState('')
   const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>('idle')
@@ -400,7 +399,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          admin_password: import.meta.env.VITE_ADMIN_PASSWORD,
+          admin_password: import.meta.env.VITE_ADMIN_TOKEN,
         }),
       })
 
@@ -1252,129 +1251,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Admin footer - only show when not in admin mode */}
-        {!isAdmin && (
-          <>
-            <div style={{ marginTop: '32px', textAlign: 'center' }}>
-              <button
-                onClick={() => setShowAdmin(!showAdmin)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '12px',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  fontFamily,
-                }}
-              >
-                {showAdmin ? 'Hide Admin' : 'Admin'}
-              </button>
-            </div>
-
-            {showAdmin && (
-              <div
-                style={{
-                  marginTop: '16px',
-                  padding: '16px',
-                  backgroundColor: '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                }}
-              >
-                <p
-                  style={{
-                    margin: '0 0 12px 0',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: '#374151',
-                  }}
-                >
-                  Delete Deck
-                </p>
-                <form onSubmit={handleDeleteDeck}>
-                  <input
-                    type="text"
-                    value={deleteDeckId}
-                    onChange={(e) => setDeleteDeckId(e.target.value)}
-                    placeholder="Deck ID (UUID)"
-                    required
-                    disabled={deleteStatus === 'deleting'}
-                    style={{
-                      width: '100%',
-                      padding: '8px 10px',
-                      fontSize: '13px',
-                      fontFamily,
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      marginBottom: '8px',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <input
-                    type="password"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Admin Password"
-                    required
-                    disabled={deleteStatus === 'deleting'}
-                    style={{
-                      width: '100%',
-                      padding: '8px 10px',
-                      fontSize: '13px',
-                      fontFamily,
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      marginBottom: '8px',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={deleteStatus === 'deleting' || !deleteDeckId || !adminPassword}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      fontFamily,
-                      color: '#ffffff',
-                      backgroundColor:
-                        deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
-                          ? '#9ca3af'
-                          : '#dc2626',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor:
-                        deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
-                          ? 'not-allowed'
-                          : 'pointer',
-                    }}
-                  >
-                    {deleteStatus === 'deleting' ? 'Deleting...' : 'Delete Deck'}
-                  </button>
-                </form>
-
-                {deleteError && (
-                  <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#dc2626' }}>
-                    {deleteError}
-                  </p>
-                )}
-
-                {deleteStatus === 'success' && deleteResult && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#166534' }}>
-                    <p style={{ margin: '0 0 4px 0', fontWeight: 500 }}>Deleted successfully:</p>
-                    <p style={{ margin: 0 }}>
-                      Files: {deleteResult.deleted?.deck_pdfs || 0} PDF, {deleteResult.deleted?.slide_images || 0} images
-                    </p>
-                    <p style={{ margin: 0 }}>
-                      Rows: {deleteResult.deleted?.db_rows.slides || 0} slides, {deleteResult.deleted?.db_rows.decks || 0} deck
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
             </>
           )}
 
