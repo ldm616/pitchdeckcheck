@@ -734,48 +734,66 @@ export default function App() {
               margin: '0 auto',
               padding: '12px 24px',
               display: 'flex',
-              justifyContent: 'center',
               alignItems: 'center',
-              gap: '24px',
-              fontSize: '14px',
-              fontWeight: 500,
             }}
           >
-            <button
-              onClick={() => setAdminView('upload')}
+            <h1
               style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                fontSize: '14px',
-                fontWeight: 500,
-                fontFamily,
-                color: adminView === 'upload' ? '#2563eb' : '#6b7280',
-                cursor: 'pointer',
-                textDecoration: adminView === 'upload' ? 'underline' : 'none',
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#111827',
+                margin: 0,
+                letterSpacing: '-0.025em',
               }}
             >
-              Upload
-            </button>
-            <button
-              onClick={() => {
-                setAdminView('reports')
-                fetchReportsList()
-              }}
+              Pitch Deck Check
+            </h1>
+            <div
               style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                fontSize: '14px',
-                fontWeight: 500,
-                fontFamily,
-                color: adminView === 'reports' ? '#2563eb' : '#6b7280',
-                cursor: 'pointer',
-                textDecoration: adminView === 'reports' ? 'underline' : 'none',
+                flex: 1,
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '24px',
               }}
             >
-              Reports
-            </button>
+              <button
+                onClick={() => setAdminView('upload')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  fontFamily,
+                  color: adminView === 'upload' ? '#2563eb' : '#6b7280',
+                  cursor: 'pointer',
+                  textDecoration: adminView === 'upload' ? 'underline' : 'none',
+                }}
+              >
+                Upload
+              </button>
+              <button
+                onClick={() => {
+                  setAdminView('reports')
+                  fetchReportsList()
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  fontFamily,
+                  color: adminView === 'reports' ? '#2563eb' : '#6b7280',
+                  cursor: 'pointer',
+                  textDecoration: adminView === 'reports' ? 'underline' : 'none',
+                }}
+              >
+                Reports
+              </button>
+            </div>
+            {/* Spacer to balance the title on the left */}
+            <div style={{ width: '120px' }} />
           </div>
         </div>
       )}
@@ -804,21 +822,21 @@ export default function App() {
           {/* Upload View */}
           {(!isAdmin || adminView === 'upload') && (
             <>
-              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+              <div style={{ textAlign: isAdmin ? 'left' : 'center', marginBottom: '32px' }}>
                 <h1
                   style={{
-                    fontSize: '28px',
+                    fontSize: isAdmin ? '20px' : '28px',
                     fontWeight: 600,
                     color: '#111827',
-                    margin: '0 0 12px 0',
+                    margin: isAdmin ? '0 0 8px 0' : '0 0 12px 0',
                     letterSpacing: '-0.025em',
                   }}
                 >
-                  Pitch Deck Check
+                  {isAdmin ? 'Upload Deck' : 'Pitch Deck Check'}
                 </h1>
                 <p
                   style={{
-                    fontSize: '15px',
+                    fontSize: isAdmin ? '14px' : '15px',
                     color: '#6b7280',
                     margin: 0,
                     lineHeight: 1.5,
