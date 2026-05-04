@@ -41,10 +41,13 @@ Respond with valid JSON in this exact format:
   "inferred_type": "one of the slide types listed above"
 }`
 
-async function setDeckStatus(supabase, deckId, status, error = null) {
+async function setDeckStatus(supabase, deckId, status, error = null, slideCount = null) {
   const update = {
     processing_status: status,
     processing_error: error,
+  }
+  if (slideCount !== null) {
+    update.slide_count = slideCount
   }
   await supabase.from('decks').update(update).eq('id', deckId)
 }
