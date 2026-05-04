@@ -485,6 +485,9 @@ export default function App() {
     )
   }
 
+  // Determine if we're showing the report (wider layout)
+  const showingReport = status === 'success' && report
+
   // Main upload form
   return (
     <div
@@ -501,11 +504,12 @@ export default function App() {
       <div
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: showingReport ? '720px' : '440px',
           backgroundColor: '#ffffff',
           borderRadius: '12px',
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
-          padding: '40px 32px',
+          padding: showingReport ? '48px 40px' : '40px 32px',
+          transition: 'max-width 0.3s ease, padding 0.3s ease',
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -733,23 +737,23 @@ export default function App() {
             {/* Summary */}
             <div
               style={{
-                padding: '12px 16px',
+                padding: '16px 20px',
                 backgroundColor: '#f9fafb',
                 borderRadius: '8px',
-                marginBottom: '20px',
+                marginBottom: '24px',
               }}
             >
-              <p style={{ margin: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>
+              <p style={{ margin: 0, fontSize: '15px', color: '#374151', lineHeight: 1.7 }}>
                 {report.summary}
               </p>
             </div>
 
             {/* Strengths */}
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '24px' }}>
               <h3
                 style={{
                   margin: '0 0 12px 0',
-                  fontSize: '15px',
+                  fontSize: '16px',
                   fontWeight: 600,
                   color: '#111827',
                 }}
@@ -760,11 +764,11 @@ export default function App() {
                 <div
                   key={idx}
                   style={{
-                    padding: '10px 12px',
+                    padding: '12px 16px',
                     backgroundColor: '#f0fdf4',
                     border: '1px solid #bbf7d0',
                     borderRadius: '6px',
-                    marginBottom: '8px',
+                    marginBottom: '10px',
                   }}
                 >
                   <p
@@ -777,7 +781,7 @@ export default function App() {
                   >
                     {strength.title}
                   </p>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#15803d' }}>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#15803d', lineHeight: 1.5 }}>
                     {strength.detail}
                   </p>
                 </div>
@@ -785,11 +789,11 @@ export default function App() {
             </div>
 
             {/* Biggest Issues */}
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '24px' }}>
               <h3
                 style={{
                   margin: '0 0 12px 0',
-                  fontSize: '15px',
+                  fontSize: '16px',
                   fontWeight: 600,
                   color: '#111827',
                 }}
@@ -800,7 +804,7 @@ export default function App() {
                 <div
                   key={idx}
                   style={{
-                    padding: '10px 12px',
+                    padding: '12px 16px',
                     backgroundColor:
                       issue.priority === 'high'
                         ? '#fef2f2'
@@ -815,7 +819,7 @@ export default function App() {
                           : '#e5e7eb'
                     }`,
                     borderRadius: '6px',
-                    marginBottom: '8px',
+                    marginBottom: '10px',
                   }}
                 >
                   <div
@@ -868,7 +872,8 @@ export default function App() {
                   <p
                     style={{
                       margin: 0,
-                      fontSize: '13px',
+                      fontSize: '14px',
+                      lineHeight: 1.5,
                       color:
                         issue.priority === 'high'
                           ? '#b91c1c'
@@ -884,11 +889,11 @@ export default function App() {
             </div>
 
             {/* Slide Notes */}
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '24px' }}>
               <h3
                 style={{
                   margin: '0 0 12px 0',
-                  fontSize: '15px',
+                  fontSize: '16px',
                   fontWeight: 600,
                   color: '#111827',
                 }}
@@ -896,7 +901,7 @@ export default function App() {
                 Slide-by-Slide Notes
               </h3>
               {(!report.slide_notes || report.slide_notes.length === 0) ? (
-                <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
+                <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
                   No slide-specific notes available.
                 </p>
               ) : (
@@ -904,11 +909,11 @@ export default function App() {
                   <div
                     key={note.slide_number ?? idx}
                     style={{
-                      padding: '10px 12px',
+                      padding: '12px 16px',
                       backgroundColor: '#ffffff',
                       border: '1px solid #e5e7eb',
                       borderRadius: '6px',
-                      marginBottom: '6px',
+                      marginBottom: '8px',
                     }}
                   >
                     <div
@@ -921,7 +926,7 @@ export default function App() {
                     >
                       <span
                         style={{
-                          fontSize: '12px',
+                          fontSize: '13px',
                           fontWeight: 600,
                           color: '#6b7280',
                         }}
@@ -931,7 +936,7 @@ export default function App() {
                       <span
                         style={{
                           fontSize: '11px',
-                          padding: '1px 5px',
+                          padding: '2px 6px',
                           borderRadius: '3px',
                           backgroundColor: '#f3f4f6',
                           color: '#6b7280',
@@ -941,7 +946,7 @@ export default function App() {
                       </span>
                       <span
                         style={{
-                          fontSize: '12px',
+                          fontSize: '13px',
                           fontWeight: 600,
                           color:
                             note.grade === 'A'
@@ -958,7 +963,7 @@ export default function App() {
                         {note.grade}
                       </span>
                     </div>
-                    <p style={{ margin: 0, fontSize: '13px', color: '#4b5563' }}>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#4b5563', lineHeight: 1.5 }}>
                       {note.note}
                     </p>
                   </div>
@@ -969,7 +974,7 @@ export default function App() {
             {/* Upgrade Teaser */}
             <div
               style={{
-                padding: '16px',
+                padding: '20px',
                 backgroundColor: '#eff6ff',
                 border: '1px solid #bfdbfe',
                 borderRadius: '8px',
@@ -977,8 +982,8 @@ export default function App() {
             >
               <p
                 style={{
-                  margin: '0 0 8px 0',
-                  fontSize: '14px',
+                  margin: '0 0 10px 0',
+                  fontSize: '15px',
                   fontWeight: 600,
                   color: '#1e40af',
                 }}
@@ -990,9 +995,10 @@ export default function App() {
                   <li
                     key={idx}
                     style={{
-                      fontSize: '13px',
+                      fontSize: '14px',
                       color: '#1d4ed8',
-                      marginBottom: '4px',
+                      marginBottom: '6px',
+                      lineHeight: 1.4,
                     }}
                   >
                     {bullet}
