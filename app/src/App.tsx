@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 
-type Status = 'idle' | 'uploading' | 'extracting' | 'success' | 'error'
+type Status = 'idle' | 'uploading' | 'extracting' | 'analyzing' | 'success' | 'error'
 type DeleteStatus = 'idle' | 'deleting' | 'success' | 'error'
 
 interface UploadResult {
@@ -12,6 +12,12 @@ interface ExtractionResult {
   deck_id: string
   slide_count: number
   slides: Array<{ slide_number: number; image_path: string }>
+}
+
+interface AnalysisResult {
+  deck_id: string
+  analyzed_count: number
+  slides: Array<{ slide_number: number; inferred_type: string; text_length: number }>
 }
 
 interface DeleteResult {
@@ -133,6 +139,24 @@ export default function App() {
       }
 
       setSlideCount(extractData.slide_count)
+      setStatus('analyzing')
+
+      const analyzeResponse = await fetch('/.netlify/functions/analyze-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deck_id: uploadData.deck_id,
+          access_token: uploadData.access_token,
+        }),
+      })
+
+      const analyzeData: AnalysisResult = await analyzeResponse.json()
+
+      if (!analyzeResponse.ok) {
+        console.error('Analysis error:', analyzeData)
+        throw new Error('Analysis failed')
+      }
+
       setStatus('success')
     } catch (err) {
       console.error('Error:', err)
@@ -184,7 +208,7 @@ export default function App() {
     }
   }
 
-  const isProcessing = status === 'uploading' || status === 'extracting'
+  const isProcessing = status === 'uploading' || status === 'extracting' || status === 'analyzing'
   const isDisabled = isProcessing || !file || !email
 
   const getStatusText = () => {
@@ -193,6 +217,8 @@ export default function App() {
         return 'Uploading deck...'
       case 'extracting':
         return 'Extracting slides...'
+      case 'analyzing':
+        return 'Analyzing slides...'
       default:
         return 'Upload Deck'
     }
@@ -485,7 +511,7 @@ export default function App() {
                 color: '#dc2626',
               }}
             >
-              Upload or extraction failed. Please try again.
+              Processing failed. Please try again.
             </p>
           </div>
         )}
@@ -531,7 +557,7 @@ export default function App() {
                 color: '#374151',
               }}
             >
-              Extracted <strong>{slideCount}</strong> slides
+              Extracted and analyzed <strong>{slideCount}</strong> slides
             </p>
           </div>
         )}

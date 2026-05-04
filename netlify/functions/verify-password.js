@@ -7,10 +7,10 @@ exports.handler = async (event) => {
     }
   }
 
-  const sitePassword = process.env.SITE_PASSWORD
+  const adminPassword = process.env.ADMIN_PASSWORD
 
-  if (!sitePassword) {
-    console.error('SITE_PASSWORD environment variable not set')
+  if (!adminPassword) {
+    console.error('ADMIN_PASSWORD environment variable not set')
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -39,7 +39,7 @@ exports.handler = async (event) => {
     }
   }
 
-  if (password === sitePassword) {
+  if (password === adminPassword) {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
