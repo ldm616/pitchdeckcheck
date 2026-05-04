@@ -1,15 +1,12 @@
 [build]
   base = "app"
-  command = "npm run build"
+  command = "npm run build && cd ../netlify/functions && npm install"
   publish = "dist"
   functions = "../netlify/functions"
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["busboy", "@napi-rs/canvas", "@supabase/supabase-js", "pdfjs-dist"]
-
-[functions."extract-slides"]
-  node_bundler = "none"
+  external_node_modules = ["busboy", "@napi-rs/canvas", "pdfjs-dist"]
 
 [[redirects]]
   from = "/*"
