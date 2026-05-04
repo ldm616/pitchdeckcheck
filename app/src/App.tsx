@@ -646,7 +646,7 @@ export default function App() {
                 color: '#374151',
               }}
             >
-              Extracted and analyzed <strong>{slideCount}</strong> slides
+              Extracted and analyzed {slideCount} slides
             </p>
           </div>
         )}
