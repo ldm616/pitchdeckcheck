@@ -822,31 +822,34 @@ export default function App() {
           {/* Upload View */}
           {(!isAdmin || adminView === 'upload') && (
             <>
-              <div style={{ textAlign: isAdmin ? 'left' : 'center', marginBottom: '32px' }}>
-                <h1
-                  style={{
-                    fontSize: isAdmin ? '20px' : '28px',
-                    fontWeight: 600,
-                    color: '#111827',
-                    margin: isAdmin ? '0 0 8px 0' : '0 0 12px 0',
-                    letterSpacing: '-0.025em',
-                  }}
-                >
-                  {isAdmin ? 'Upload Deck' : 'Pitch Deck Check'}
-                </h1>
-                <p
-                  style={{
-                    fontSize: isAdmin ? '14px' : '15px',
-                    color: '#6b7280',
-                    margin: 0,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  Upload your pitch deck to get an investor-readiness review.
-                </p>
-              </div>
+              {/* Hide header and form when viewing a report in admin mode */}
+              {!(isAdmin && showingReport) && (
+                <>
+                  <div style={{ textAlign: isAdmin ? 'left' : 'center', marginBottom: '32px' }}>
+                    <h1
+                      style={{
+                        fontSize: isAdmin ? '20px' : '28px',
+                        fontWeight: 600,
+                        color: '#111827',
+                        margin: isAdmin ? '0 0 8px 0' : '0 0 12px 0',
+                        letterSpacing: '-0.025em',
+                      }}
+                    >
+                      {isAdmin ? 'Upload Deck' : 'Pitch Deck Check'}
+                    </h1>
+                    <p
+                      style={{
+                        fontSize: isAdmin ? '14px' : '15px',
+                        color: '#6b7280',
+                        margin: 0,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Upload your pitch deck to get an investor-readiness review.
+                    </p>
+                  </div>
 
-              <form onSubmit={handleSubmit}>
+                  <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
             <label
               htmlFor="email"
@@ -997,6 +1000,8 @@ export default function App() {
             </p>
           </div>
         )}
+                </>
+              )}
 
         {status === 'success' && report && (
           <div style={{ marginTop: '24px' }}>
