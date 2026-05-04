@@ -1,6 +1,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 
 type Status = 'idle' | 'uploading' | 'extracting' | 'success' | 'error'
+type DeleteStatus = 'idle' | 'deleting' | 'success' | 'error'
 
 interface UploadResult {
   deck_id: string
@@ -11,6 +12,23 @@ interface ExtractionResult {
   deck_id: string
   slide_count: number
   slides: Array<{ slide_number: number; image_path: string }>
+}
+
+interface DeleteResult {
+  ok: boolean
+  deck_id?: string
+  deleted?: {
+    deck_pdfs: number
+    slide_images: number
+    db_rows: {
+      slides: number
+      reports: number
+      payments: number
+      events: number
+      decks: number
+    }
+  }
+  error?: string
 }
 
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
@@ -26,6 +44,14 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [slideCount, setSlideCount] = useState<number | null>(null)
+
+  // Admin delete state
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [deleteDeckId, setDeleteDeckId] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>('idle')
+  const [deleteResult, setDeleteResult] = useState<DeleteResult | null>(null)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     const authenticated = sessionStorage.getItem(SESSION_KEY)
@@ -120,6 +146,41 @@ export default function App() {
       setFile(selected)
     } else {
       setFile(null)
+    }
+  }
+
+  const handleDeleteDeck = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!deleteDeckId || !adminPassword) return
+
+    setDeleteStatus('deleting')
+    setDeleteError('')
+    setDeleteResult(null)
+
+    try {
+      const response = await fetch('/.netlify/functions/delete-deck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deck_id: deleteDeckId,
+          admin_password: adminPassword,
+        }),
+      })
+
+      const data: DeleteResult = await response.json()
+
+      if (response.ok && data.ok) {
+        setDeleteResult(data)
+        setDeleteStatus('success')
+        setDeleteDeckId('')
+      } else {
+        setDeleteError(data.error || 'Delete failed')
+        setDeleteStatus('error')
+      }
+    } catch (err) {
+      console.error('Delete error:', err)
+      setDeleteError('Failed to delete deck')
+      setDeleteStatus('error')
     }
   }
 
@@ -449,6 +510,126 @@ export default function App() {
             >
               Extraction complete. {slideCount} slides found.
             </p>
+          </div>
+        )}
+
+        {/* Admin footer */}
+        <div style={{ marginTop: '32px', textAlign: 'center' }}>
+          <button
+            onClick={() => setShowAdmin(!showAdmin)}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '12px',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              fontFamily,
+            }}
+          >
+            {showAdmin ? 'Hide Admin' : 'Admin'}
+          </button>
+        </div>
+
+        {showAdmin && (
+          <div
+            style={{
+              marginTop: '16px',
+              padding: '16px',
+              backgroundColor: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+            }}
+          >
+            <p
+              style={{
+                margin: '0 0 12px 0',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: '#374151',
+              }}
+            >
+              Delete Deck
+            </p>
+            <form onSubmit={handleDeleteDeck}>
+              <input
+                type="text"
+                value={deleteDeckId}
+                onChange={(e) => setDeleteDeckId(e.target.value)}
+                placeholder="Deck ID (UUID)"
+                required
+                disabled={deleteStatus === 'deleting'}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  fontSize: '13px',
+                  fontFamily,
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  marginBottom: '8px',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Admin Password"
+                required
+                disabled={deleteStatus === 'deleting'}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  fontSize: '13px',
+                  fontFamily,
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  marginBottom: '8px',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <button
+                type="submit"
+                disabled={deleteStatus === 'deleting' || !deleteDeckId || !adminPassword}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  fontFamily,
+                  color: '#ffffff',
+                  backgroundColor:
+                    deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
+                      ? '#9ca3af'
+                      : '#dc2626',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor:
+                    deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
+                      ? 'not-allowed'
+                      : 'pointer',
+                }}
+              >
+                {deleteStatus === 'deleting' ? 'Deleting...' : 'Delete Deck'}
+              </button>
+            </form>
+
+            {deleteError && (
+              <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#dc2626' }}>
+                {deleteError}
+              </p>
+            )}
+
+            {deleteStatus === 'success' && deleteResult && (
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#166534' }}>
+                <p style={{ margin: '0 0 4px 0', fontWeight: 500 }}>Deleted successfully:</p>
+                <p style={{ margin: 0 }}>
+                  Files: {deleteResult.deleted?.deck_pdfs || 0} PDF, {deleteResult.deleted?.slide_images || 0} images
+                </p>
+                <p style={{ margin: 0 }}>
+                  Rows: {deleteResult.deleted?.db_rows.slides || 0} slides, {deleteResult.deleted?.db_rows.decks || 0} deck
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
