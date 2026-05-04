@@ -1,8 +1,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef, useMemo } from 'react'
 
 type Status = 'idle' | 'uploading' | 'processing' | 'success' | 'error' | 'timeout'
-type DeleteStatus = 'idle' | 'deleting' | 'success' | 'error'
-type AdminView = 'upload' | 'reports' | 'delete'
+type AdminView = 'upload' | 'reports'
 
 interface UploadResult {
   deck_id: string
@@ -138,12 +137,10 @@ export default function App() {
   const timeoutRef = useRef<number | null>(null)
   const pollStartTimeRef = useRef<number | null>(null)
 
-  // Admin delete state
-  const [deleteDeckId, setDeleteDeckId] = useState('')
-  const [adminPassword, setAdminPassword] = useState('')
-  const [deleteStatus, setDeleteStatus] = useState<DeleteStatus>('idle')
-  const [deleteResult, setDeleteResult] = useState<DeleteResult | null>(null)
-  const [deleteError, setDeleteError] = useState('')
+  // Admin action state (for delete/regenerate on reports)
+  const [actionDeckId, setActionDeckId] = useState<string | null>(null)
+  const [actionType, setActionType] = useState<'delete' | 'regenerate' | null>(null)
+  const [actionError, setActionError] = useState('')
 
   useEffect(() => {
     const authenticated = sessionStorage.getItem(SESSION_KEY)
@@ -355,38 +352,77 @@ export default function App() {
     }
   }
 
-  const handleDeleteDeck = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!deleteDeckId || !adminPassword) return
+  const handleDeleteReport = async (deckId: string) => {
+    if (!confirm('Delete this deck and all associated data? This cannot be undone.')) {
+      return
+    }
 
-    setDeleteStatus('deleting')
-    setDeleteError('')
-    setDeleteResult(null)
+    setActionDeckId(deckId)
+    setActionType('delete')
+    setActionError('')
 
     try {
       const response = await fetch('/.netlify/functions/delete-deck', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deck_id: deleteDeckId,
-          admin_password: adminPassword,
+          deck_id: deckId,
+          admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
         }),
       })
 
       const data: DeleteResult = await response.json()
 
       if (response.ok && data.ok) {
-        setDeleteResult(data)
-        setDeleteStatus('success')
-        setDeleteDeckId('')
+        // Remove from list
+        setReportsList((prev) => prev.filter((r) => r.deck_id !== deckId))
       } else {
-        setDeleteError(data.error || 'Delete failed')
-        setDeleteStatus('error')
+        setActionError(data.error || 'Delete failed')
       }
     } catch (err) {
       console.error('Delete error:', err)
-      setDeleteError('Failed to delete deck')
-      setDeleteStatus('error')
+      setActionError('Failed to delete deck')
+    } finally {
+      setActionDeckId(null)
+      setActionType(null)
+    }
+  }
+
+  const handleRegenerateReport = async (deckId: string) => {
+    setActionDeckId(deckId)
+    setActionType('regenerate')
+    setActionError('')
+
+    try {
+      const response = await fetch('/.netlify/functions/regenerate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deck_id: deckId,
+          admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.ok) {
+        // Update the report in the list with new grade
+        setReportsList((prev) =>
+          prev.map((r) =>
+            r.deck_id === deckId
+              ? { ...r, status: 'ready', overall_grade: data.overall_grade }
+              : r
+          )
+        )
+      } else {
+        setActionError(data.error || 'Regenerate failed')
+      }
+    } catch (err) {
+      console.error('Regenerate error:', err)
+      setActionError('Failed to regenerate report')
+    } finally {
+      setActionDeckId(null)
+      setActionType(null)
     }
   }
 
@@ -649,22 +685,6 @@ export default function App() {
               }}
             >
               Reports
-            </button>
-            <button
-              onClick={() => setAdminView('delete')}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                fontSize: '14px',
-                fontWeight: 500,
-                fontFamily,
-                color: adminView === 'delete' ? '#dc2626' : '#6b7280',
-                cursor: 'pointer',
-                textDecoration: adminView === 'delete' ? 'underline' : 'none',
-              }}
-            >
-              Delete
             </button>
           </div>
         </div>
@@ -1272,7 +1292,7 @@ export default function App() {
                 <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading reports...</p>
               )}
 
-              {reportsError && (
+              {(reportsError || actionError) && (
                 <div
                   style={{
                     padding: '12px 16px',
@@ -1282,11 +1302,13 @@ export default function App() {
                     marginBottom: '16px',
                   }}
                 >
-                  <p style={{ margin: 0, fontSize: '14px', color: '#dc2626' }}>{reportsError}</p>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#dc2626' }}>
+                    {reportsError || actionError}
+                  </p>
                 </div>
               )}
 
-              {!reportsLoading && reportsList.length === 0 && !reportsError && (
+              {!reportsLoading && reportsList.length === 0 && !reportsError && !actionError && (
                 <p style={{ color: '#6b7280', fontSize: '14px' }}>No reports found.</p>
               )}
 
@@ -1393,6 +1415,54 @@ export default function App() {
                           >
                             {new Date(item.created_at).toLocaleDateString()}
                           </span>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRegenerateReport(item.deck_id)
+                            }}
+                            disabled={actionDeckId === item.deck_id}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              fontFamily,
+                              color: '#2563eb',
+                              backgroundColor: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '4px',
+                              cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
+                              opacity: actionDeckId === item.deck_id ? 0.5 : 1,
+                            }}
+                          >
+                            {actionDeckId === item.deck_id && actionType === 'regenerate'
+                              ? 'Regenerating...'
+                              : 'Regenerate'}
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteReport(item.deck_id)
+                            }}
+                            disabled={actionDeckId === item.deck_id}
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              fontFamily,
+                              color: '#dc2626',
+                              backgroundColor: '#fef2f2',
+                              border: '1px solid #fecaca',
+                              borderRadius: '4px',
+                              cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
+                              opacity: actionDeckId === item.deck_id ? 0.5 : 1,
+                            }}
+                          >
+                            {actionDeckId === item.deck_id && actionType === 'delete'
+                              ? 'Deleting...'
+                              : 'Delete'}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1402,159 +1472,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Delete View - Admin only */}
-          {isAdmin && adminView === 'delete' && (
-            <div>
-              <h2
-                style={{
-                  fontSize: '20px',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: '0 0 20px 0',
-                }}
-              >
-                Delete Deck
-              </h2>
-
-              <form onSubmit={handleDeleteDeck}>
-                <div style={{ marginBottom: '16px' }}>
-                  <label
-                    htmlFor="delete-deck-id"
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: '#374151',
-                      marginBottom: '6px',
-                    }}
-                  >
-                    Deck ID (UUID)
-                  </label>
-                  <input
-                    id="delete-deck-id"
-                    type="text"
-                    value={deleteDeckId}
-                    onChange={(e) => setDeleteDeckId(e.target.value)}
-                    placeholder="e.g. 12345678-1234-1234-1234-123456789abc"
-                    required
-                    disabled={deleteStatus === 'deleting'}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: '15px',
-                      fontFamily,
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: '20px' }}>
-                  <label
-                    htmlFor="delete-admin-password"
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: '#374151',
-                      marginBottom: '6px',
-                    }}
-                  >
-                    Admin Password
-                  </label>
-                  <input
-                    id="delete-admin-password"
-                    type="password"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Enter admin password"
-                    required
-                    disabled={deleteStatus === 'deleting'}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px',
-                      fontSize: '15px',
-                      fontFamily,
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={deleteStatus === 'deleting' || !deleteDeckId || !adminPassword}
-                  style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    fontSize: '15px',
-                    fontWeight: 500,
-                    fontFamily,
-                    color: '#ffffff',
-                    backgroundColor:
-                      deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
-                        ? '#9ca3af'
-                        : '#dc2626',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor:
-                      deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
-                        ? 'not-allowed'
-                        : 'pointer',
-                  }}
-                >
-                  {deleteStatus === 'deleting' ? 'Deleting...' : 'Delete Deck'}
-                </button>
-              </form>
-
-              {deleteError && (
-                <div
-                  style={{
-                    marginTop: '16px',
-                    padding: '12px 16px',
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <p style={{ margin: 0, fontSize: '14px', color: '#dc2626' }}>{deleteError}</p>
-                </div>
-              )}
-
-              {deleteStatus === 'success' && deleteResult && (
-                <div
-                  style={{
-                    marginTop: '16px',
-                    padding: '16px',
-                    backgroundColor: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: '0 0 8px 0',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: '#166534',
-                    }}
-                  >
-                    Deleted successfully
-                  </p>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#15803d' }}>
-                    Files: {deleteResult.deleted?.deck_pdfs || 0} PDF, {deleteResult.deleted?.slide_images || 0} images
-                  </p>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#15803d' }}>
-                    Rows: {deleteResult.deleted?.db_rows.slides || 0} slides, {deleteResult.deleted?.db_rows.decks || 0} deck
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
