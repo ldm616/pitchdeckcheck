@@ -9,6 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^0.1.53",
+    "@supabase/supabase-js": "^2.50.0",
+    "busboy": "^1.6.0",
+    "pdfjs-dist": "^4.4.168",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.22.3"

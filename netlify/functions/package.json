@@ -1,16 +1,12 @@
 {
   "name": "pitchdeckcheck-functions",
   "version": "1.0.0",
-  "dependencies": {
-    "@napi-rs/canvas": "^0.1.53",
-    "@supabase/supabase-js": "^2.50.0",
-    "busboy": "^1.6.0",
-    "pdfjs-dist": "^4.4.168"
-  },
   "devDependencies": {
     "@netlify/functions": "^2.6.0",
+    "@supabase/supabase-js": "^2.50.0",
     "@types/busboy": "^1.5.4",
     "@types/node": "^20.11.0",
+    "busboy": "^1.6.0",
     "typescript": "^5.4.2"
   }
 }
