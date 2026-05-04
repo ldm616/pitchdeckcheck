@@ -7,77 +7,62 @@ const {
   computeSlideScore,
   computeDeckScore,
   generateFallbackAnswers,
+  sortByImportance,
+  sortAnswersByImportance,
 } = require('./rubrics')
 
 /**
- * Prompt for rubric-based slide evaluation with actionable feedback.
- * Model answers each rubric question and provides missing/fixes/examples.
+ * Prompt for investor question evaluation with 0-5 scoring.
+ * Each question gets: score, assessment, gap, fix.
  */
 const RUBRIC_EVAL_PROMPT = `You are an experienced early-stage startup investor evaluating a pitch deck slide for investor-readiness. You are skeptical by default and evaluate strictly.
 
-You will receive a slide's extracted text and its inferred type. Your job is to:
-1. Answer each rubric question with yes/partial/no
-2. Identify what's MISSING vs investor expectations
-3. Provide GUIDANCE on how to address gaps (not instructions)
-4. Give EXAMPLES of patterns from strong decks
+You will receive a slide's extracted text and a set of investor questions to evaluate. For each question, you must provide:
+- A score from 0-5
+- An assessment (what IS present)
+- A gap (what is MISSING)
+- A fix (conditional guidance on how to address the gap)
+
+SCORING SCALE (0-5):
+5 = Fully answers investor expectation with strong, specific evidence
+4 = Mostly answers, minor gaps remain
+3 = Partially answers, meaningful gaps
+2 = Weak answer, major gaps
+1 = Barely addressed
+0 = Not addressed / not visible in slide
 
 SCORING RULES:
-- "yes" (score 2): The criterion is clearly met with specific, visible evidence in the extracted text.
-- "partial" (score 1): The criterion is partially met or implied but lacks specificity, clarity, or strong evidence.
-- "no" (score 0): The criterion is not met or no relevant evidence is visible in the extracted text.
+- Score based ONLY on visible evidence in the extracted text
+- Do NOT assume facts, numbers, or claims not visible
+- If slide text is empty or "(No text extracted)", score all questions 0
+- Be strict: most slides should score 2-3, not 4-5
+- Score 5 requires exceptional clarity AND strong supporting evidence
 
-ANTI-HALLUCINATION RULES (critical):
-- Base your evaluation ONLY on the extracted slide text provided.
-- Do NOT invent or assume facts, numbers, names, or claims not visible in the text.
-- If the slide text is empty or "(No text extracted)", score all questions as "no" and note limited confidence.
-- If something is implied but not explicitly stated, score as "partial" at best.
-- Do NOT reward claims that lack visible supporting evidence.
+ASSESSMENT RULES:
+- Describe what IS visible in the slide related to this question
+- Quote or reference actual content when possible
+- If nothing relevant is present, say "Not addressed in slide"
+- Keep to 1-2 sentences
 
-MISSING ITEMS RULES:
-- Derive missing items ONLY from rubric questions scored "no" or "partial"
-- Frame each missing item in terms of INVESTOR EXPECTATIONS:
-  - Good: "No visible assumptions behind market size. Investors need to see how you arrived at this number to assess credibility."
-  - Bad: "Missing market assumptions"
-- Be specific about WHY it matters for investor decision-making
-- Do NOT invent problems unrelated to the rubric questions
+GAP RULES:
+- Describe what an investor would expect to see but doesn't
+- Be specific about what's missing
+- Connect to investor decision-making: "Investors need X to assess Y"
+- If score is 5, gap can be "None - fully addressed"
+- Keep to 1-2 sentences
 
-FIXES RULES (critical - tone matters):
-- Fixes are GUIDANCE, not instructions. Do NOT write copy for the founder.
+FIX RULES (CRITICAL - tone matters):
+- Fixes are GUIDANCE, not instructions
 - Use CONDITIONAL, NON-PRESCRIPTIVE phrasing:
-  - Good: "If you have customer data, showing specific numbers would strengthen credibility"
-  - Good: "Investors typically expect to see bottom-up sizing logic here"
-  - Good: "Consider including your assumptions if they support the market opportunity"
-  - Bad: "Add bottom-up market sizing"
-  - Bad: "Show your customer numbers"
-  - Bad: "Include assumptions"
+  - "If this data exists, showing it would strengthen credibility"
+  - "Investors typically expect to see X here"
+  - "It would help to include Y if available"
 - NEVER assume the founder has data they haven't shown
-- NEVER imply data exists if it's not visible
-- Connect each fix to investor credibility or decision-making
-- Include 2-4 guidance items based on the most important gaps
-
-EXAMPLES RULES:
-- Examples must be PATTERN-LEVEL only, not specific claims
-- Use phrasing like:
-  - "Strong decks often show..."
-  - "Top investor-ready decks typically..."
-  - "A common pattern in successful fundraises is..."
-- If referencing a company (Airbnb, Dropbox), keep it generic and widely known
-- Do NOT cite specific numbers, metrics, or fabricated claims
-- Do NOT overuse named companies - patterns are more valuable
-- Include 1-2 examples maximum
-
-TONE RULES (critical):
-- Sound like an experienced investor coach, not generic AI
-- NEVER use these phrases:
-  - "could be improved"
-  - "would benefit from"
-  - "consider adding"
-  - "might want to"
-- ALL feedback must tie to:
-  - Investor expectations
-  - Credibility assessment
-  - Investment decision-making
-- Be direct but not prescriptive
+- NEVER write exact copy for the founder
+- NEVER fabricate specific numbers or claims
+- Connect to investor credibility or decision-making
+- If score is 5, fix can be "None needed"
+- Keep to 1-2 sentences
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching this structure:
@@ -85,43 +70,31 @@ Return ONLY valid JSON matching this structure:
 {
   "answers": [
     {
-      "question_id": "problem_01",
-      "answer": "yes|partial|no",
-      "score": 2|1|0,
-      "evidence": "Brief quote or reference from the slide text that supports this score",
-      "reasoning": "1 sentence explaining why this score was given"
+      "question_id": "market_01",
+      "score": 3,
+      "assessment": "The slide states a $2B TAM but does not show calculation methodology.",
+      "gap": "No visible assumptions or bottom-up sizing. Investors need to see how this number was derived.",
+      "fix": "If available, showing bottom-up sizing (e.g. customer count × average spend) would strengthen credibility."
     }
-  ],
-  "missing": [
-    "What's missing + why investors need it (1-2 sentences)"
-  ],
-  "fixes": [
-    "Conditional guidance tied to investor expectations"
-  ],
-  "examples": [
-    "Pattern-level reference to what strong decks do"
-  ],
-  "summary": "1-2 sentence diagnosis of the slide's main strength and weakness"
+  ]
 }
 
 REQUIREMENTS:
-- Answer EVERY question in the rubric provided
-- Each answer must have question_id, answer, score, evidence, and reasoning
-- score must match answer: yes=2, partial=1, no=0
-- missing: 1-4 items, each explaining what's missing AND why it matters to investors
-- fixes: 2-4 conditional guidance items (not directives)
-- examples: 1-2 pattern-level references
-- summary: concise diagnosis (strength + weakness)`
+- Answer EVERY question provided
+- Each answer must have question_id, score, assessment, gap, and fix
+- Score must be an integer from 0 to 5
+- All text fields must be 1-2 sentences, clear and specific`
 
 /**
  * Prompt for generating the deck summary after all slides are evaluated.
  */
-const SUMMARY_PROMPT = `You are an experienced early-stage startup investor. You have just evaluated a pitch deck slide-by-slide using a structured rubric. Now summarize the overall findings.
+const SUMMARY_PROMPT = `You are an experienced early-stage startup investor. You have just evaluated a pitch deck slide-by-slide. Now summarize the overall findings.
 
 RULES:
 - Be balanced and honest. Include both strengths and weaknesses.
 - The summary should be 2-4 sentences covering: the strongest positive signal, the main investor friction, and overall investor-readiness.
-- Do NOT invent facts not in the slide data. Base all observations on the evaluation results.
+- Do NOT invent facts not in the evaluation data.
+- Sound like an experienced investor coach, not generic AI.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON:
@@ -131,22 +104,13 @@ Return ONLY valid JSON:
 }`
 
 /**
- * Generate fallback diagnosis when evaluation fails.
- */
-function generateFallbackDiagnosis(rubric) {
-  return {
-    missing: ['Unable to evaluate slide content'],
-    fixes: ['Ensure slide has clear, readable content'],
-    examples: [],
-    summary: 'Evaluation failed due to processing error.',
-  }
-}
-
-/**
- * Evaluate a single slide against its rubric with actionable feedback.
+ * Evaluate a single slide against its investor questions.
  */
 async function evaluateSlide(openai, slide, rubric) {
-  const rubricQuestions = rubric.map((q) => ({
+  // Sort questions by importance for display
+  const sortedRubric = sortByImportance(rubric)
+
+  const questions = sortedRubric.map((q) => ({
     question_id: q.id,
     question: q.question,
   }))
@@ -157,10 +121,10 @@ SLIDE NUMBER: ${slide.slide_number}
 EXTRACTED TEXT:
 ${slide.extracted_text || '(No text extracted)'}
 
-RUBRIC QUESTIONS TO ANSWER:
-${JSON.stringify(rubricQuestions, null, 2)}
+INVESTOR QUESTIONS TO EVALUATE:
+${JSON.stringify(questions, null, 2)}
 
-Evaluate this slide by answering each rubric question, then provide missing items, fixes, examples, and a summary.`
+Evaluate each question using the 0-5 scale. Provide assessment, gap, and fix for each.`
 
   try {
     const response = await openai.chat.completions.create({
@@ -186,39 +150,23 @@ Evaluate this slide by answering each rubric question, then provide missing item
 
     // Validate and normalize answers
     const validatedAnswers = result.answers.map((a) => {
-      const score =
-        a.answer === 'yes' ? 2 : a.answer === 'partial' ? 1 : a.answer === 'no' ? 0 : a.score ?? 0
+      const score = Math.min(5, Math.max(0, Math.round(a.score) || 0))
       return {
         question_id: a.question_id,
-        answer: a.answer,
         score,
-        evidence: a.evidence || '',
-        reasoning: a.reasoning || '',
+        assessment: a.assessment || 'Unable to assess.',
+        gap: a.gap || 'Unable to determine gap.',
+        fix: a.fix || 'Unable to provide guidance.',
       }
     })
 
-    // Validate and normalize actionable feedback
-    const missing = Array.isArray(result.missing) ? result.missing.filter((m) => typeof m === 'string' && m.trim()) : []
-    const fixes = Array.isArray(result.fixes) ? result.fixes.filter((f) => typeof f === 'string' && f.trim()) : []
-    const examples = Array.isArray(result.examples) ? result.examples.filter((e) => typeof e === 'string' && e.trim()) : []
-    const summary = typeof result.summary === 'string' ? result.summary : ''
+    // Sort by importance
+    const sortedAnswers = sortAnswersByImportance(validatedAnswers, rubric)
 
-    return {
-      success: true,
-      answers: validatedAnswers,
-      missing,
-      fixes,
-      examples,
-      summary,
-    }
+    return { success: true, answers: sortedAnswers }
   } catch (err) {
     console.error(`Slide ${slide.slide_number} evaluation error:`, err.message)
-    const fallback = generateFallbackDiagnosis(rubric)
-    return {
-      success: false,
-      answers: generateFallbackAnswers(rubric),
-      ...fallback,
-    }
+    return { success: false, answers: generateFallbackAnswers(rubric) }
   }
 }
 
@@ -230,8 +178,7 @@ async function generateDeckSummary(openai, slideEvaluations, overallGrade, deckS
     slide_number: s.slide_number,
     type: s.type,
     grade: s.grade,
-    missing_count: s.diagnosis?.missing?.length || 0,
-    fix_count: s.fixes?.length || 0,
+    normalized_score: s.normalized_score,
   }))
 
   const userMessage = `DECK EVALUATION RESULTS:
@@ -269,99 +216,100 @@ Generate a summary of this deck's investor-readiness.`
 
 /**
  * Build free report subset from full report.
- * Exposes limited info: fix_count, short diagnosis. No fixes/examples leaked.
+ * Shows: question, score, assessment
+ * Hides: fix
  */
 function buildFreeReport(fullReport) {
-  // Collect issues from slides with their fix counts
-  const slideIssues = []
-  for (const slide of fullReport.slides) {
-    const weight = SLIDE_WEIGHTS[slide.type] ?? 0.5
-    if (weight === 0) continue // Skip cover/contact
-
-    // Get missing items for this slide
-    const missingItems = slide.diagnosis?.missing || []
-    const fixCount = slide.fixes?.length || 0
-
-    for (const missing of missingItems) {
-      slideIssues.push({
-        title: missing,
-        slide_type: slide.type,
-        slide_number: slide.slide_number,
-        slide_weight: weight,
-        fix_count: fixCount,
-        grade: slide.grade,
-      })
-    }
-  }
-
-  // Sort by slide weight (higher impact slides first), then by grade (worse first)
-  const gradeOrder = { E: 0, D: 1, C: 2, B: 3, A: 4 }
-  slideIssues.sort((a, b) => {
-    if (b.slide_weight !== a.slide_weight) return b.slide_weight - a.slide_weight
-    return (gradeOrder[a.grade] || 2) - (gradeOrder[b.grade] || 2)
-  })
-
-  // Top 3 biggest issues with fix_count
-  const topIssues = slideIssues.slice(0, 3).map((issue) => ({
-    title: issue.title,
-    detail: `${issue.slide_type} slide needs improvement`,
-    slide_type: issue.slide_type,
-    fix_count: issue.fix_count,
-    priority: issue.slide_weight >= 1.2 ? 'high' : issue.slide_weight >= 0.8 ? 'medium' : 'low',
-  }))
-
-  // Collect strengths from high-scoring slides
-  const slideStrengths = []
+  // Collect biggest issues (lowest scoring questions from high-weight slides)
+  const allIssues = []
   for (const slide of fullReport.slides) {
     const weight = SLIDE_WEIGHTS[slide.type] ?? 0.5
     if (weight === 0) continue
-    if (slide.grade !== 'A' && slide.grade !== 'B') continue
 
-    // Use slide summary as strength indicator
-    if (slide.summary) {
-      slideStrengths.push({
-        title: `Strong ${slide.type} slide`,
-        detail: slide.summary,
-        slide_type: slide.type,
-        slide_weight: weight,
-      })
+    for (const q of slide.questions) {
+      if (q.score <= 2) {
+        allIssues.push({
+          question: q.question,
+          score: q.score,
+          assessment: q.assessment,
+          gap: q.gap,
+          slide_type: slide.type,
+          slide_number: slide.slide_number,
+          slide_weight: weight,
+        })
+      }
     }
   }
 
-  slideStrengths.sort((a, b) => b.slide_weight - a.slide_weight)
-  const topStrengths = slideStrengths.slice(0, 3).map((s) => ({
-    title: s.title,
-    detail: s.detail,
+  // Sort by slide weight (higher first), then by score (lower first)
+  allIssues.sort((a, b) => {
+    if (b.slide_weight !== a.slide_weight) return b.slide_weight - a.slide_weight
+    return a.score - b.score
+  })
+
+  // Top 3 biggest issues
+  const topIssues = allIssues.slice(0, 3).map((issue) => ({
+    question: issue.question,
+    score: issue.score,
+    assessment: issue.assessment,
+    gap: issue.gap,
+    slide_type: issue.slide_type,
+    priority: issue.slide_weight >= 1.2 ? 'high' : issue.slide_weight >= 0.8 ? 'medium' : 'low',
+  }))
+
+  // Collect strengths (highest scoring questions from high-weight slides)
+  const allStrengths = []
+  for (const slide of fullReport.slides) {
+    const weight = SLIDE_WEIGHTS[slide.type] ?? 0.5
+    if (weight === 0) continue
+
+    for (const q of slide.questions) {
+      if (q.score >= 4) {
+        allStrengths.push({
+          question: q.question,
+          score: q.score,
+          assessment: q.assessment,
+          slide_type: slide.type,
+          slide_weight: weight,
+        })
+      }
+    }
+  }
+
+  allStrengths.sort((a, b) => {
+    if (b.slide_weight !== a.slide_weight) return b.slide_weight - a.slide_weight
+    return b.score - a.score
+  })
+
+  const topStrengths = allStrengths.slice(0, 3).map((s) => ({
+    question: s.question,
+    score: s.score,
+    assessment: s.assessment,
     slide_type: s.slide_type,
   }))
 
-  // Slide notes: diagnosis with investor context (no fixes, no examples)
+  // Slide notes: question/score/assessment only (no fix)
   const slideNotes = fullReport.slides.map((slide) => {
-    const firstMissing = slide.diagnosis?.missing?.[0]
-    const slideSummary = slide.summary
+    // Get the most important low-scoring question for the note
+    const lowScoring = slide.questions.filter((q) => q.score <= 2)
+    const topGap = lowScoring[0] // Already sorted by importance
 
     let note
     if (slide.grade === 'A') {
-      // Use summary if available, otherwise generic excellent
-      note = slideSummary || 'Meets investor expectations with clear, credible content.'
+      note = 'Strong slide. Meets investor expectations.'
     } else if (slide.grade === 'B') {
-      // Use summary if available, otherwise generic good
-      note = slideSummary || 'Solid foundation. Minor gaps remain that investors may question.'
-    } else if (firstMissing) {
-      // For C/D/E grades, use the first missing item (now includes investor context)
-      note = firstMissing
-    } else if (slideSummary) {
-      // Fallback to summary
-      note = slideSummary
+      note = 'Good foundation. Minor gaps remain.'
+    } else if (topGap) {
+      note = topGap.gap
     } else {
-      // Last resort fallback with investor framing
-      note = 'Key information missing. Investors will have unanswered questions about this section.'
+      note = 'Needs improvement to meet investor expectations.'
     }
 
     return {
       slide_number: slide.slide_number,
       inferred_type: slide.type,
       grade: slide.grade,
+      normalized_score: slide.normalized_score,
       note,
     }
   })
@@ -376,17 +324,17 @@ function buildFreeReport(fullReport) {
     upgrade_teaser: {
       title: 'Unlock the full report',
       bullets: [
-        'Specific fixes for each weak slide',
-        'Examples from successful pitch decks',
-        'Detailed rubric scoring with evidence',
+        'Specific fixes for every gap identified',
+        'Full question-by-question scoring breakdown',
         'Prioritized action items by investor impact',
+        'Detailed assessment and evidence for each criterion',
       ],
     },
   }
 }
 
 /**
- * Generate a full rubric-based report with actionable feedback, then derive the free subset.
+ * Generate a full report with investor question evaluation, then derive the free subset.
  * Stores both full_report and free_report in reports.content.
  */
 async function generateFreeReport(supabase, deckId) {
@@ -429,7 +377,6 @@ async function generateFreeReport(supabase, deckId) {
   await setDeckStatus(supabase, deckId, 'generating_free', null)
 
   // Create or update report row
-  // Note: DB has unique constraint on (deck_id, report_type), so we update existing
   const { data: existingReport } = await supabase
     .from('reports')
     .select('id')
@@ -468,7 +415,7 @@ async function generateFreeReport(supabase, deckId) {
     reportId = newReport.id
   }
 
-  console.log(`Generating rubric-based report for deck ${deckId}, report ${reportId}`)
+  console.log(`Generating report for deck ${deckId}, report ${reportId}`)
 
   try {
     const openai = new OpenAI.default({ apiKey: openaiKey })
@@ -482,25 +429,33 @@ async function generateFreeReport(supabase, deckId) {
 
       console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-      const evalResult = await evaluateSlide(openai, slide, rubric)
+      const { answers } = await evaluateSlide(openai, slide, rubric)
 
-      // Compute deterministic slide score
-      const slideScoreResult = computeSlideScore(evalResult.answers, rubric)
+      // Compute deterministic slide score (0-5 scale)
+      const slideScoreResult = computeSlideScore(answers, rubric)
+
+      // Build question array with full details
+      const questionMap = {}
+      for (const q of rubric) {
+        questionMap[q.id] = q.question
+      }
+
+      const questions = answers.map((a) => ({
+        question: questionMap[a.question_id] || a.question_id,
+        score: a.score,
+        assessment: a.assessment,
+        gap: a.gap,
+        fix: a.fix,
+      }))
 
       slideEvaluations.push({
         slide_number: slide.slide_number,
         type: slideType,
-        rubric_answers: evalResult.answers,
+        grade: slideScoreResult.grade,
+        normalized_score: slideScoreResult.normalized,
         weighted_score: slideScoreResult.weightedScore,
         max_score: slideScoreResult.maxScore,
-        normalized: slideScoreResult.normalized,
-        grade: slideScoreResult.grade,
-        diagnosis: {
-          missing: evalResult.missing,
-        },
-        fixes: evalResult.fixes,
-        examples: evalResult.examples,
-        summary: evalResult.summary,
+        questions,
       })
     }
 
