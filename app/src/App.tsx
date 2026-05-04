@@ -703,7 +703,7 @@ export default function App() {
 
   // Determine max width based on view and content
   const getMaxWidth = () => {
-    if (adminView === 'reports') return '900px'
+    if (isAdmin) return '900px' // Consistent width for admin views
     if (showingReport) return '720px'
     return '440px'
   }
@@ -734,6 +734,8 @@ export default function App() {
               margin: '0 auto',
               padding: '12px 24px',
               display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
               gap: '24px',
               fontSize: '14px',
               fontWeight: 500,
