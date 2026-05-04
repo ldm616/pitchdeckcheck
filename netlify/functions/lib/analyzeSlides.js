@@ -77,10 +77,78 @@ Respond with valid JSON in this exact format:
 }`
 
 /**
- * Analyze slides using OpenAI vision.
+ * Analyze a single slide using OpenAI vision.
+ * @param {object} openai - OpenAI client
+ * @param {object} supabase - Supabase client
+ * @param {object} slide - Slide object with id, slide_number, image_path
+ * @param {number} totalSlides - Total number of slides for logging
+ * @returns {Promise<{success: boolean, extractedText: string, inferredType: string, error?: string}>}
+ */
+async function analyzeSingleSlide(openai, supabase, slide, totalSlides) {
+  console.log(`Analyzing slide ${slide.slide_number}/${totalSlides}`)
+
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+    .from('slide-images')
+    .createSignedUrl(slide.image_path, 300)
+
+  if (signedUrlError || !signedUrlData?.signedUrl) {
+    throw new Error(`Failed to create signed URL: ${signedUrlError?.message || 'Unknown error'}`)
+  }
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT,
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: {
+              url: signedUrlData.signedUrl,
+              detail: 'high',
+            },
+          },
+          {
+            type: 'text',
+            text: 'Analyze this pitch deck slide. Extract all visible text and infer the slide type based on the content and its role in the investor narrative.',
+          },
+        ],
+      },
+    ],
+    max_tokens: 2000,
+    response_format: { type: 'json_object' },
+  })
+
+  const content = response.choices[0]?.message?.content
+  if (!content) {
+    throw new Error('Empty response from OpenAI')
+  }
+
+  const parsed = JSON.parse(content)
+
+  const extractedText = parsed.extracted_text || ''
+  let inferredType = parsed.inferred_type || 'other'
+
+  if (!SLIDE_TYPES.includes(inferredType)) {
+    inferredType = 'other'
+  }
+
+  return {
+    success: true,
+    extractedText,
+    inferredType,
+  }
+}
+
+/**
+ * Analyze slides using OpenAI vision with per-slide failure tolerance.
  * @param {object} supabase - Supabase client
  * @param {string} deckId - Deck ID
- * @returns {Promise<{success: boolean, analyzedCount?: number, slides?: Array, error?: string}>}
+ * @returns {Promise<{success: boolean, analyzedCount?: number, failedCount?: number, totalSlides?: number, error?: string}>}
  */
 async function analyzeSlides(supabase, deckId) {
   const openaiKey = process.env.OPENAI_API_KEY
@@ -112,102 +180,71 @@ async function analyzeSlides(supabase, deckId) {
 
   await setDeckStatus(supabase, deckId, 'analyzing', null)
 
+  const totalSlides = slides.length
+  let analyzedCount = 0
+  let failedCount = 0
   const results = []
 
-  try {
-    for (const slide of slides) {
-      console.log(`Analyzing slide ${slide.slide_number}/${slides.length}`)
+  for (const slide of slides) {
+    let extractedText = ''
+    let inferredType = 'other'
+    let slideSuccess = false
 
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('slide-images')
-        .createSignedUrl(slide.image_path, 300)
-
-      if (signedUrlError || !signedUrlData?.signedUrl) {
-        console.error(`Failed to create signed URL for slide ${slide.slide_number}:`, signedUrlError)
-        await setDeckStatus(supabase, deckId, 'failed', `Failed to access slide ${slide.slide_number}`)
-        return { success: false, error: `Failed to access slide ${slide.slide_number}` }
-      }
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: SYSTEM_PROMPT,
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: {
-                  url: signedUrlData.signedUrl,
-                  detail: 'high',
-                },
-              },
-              {
-                type: 'text',
-                text: 'Analyze this pitch deck slide. Extract all visible text and infer the slide type based on the content and its role in the investor narrative.',
-              },
-            ],
-          },
-        ],
-        max_tokens: 2000,
-        response_format: { type: 'json_object' },
-      })
-
-      const content = response.choices[0]?.message?.content
-      if (!content) {
-        console.error(`Empty response for slide ${slide.slide_number}`)
-        continue
-      }
-
-      let parsed
-      try {
-        parsed = JSON.parse(content)
-      } catch (parseError) {
-        console.error(`Failed to parse response for slide ${slide.slide_number}:`, parseError)
-        continue
-      }
-
-      const extractedText = parsed.extracted_text || ''
-      let inferredType = parsed.inferred_type || 'other'
-
-      if (!SLIDE_TYPES.includes(inferredType)) {
-        inferredType = 'other'
-      }
-
-      const { error: updateError } = await supabase
-        .from('slides')
-        .update({
-          extracted_text: extractedText,
-          inferred_type: inferredType,
-        })
-        .eq('id', slide.id)
-
-      if (updateError) {
-        console.error(`Failed to update slide ${slide.slide_number}:`, updateError)
-      }
-
-      results.push({
-        slide_number: slide.slide_number,
-        inferred_type: inferredType,
-        text_length: extractedText.length,
-      })
+    try {
+      const result = await analyzeSingleSlide(openai, supabase, slide, totalSlides)
+      extractedText = result.extractedText
+      inferredType = result.inferredType
+      slideSuccess = true
+      analyzedCount++
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      console.error(`Slide ${slide.slide_number} failed: ${errorMessage}`)
+      failedCount++
+      // extractedText and inferredType already set to fallback values
     }
 
-    await setDeckStatus(supabase, deckId, 'analyzed', null)
+    // Update slide row regardless of success/failure
+    const { error: updateError } = await supabase
+      .from('slides')
+      .update({
+        extracted_text: extractedText,
+        inferred_type: inferredType,
+      })
+      .eq('id', slide.id)
 
+    if (updateError) {
+      console.error(`Failed to update slide ${slide.slide_number}:`, updateError)
+    }
+
+    results.push({
+      slide_number: slide.slide_number,
+      inferred_type: inferredType,
+      text_length: extractedText.length,
+      success: slideSuccess,
+    })
+  }
+
+  console.log(`Analysis complete: ${analyzedCount} succeeded, ${failedCount} failed`)
+
+  // Determine final deck status
+  if (analyzedCount > 0) {
+    await setDeckStatus(supabase, deckId, 'analyzed', null)
     return {
       success: true,
-      analyzedCount: results.length,
+      analyzedCount,
+      failedCount,
+      totalSlides,
       slides: results,
     }
-  } catch (err) {
-    console.error('Analysis error:', err)
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error during analysis'
-    await setDeckStatus(supabase, deckId, 'failed', errorMessage)
-    return { success: false, error: errorMessage }
+  } else {
+    await setDeckStatus(supabase, deckId, 'failed', 'All slide analysis failed')
+    return {
+      success: false,
+      analyzedCount,
+      failedCount,
+      totalSlides,
+      error: 'All slide analysis failed',
+    }
   }
 }
 
