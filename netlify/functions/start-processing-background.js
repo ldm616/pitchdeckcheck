@@ -1,4 +1,5 @@
 const { getSupabaseClient, verifyDeckAccess } = require('./lib/supabase')
+const { extractSlides } = require('./lib/extractSlides')
 const { analyzeSlides } = require('./lib/analyzeSlides')
 
 exports.handler = async (event) => {
@@ -43,7 +44,7 @@ exports.handler = async (event) => {
     }
   }
 
-  const { valid, error: accessError } = await verifyDeckAccess(supabase, deck_id, access_token)
+  const { valid, error: accessError, deck } = await verifyDeckAccess(supabase, deck_id, access_token)
 
   if (!valid) {
     const statusCode = accessError === 'Deck not found' ? 404 : 403
@@ -54,23 +55,52 @@ exports.handler = async (event) => {
     }
   }
 
-  const result = await analyzeSlides(supabase, deck_id)
+  // Run extraction
+  console.log(`Starting extraction for deck ${deck_id}`)
+  const extractResult = await extractSlides(supabase, deck_id, deck.file_path)
 
-  if (!result.success) {
+  if (!extractResult.success) {
+    console.error(`Extraction failed for deck ${deck_id}:`, extractResult.error)
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: result.error }),
+      body: JSON.stringify({
+        ok: false,
+        deck_id,
+        error: extractResult.error,
+      }),
     }
   }
+
+  console.log(`Extraction complete for deck ${deck_id}: ${extractResult.slideCount} slides`)
+
+  // Run analysis
+  console.log(`Starting analysis for deck ${deck_id}`)
+  const analyzeResult = await analyzeSlides(supabase, deck_id)
+
+  if (!analyzeResult.success) {
+    console.error(`Analysis failed for deck ${deck_id}:`, analyzeResult.error)
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ok: false,
+        deck_id,
+        error: analyzeResult.error,
+      }),
+    }
+  }
+
+  console.log(`Analysis complete for deck ${deck_id}: ${analyzeResult.analyzedCount} slides analyzed`)
 
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      ok: true,
       deck_id,
-      analyzed_count: result.analyzedCount,
-      slides: result.slides,
+      slide_count: extractResult.slideCount,
+      analyzed_count: analyzeResult.analyzedCount,
     }),
   }
 }

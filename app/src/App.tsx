@@ -1,17 +1,11 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react'
 
-type Status = 'idle' | 'uploading' | 'extracting' | 'analyzing' | 'success' | 'error'
+type Status = 'idle' | 'uploading' | 'processing' | 'success' | 'error' | 'timeout'
 type DeleteStatus = 'idle' | 'deleting' | 'success' | 'error'
 
 interface UploadResult {
   deck_id: string
   access_token: string
-}
-
-interface ExtractionResult {
-  deck_id: string
-  slide_count: number
-  slides: Array<{ slide_number: number; image_path: string }>
 }
 
 interface DeckStatusResult {
@@ -42,6 +36,7 @@ interface DeleteResult {
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 const SESSION_KEY = 'pdc_authenticated'
 const POLL_INTERVAL_MS = 2000
+const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -52,10 +47,13 @@ export default function App() {
   const [email, setEmail] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
+  const [processingStatus, setProcessingStatus] = useState<string | null>(null)
   const [slideCount, setSlideCount] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const pollIntervalRef = useRef<number | null>(null)
+  const timeoutRef = useRef<number | null>(null)
+  const pollStartTimeRef = useRef<number | null>(null)
 
   // Admin delete state
   const [showAdmin, setShowAdmin] = useState(false)
@@ -77,6 +75,9 @@ export default function App() {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current)
       }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
     }
   }, [])
 
@@ -85,6 +86,11 @@ export default function App() {
       clearInterval(pollIntervalRef.current)
       pollIntervalRef.current = null
     }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    pollStartTimeRef.current = null
   }
 
   const pollDeckStatus = async (deckId: string, accessToken: string): Promise<DeckStatusResult | null> => {
@@ -108,6 +114,13 @@ export default function App() {
 
   const startPolling = (deckId: string, accessToken: string) => {
     stopPolling()
+    pollStartTimeRef.current = Date.now()
+
+    // Set timeout for 10 minutes
+    timeoutRef.current = window.setTimeout(() => {
+      stopPolling()
+      setStatus('timeout')
+    }, TIMEOUT_MS)
 
     pollIntervalRef.current = window.setInterval(async () => {
       const statusData = await pollDeckStatus(deckId, accessToken)
@@ -116,15 +129,19 @@ export default function App() {
         return
       }
 
+      // Update processing status for UI
+      setProcessingStatus(statusData.processing_status)
+
       if (statusData.processing_status === 'analyzed') {
         stopPolling()
         setSlideCount(statusData.slide_count)
         setStatus('success')
       } else if (statusData.processing_status === 'failed') {
         stopPolling()
-        setErrorMessage(statusData.processing_error || 'Analysis failed')
+        setErrorMessage(statusData.processing_error || 'Processing failed')
         setStatus('error')
       }
+      // For extracting, extracted, analyzing - continue polling
     }, POLL_INTERVAL_MS)
   }
 
@@ -165,6 +182,7 @@ export default function App() {
     setStatus('uploading')
     setSlideCount(null)
     setErrorMessage(null)
+    setProcessingStatus(null)
     stopPolling()
 
     try {
@@ -184,49 +202,25 @@ export default function App() {
         throw new Error('Upload failed')
       }
 
-      setStatus('extracting')
+      // Switch to processing state and start polling immediately
+      setStatus('processing')
+      setProcessingStatus('extracting')
 
-      const extractResponse = await fetch('/.netlify/functions/extract-slides', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deck_id: uploadData.deck_id,
-          access_token: uploadData.access_token,
-        }),
-      })
-
-      const extractData: ExtractionResult = await extractResponse.json()
-
-      if (!extractResponse.ok) {
-        console.error('Extraction error:', extractData)
-        throw new Error('Extraction failed')
-      }
-
-      setSlideCount(extractData.slide_count)
-      setStatus('analyzing')
-
+      // Start polling before triggering background processing
       startPolling(uploadData.deck_id, uploadData.access_token)
 
-      fetch('/.netlify/functions/analyze-slides', {
+      // Fire and forget - trigger background processing
+      fetch('/.netlify/functions/start-processing-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deck_id: uploadData.deck_id,
           access_token: uploadData.access_token,
         }),
+      }).catch((err) => {
+        console.error('Background processing trigger error:', err)
+        // Don't fail - polling will detect the actual status
       })
-        .then(async (analyzeResponse) => {
-          if (analyzeResponse.ok) {
-            const contentType = analyzeResponse.headers.get('content-type')
-            if (contentType && contentType.includes('application/json')) {
-              stopPolling()
-              setStatus('success')
-            }
-          }
-        })
-        .catch(() => {
-          // Ignore errors - polling will handle the status
-        })
     } catch (err) {
       console.error('Error:', err)
       stopPolling()
@@ -278,20 +272,23 @@ export default function App() {
     }
   }
 
-  const isProcessing = status === 'uploading' || status === 'extracting' || status === 'analyzing'
+  const isProcessing = status === 'uploading' || status === 'processing'
   const isDisabled = isProcessing || !file || !email
 
   const getStatusText = () => {
-    switch (status) {
-      case 'uploading':
-        return 'Uploading deck...'
-      case 'extracting':
-        return 'Extracting slides...'
-      case 'analyzing':
-        return 'Analyzing slides...'
-      default:
-        return 'Upload Deck'
+    if (status === 'uploading') {
+      return 'Uploading deck...'
     }
+    if (status === 'processing') {
+      if (processingStatus === 'extracting') {
+        return 'Extracting slides...'
+      }
+      if (processingStatus === 'extracted' || processingStatus === 'analyzing') {
+        return 'Analyzing slides...'
+      }
+      return 'Processing...'
+    }
+    return 'Upload Deck'
   }
 
   // Password gate
@@ -582,6 +579,28 @@ export default function App() {
               }}
             >
               {errorMessage || 'Processing failed. Please try again.'}
+            </p>
+          </div>
+        )}
+
+        {status === 'timeout' && (
+          <div
+            style={{
+              marginTop: '20px',
+              padding: '12px 16px',
+              backgroundColor: '#fefce8',
+              border: '1px solid #fef08a',
+              borderRadius: '8px',
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: '14px',
+                color: '#a16207',
+              }}
+            >
+              Still processing. Check back shortly.
             </p>
           </div>
         )}
