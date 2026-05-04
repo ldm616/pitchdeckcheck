@@ -1,6 +1,48 @@
 const OpenAI = require('openai')
 const { setDeckStatus } = require('./supabase')
 
+// Slide weights for weighted scoring
+// Higher weight = more impact on overall grade
+// 0 weight = excluded from scoring (non-impact slides)
+const SLIDE_WEIGHTS = {
+  problem: 1.3,
+  solution: 1.3,
+  market: 1.3,
+  traction: 1.5,
+  team: 1.3,
+  business_model: 1.2,
+  financials: 1.2,
+  ask: 1.2,
+
+  product: 1.0,
+  competition: 1.0,
+  go_to_market: 1.0,
+  roadmap: 0.8,
+  investment_highlights: 0.6,
+
+  cover: 0.0,
+  contact: 0.0,
+  other: 0.5,
+}
+
+// Grade to numeric score mapping
+const GRADE_TO_SCORE = {
+  A: 5,
+  B: 4,
+  C: 3,
+  D: 2,
+  E: 1,
+}
+
+// Numeric score to grade mapping
+const scoreToGrade = (score) => {
+  if (score >= 4.5) return 'A'
+  if (score >= 3.5) return 'B'
+  if (score >= 2.5) return 'C'
+  if (score >= 1.5) return 'D'
+  return 'E'
+}
+
 const REPORT_PROMPT = `You are an experienced early-stage startup investor reviewing a pitch deck for investor-readiness. You are skeptical by default and grade strictly.
 
 You will receive the extracted text and inferred type for each slide in a pitch deck. Your job is to evaluate the deck and produce a structured JSON report.
@@ -19,6 +61,27 @@ GRADING SCALE (grade strictly):
 - C: Understandable but meaningfully incomplete. Several important investor questions remain unanswered. Needs significant improvement before fundraising.
 - D: Hard to understand, thin, vague, or poorly structured. Many important investor questions unanswered.
 - E: Not investor-ready. Very incomplete or confusing.
+
+SLIDE-LEVEL RUBRIC (grade each slide based on how well it answers the implied investor question):
+- problem: Is the problem clear, specific, and meaningful? Does it establish urgency?
+- solution: Is the solution clear, differentiated, and obviously tied to the problem?
+- market: Is the market credible, well-defined, and supported with data?
+- traction: Is there real evidence of demand (users, revenue, pilots, waitlist)?
+- team: Does the team inspire confidence in execution ability?
+- financials: Are projections credible with visible assumptions?
+- ask: Is the raise amount clear and justified with use of funds?
+- product: Is the product understandable and compelling?
+- competition: Is competitive positioning honest and differentiated?
+- business_model: Is monetization clear and believable?
+- go_to_market: Is the distribution strategy concrete?
+- roadmap: Are milestones specific and achievable?
+
+SLIDE GRADING RULES:
+- Grade each slide based on investor usefulness, not just completeness.
+- A grade requires strong evidence AND clarity, not just presence of information.
+- cover and contact slides are low-impact. They should rarely exceed B. Do not inflate their grades.
+- High-impact slides (problem, solution, market, traction, team, ask) need evidence to earn A.
+- Vague or generic content should be C or below.
 
 GRADING RULES:
 - Do NOT give an A just because the deck has all major sections. Completeness alone is not excellence.
@@ -107,6 +170,58 @@ CRITICAL REQUIREMENTS:
 - slide_notes: EXACTLY ONE item per slide in the deck. If the deck has 17 slides, return 17 slide_notes. If it has 5 slides, return 5 slide_notes.
 - All grades must be single letters: A, B, C, D, or E (no plus/minus)
 - upgrade_teaser should always have exactly the 3 bullets shown above`
+
+/**
+ * Compute weighted deck score from slide notes.
+ * @param {Array} slideNotes - Array of slide note objects with inferred_type and grade
+ * @returns {{deckScore: number, totalWeight: number, slideCountUsed: number, overallGrade: string}}
+ */
+function computeWeightedScore(slideNotes) {
+  let totalWeightedScore = 0
+  let totalWeight = 0
+  let slideCountUsed = 0
+
+  for (const note of slideNotes) {
+    const type = note.inferred_type || 'other'
+    const weight = SLIDE_WEIGHTS[type] ?? 0.5
+    const grade = note.grade
+
+    // Skip slides with zero weight (cover, contact)
+    if (weight === 0) {
+      continue
+    }
+
+    const score = GRADE_TO_SCORE[grade]
+    if (score === undefined) {
+      console.warn(`Invalid grade "${grade}" for slide ${note.slide_number}, skipping`)
+      continue
+    }
+
+    totalWeightedScore += score * weight
+    totalWeight += weight
+    slideCountUsed++
+  }
+
+  // Avoid division by zero
+  if (totalWeight === 0) {
+    return {
+      deckScore: 3.0, // Default to C
+      totalWeight: 0,
+      slideCountUsed: 0,
+      overallGrade: 'C',
+    }
+  }
+
+  const deckScore = totalWeightedScore / totalWeight
+  const overallGrade = scoreToGrade(deckScore)
+
+  return {
+    deckScore: Math.round(deckScore * 100) / 100, // Round to 2 decimal places
+    totalWeight: Math.round(totalWeight * 100) / 100,
+    slideCountUsed,
+    overallGrade,
+  }
+}
 
 /**
  * Generate a free investor-readiness report for a deck.
@@ -267,6 +382,27 @@ Please evaluate this deck and return your report as JSON.`
       // Don't fail, but log the issue - the model sometimes gets this wrong
     }
 
+    // Compute weighted score from slide notes
+    const scoringResult = computeWeightedScore(report.slide_notes)
+    const modelGrade = report.overall_grade
+    const computedGrade = scoringResult.overallGrade
+
+    console.log(
+      `Scoring: model_grade=${modelGrade}, computed_grade=${computedGrade}, ` +
+        `deck_score=${scoringResult.deckScore}, slides_used=${scoringResult.slideCountUsed}`
+    )
+
+    // Override model's overall_grade with computed grade (deterministic)
+    report.overall_grade = computedGrade
+
+    // Add scoring debug fields to report content
+    report.scoring = {
+      deck_score: scoringResult.deckScore,
+      total_weight: scoringResult.totalWeight,
+      slide_count_used: scoringResult.slideCountUsed,
+      model_grade: modelGrade, // Keep track of what the model thought
+    }
+
     // Update report row with results
     const { error: updateError } = await supabase
       .from('reports')
@@ -311,5 +447,9 @@ Please evaluate this deck and return your report as JSON.`
 
 module.exports = {
   generateFreeReport,
+  computeWeightedScore,
   REPORT_PROMPT,
+  SLIDE_WEIGHTS,
+  GRADE_TO_SCORE,
+  scoreToGrade,
 }
