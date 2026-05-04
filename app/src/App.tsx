@@ -1411,9 +1411,19 @@ export default function App() {
                             style={{
                               fontSize: '12px',
                               color: '#9ca3af',
+                              minWidth: '120px',
                             }}
                           >
-                            {new Date(item.created_at).toLocaleDateString()}
+                            {new Date(item.created_at).toLocaleDateString('en-US', {
+                              weekday: 'short',
+                              month: 'short',
+                              day: 'numeric',
+                            })}{' '}
+                            {new Date(item.created_at).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true,
+                            })}
                           </span>
 
                           <button
@@ -1423,21 +1433,56 @@ export default function App() {
                             }}
                             disabled={actionDeckId === item.deck_id}
                             style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '2px',
                               padding: '4px 8px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              fontFamily,
-                              color: '#2563eb',
-                              backgroundColor: '#eff6ff',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '4px',
+                              background: 'none',
+                              border: 'none',
                               cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
                               opacity: actionDeckId === item.deck_id ? 0.5 : 1,
                             }}
+                            onMouseEnter={(e) => {
+                              if (actionDeckId !== item.deck_id) {
+                                const svg = e.currentTarget.querySelector('svg')
+                                const label = e.currentTarget.querySelector('span')
+                                if (svg) svg.style.color = '#22c55e'
+                                if (label) label.style.color = '#22c55e'
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              const svg = e.currentTarget.querySelector('svg')
+                              const label = e.currentTarget.querySelector('span')
+                              if (svg) svg.style.color = '#9ca3af'
+                              if (label) label.style.color = '#9ca3af'
+                            }}
                           >
-                            {actionDeckId === item.deck_id && actionType === 'regenerate'
-                              ? 'Regenerating...'
-                              : 'Regenerate'}
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ color: '#9ca3af', transition: 'color 0.15s' }}
+                            >
+                              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                              <path d="M21 3v5h-5" />
+                            </svg>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                color: '#9ca3af',
+                                transition: 'color 0.15s',
+                              }}
+                            >
+                              {actionDeckId === item.deck_id && actionType === 'regenerate'
+                                ? 'Working...'
+                                : 'Regen'}
+                            </span>
                           </button>
 
                           <button
@@ -1447,21 +1492,59 @@ export default function App() {
                             }}
                             disabled={actionDeckId === item.deck_id}
                             style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '2px',
                               padding: '4px 8px',
-                              fontSize: '11px',
-                              fontWeight: 500,
-                              fontFamily,
-                              color: '#dc2626',
-                              backgroundColor: '#fef2f2',
-                              border: '1px solid #fecaca',
-                              borderRadius: '4px',
+                              background: 'none',
+                              border: 'none',
                               cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
                               opacity: actionDeckId === item.deck_id ? 0.5 : 1,
                             }}
+                            onMouseEnter={(e) => {
+                              if (actionDeckId !== item.deck_id) {
+                                const svg = e.currentTarget.querySelector('svg')
+                                const label = e.currentTarget.querySelector('span')
+                                if (svg) svg.style.color = '#dc2626'
+                                if (label) label.style.color = '#dc2626'
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              const svg = e.currentTarget.querySelector('svg')
+                              const label = e.currentTarget.querySelector('span')
+                              if (svg) svg.style.color = '#9ca3af'
+                              if (label) label.style.color = '#9ca3af'
+                            }}
                           >
-                            {actionDeckId === item.deck_id && actionType === 'delete'
-                              ? 'Deleting...'
-                              : 'Delete'}
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              style={{ color: '#9ca3af', transition: 'color 0.15s' }}
+                            >
+                              <path d="M3 6h18" />
+                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                              <line x1="10" y1="11" x2="10" y2="17" />
+                              <line x1="14" y1="11" x2="14" y2="17" />
+                            </svg>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                color: '#9ca3af',
+                                transition: 'color 0.15s',
+                              }}
+                            >
+                              {actionDeckId === item.deck_id && actionType === 'delete'
+                                ? 'Deleting...'
+                                : 'Delete'}
+                            </span>
                           </button>
                         </div>
                       </div>
