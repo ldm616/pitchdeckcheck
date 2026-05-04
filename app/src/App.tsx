@@ -895,69 +895,75 @@ export default function App() {
               >
                 Slide-by-Slide Notes
               </h3>
-              {report.slide_notes.map((note) => (
-                <div
-                  key={note.slide_number}
-                  style={{
-                    padding: '10px 12px',
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    marginBottom: '6px',
-                  }}
-                >
+              {(!report.slide_notes || report.slide_notes.length === 0) ? (
+                <p style={{ margin: 0, fontSize: '13px', color: '#6b7280' }}>
+                  No slide-specific notes available.
+                </p>
+              ) : (
+                report.slide_notes.map((note, idx) => (
                   <div
+                    key={note.slide_number ?? idx}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '4px',
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      marginBottom: '6px',
                     }}
                   >
-                    <span
+                    <div
                       style={{
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: '#6b7280',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '4px',
                       }}
                     >
-                      Slide {note.slide_number}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        padding: '1px 5px',
-                        borderRadius: '3px',
-                        backgroundColor: '#f3f4f6',
-                        color: '#6b7280',
-                      }}
-                    >
-                      {note.inferred_type}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color:
-                          note.grade === 'A'
-                            ? '#22c55e'
-                            : note.grade === 'B'
-                              ? '#84cc16'
-                              : note.grade === 'C'
-                                ? '#eab308'
-                                : note.grade === 'D'
-                                  ? '#f97316'
-                                  : '#ef4444',
-                      }}
-                    >
-                      {note.grade}
-                    </span>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color: '#6b7280',
+                        }}
+                      >
+                        Slide {note.slide_number}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#6b7280',
+                        }}
+                      >
+                        {note.inferred_type}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          color:
+                            note.grade === 'A'
+                              ? '#22c55e'
+                              : note.grade === 'B'
+                                ? '#84cc16'
+                                : note.grade === 'C'
+                                  ? '#eab308'
+                                  : note.grade === 'D'
+                                    ? '#f97316'
+                                    : '#ef4444',
+                        }}
+                      >
+                        {note.grade}
+                      </span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#4b5563' }}>
+                      {note.note}
+                    </p>
                   </div>
-                  <p style={{ margin: 0, fontSize: '13px', color: '#4b5563' }}>
-                    {note.note}
-                  </p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             {/* Upgrade Teaser */}
