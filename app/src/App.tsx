@@ -494,21 +494,44 @@ export default function App() {
           <div
             style={{
               marginTop: '20px',
-              padding: '16px',
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
             }}
           >
+            <div
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                backgroundColor: '#22c55e',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
             <p
               style={{
                 margin: 0,
                 fontSize: '15px',
-                fontWeight: 500,
-                color: '#166534',
+                color: '#374151',
               }}
             >
-              Extraction complete. {slideCount} slides found.
+              Extracted <strong>{slideCount}</strong> slides
             </p>
           </div>
         )}
