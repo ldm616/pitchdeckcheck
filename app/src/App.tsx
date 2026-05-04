@@ -1,10 +1,16 @@
 import { useState, FormEvent, ChangeEvent } from 'react'
 
-type Status = 'idle' | 'loading' | 'success' | 'error'
+type Status = 'idle' | 'uploading' | 'extracting' | 'success' | 'error'
 
 interface UploadResult {
   deck_id: string
   access_token: string
+}
+
+interface ExtractionResult {
+  deck_id: string
+  slide_count: number
+  slides: Array<{ slide_number: number; image_path: string }>
 }
 
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
@@ -13,37 +19,56 @@ export default function App() {
   const [email, setEmail] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
-  const [result, setResult] = useState<UploadResult | null>(null)
+  const [slideCount, setSlideCount] = useState<number | null>(null)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!file || !email) return
 
-    setStatus('loading')
-    setResult(null)
-
-    const formData = new FormData()
-    formData.append('email', email)
-    formData.append('file', file)
+    setStatus('uploading')
+    setSlideCount(null)
 
     try {
-      const response = await fetch('/.netlify/functions/upload-deck', {
+      // Step 1: Upload deck
+      const formData = new FormData()
+      formData.append('email', email)
+      formData.append('file', file)
+
+      const uploadResponse = await fetch('/.netlify/functions/upload-deck', {
         method: 'POST',
         body: formData,
       })
 
-      const data = await response.json()
+      const uploadData: UploadResult = await uploadResponse.json()
 
-      if (!response.ok) {
-        const errorMessage = data.error || 'Upload failed'
-        console.error('Upload error:', errorMessage)
-        throw new Error(errorMessage)
+      if (!uploadResponse.ok) {
+        console.error('Upload error:', uploadData)
+        throw new Error('Upload failed')
       }
 
-      setResult(data)
+      // Step 2: Extract slides
+      setStatus('extracting')
+
+      const extractResponse = await fetch('/.netlify/functions/extract-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deck_id: uploadData.deck_id,
+          access_token: uploadData.access_token,
+        }),
+      })
+
+      const extractData: ExtractionResult = await extractResponse.json()
+
+      if (!extractResponse.ok) {
+        console.error('Extraction error:', extractData)
+        throw new Error('Extraction failed')
+      }
+
+      setSlideCount(extractData.slide_count)
       setStatus('success')
     } catch (err) {
-      console.error('Upload error:', err)
+      console.error('Error:', err)
       setStatus('error')
     }
   }
@@ -57,7 +82,19 @@ export default function App() {
     }
   }
 
-  const isDisabled = status === 'loading' || !file || !email
+  const isProcessing = status === 'uploading' || status === 'extracting'
+  const isDisabled = isProcessing || !file || !email
+
+  const getStatusText = () => {
+    switch (status) {
+      case 'uploading':
+        return 'Uploading deck...'
+      case 'extracting':
+        return 'Extracting slides...'
+      default:
+        return 'Upload Deck'
+    }
+  }
 
   return (
     <div
@@ -127,6 +164,7 @@ export default function App() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
+              disabled={isProcessing}
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -136,6 +174,7 @@ export default function App() {
                 borderRadius: '8px',
                 outline: 'none',
                 boxSizing: 'border-box',
+                backgroundColor: isProcessing ? '#f3f4f6' : '#ffffff',
               }}
             />
           </div>
@@ -169,10 +208,11 @@ export default function App() {
                 accept="application/pdf"
                 onChange={handleFileChange}
                 required
+                disabled={isProcessing}
                 style={{
                   fontSize: '14px',
                   fontFamily,
-                  cursor: 'pointer',
+                  cursor: isProcessing ? 'not-allowed' : 'pointer',
                 }}
               />
               {file && (
@@ -206,7 +246,7 @@ export default function App() {
               cursor: isDisabled ? 'not-allowed' : 'pointer',
             }}
           >
-            {status === 'loading' ? 'Uploading...' : 'Upload Deck'}
+            {getStatusText()}
           </button>
         </form>
 
@@ -227,12 +267,12 @@ export default function App() {
                 color: '#dc2626',
               }}
             >
-              Upload failed. Please try again.
+              Upload or extraction failed. Please try again.
             </p>
           </div>
         )}
 
-        {status === 'success' && result && (
+        {status === 'success' && slideCount !== null && (
           <div
             style={{
               marginTop: '20px',
@@ -244,28 +284,14 @@ export default function App() {
           >
             <p
               style={{
-                margin: '0 0 12px 0',
+                margin: 0,
                 fontSize: '15px',
                 fontWeight: 500,
                 color: '#166534',
               }}
             >
-              Upload successful
+              Extraction complete. {slideCount} slides found.
             </p>
-            <div style={{ fontSize: '13px', color: '#374151' }}>
-              <p style={{ margin: '0 0 4px 0' }}>
-                <span style={{ color: '#6b7280' }}>deck_id:</span>{' '}
-                <code style={{ backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>
-                  {result.deck_id}
-                </code>
-              </p>
-              <p style={{ margin: 0 }}>
-                <span style={{ color: '#6b7280' }}>access_token:</span>{' '}
-                <code style={{ backgroundColor: '#e5e7eb', padding: '2px 6px', borderRadius: '4px' }}>
-                  {result.access_token}
-                </code>
-              </p>
-            </div>
           </div>
         )}
       </div>
