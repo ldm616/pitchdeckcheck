@@ -14,14 +14,12 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [result, setResult] = useState<UploadResult | null>(null)
-  const [error, setError] = useState('')
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (!file || !email) return
 
     setStatus('loading')
-    setError('')
     setResult(null)
 
     const formData = new FormData()
@@ -37,13 +35,15 @@ export default function App() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Upload failed')
+        const errorMessage = data.error || 'Upload failed'
+        console.error('Upload error:', errorMessage)
+        throw new Error(errorMessage)
       }
 
       setResult(data)
       setStatus('success')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      console.error('Upload error:', err)
       setStatus('error')
     }
   }
@@ -101,7 +101,7 @@ export default function App() {
               lineHeight: 1.5,
             }}
           >
-            Upload your pitch deck PDF to start your investor-readiness review.
+            Upload your pitch deck to get an investor-readiness review.
           </p>
         </div>
 
@@ -227,7 +227,7 @@ export default function App() {
                 color: '#dc2626',
               }}
             >
-              {error}
+              Upload failed. Please try again.
             </p>
           </div>
         )}
