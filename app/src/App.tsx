@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
+import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react'
 
 type Status = 'idle' | 'uploading' | 'extracting' | 'analyzing' | 'success' | 'error'
 type DeleteStatus = 'idle' | 'deleting' | 'success' | 'error'
@@ -14,10 +14,12 @@ interface ExtractionResult {
   slides: Array<{ slide_number: number; image_path: string }>
 }
 
-interface AnalysisResult {
+interface DeckStatusResult {
   deck_id: string
-  analyzed_count: number
-  slides: Array<{ slide_number: number; inferred_type: string; text_length: number }>
+  processing_status: string
+  processing_error: string | null
+  slide_count: number
+  analyzed_slide_count: number
 }
 
 interface DeleteResult {
@@ -39,6 +41,7 @@ interface DeleteResult {
 
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 const SESSION_KEY = 'pdc_authenticated'
+const POLL_INTERVAL_MS = 2000
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -50,6 +53,9 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [slideCount, setSlideCount] = useState<number | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const pollIntervalRef = useRef<number | null>(null)
 
   // Admin delete state
   const [showAdmin, setShowAdmin] = useState(false)
@@ -65,6 +71,62 @@ export default function App() {
       setIsAuthenticated(true)
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
+    }
+  }, [])
+
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }
+
+  const pollDeckStatus = async (deckId: string, accessToken: string): Promise<DeckStatusResult | null> => {
+    try {
+      const response = await fetch('/.netlify/functions/get-deck-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deck_id: deckId, access_token: accessToken }),
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const data: DeckStatusResult = await response.json()
+      return data
+    } catch {
+      return null
+    }
+  }
+
+  const startPolling = (deckId: string, accessToken: string) => {
+    stopPolling()
+
+    pollIntervalRef.current = window.setInterval(async () => {
+      const statusData = await pollDeckStatus(deckId, accessToken)
+
+      if (!statusData) {
+        return
+      }
+
+      if (statusData.processing_status === 'analyzed') {
+        stopPolling()
+        setSlideCount(statusData.slide_count)
+        setStatus('success')
+      } else if (statusData.processing_status === 'failed') {
+        stopPolling()
+        setErrorMessage(statusData.processing_error || 'Analysis failed')
+        setStatus('error')
+      }
+    }, POLL_INTERVAL_MS)
+  }
 
   const handlePasswordSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -102,6 +164,8 @@ export default function App() {
 
     setStatus('uploading')
     setSlideCount(null)
+    setErrorMessage(null)
+    stopPolling()
 
     try {
       const formData = new FormData()
@@ -141,7 +205,9 @@ export default function App() {
       setSlideCount(extractData.slide_count)
       setStatus('analyzing')
 
-      const analyzeResponse = await fetch('/.netlify/functions/analyze-slides', {
+      startPolling(uploadData.deck_id, uploadData.access_token)
+
+      fetch('/.netlify/functions/analyze-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,17 +215,21 @@ export default function App() {
           access_token: uploadData.access_token,
         }),
       })
-
-      const analyzeData: AnalysisResult = await analyzeResponse.json()
-
-      if (!analyzeResponse.ok) {
-        console.error('Analysis error:', analyzeData)
-        throw new Error('Analysis failed')
-      }
-
-      setStatus('success')
+        .then(async (analyzeResponse) => {
+          if (analyzeResponse.ok) {
+            const contentType = analyzeResponse.headers.get('content-type')
+            if (contentType && contentType.includes('application/json')) {
+              stopPolling()
+              setStatus('success')
+            }
+          }
+        })
+        .catch(() => {
+          // Ignore errors - polling will handle the status
+        })
     } catch (err) {
       console.error('Error:', err)
+      stopPolling()
       setStatus('error')
     }
   }
@@ -511,7 +581,7 @@ export default function App() {
                 color: '#dc2626',
               }}
             >
-              Processing failed. Please try again.
+              {errorMessage || 'Processing failed. Please try again.'}
             </p>
           </div>
         )}

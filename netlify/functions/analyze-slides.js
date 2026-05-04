@@ -13,6 +13,7 @@ const SLIDE_TYPES = [
   'team',
   'financials',
   'ask',
+  'investment_highlights',
   'other',
 ]
 
@@ -33,6 +34,7 @@ Slide types:
 - team: Team members, advisors, backgrounds
 - financials: Financial projections, runway, use of funds
 - ask: Investment ask, terms, contact info
+- investment_highlights: Summary of key reasons to invest, combining market opportunity, team strength, traction, product differentiation, and raise details
 - other: Anything that doesn't fit the above categories
 
 Respond with valid JSON in this exact format:
