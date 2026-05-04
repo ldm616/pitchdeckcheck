@@ -1,7 +1,8 @@
-import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react'
+import { useState, useEffect, FormEvent, ChangeEvent, useRef, useMemo } from 'react'
 
 type Status = 'idle' | 'uploading' | 'processing' | 'success' | 'error' | 'timeout'
 type DeleteStatus = 'idle' | 'deleting' | 'success' | 'error'
+type AdminView = 'upload' | 'reports' | 'delete'
 
 interface UploadResult {
   deck_id: string
@@ -84,12 +85,38 @@ interface DeleteResult {
   error?: string
 }
 
+interface ReportListItem {
+  id: string
+  deck_id: string
+  report_type: string
+  status: string
+  overall_grade: string | null
+  created_at: string
+  email: string | null
+  original_filename: string | null
+  slide_count: number | null
+  access_token: string | null
+}
+
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 const SESSION_KEY = 'pdc_authenticated'
 const POLL_INTERVAL_MS = 2000
 const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
 export default function App() {
+  // Check for admin mode via URL param
+  const isAdmin = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    const adminToken = params.get('admin')
+    const expectedToken = import.meta.env.VITE_ADMIN_PASSWORD
+    return adminToken !== null && adminToken === expectedToken
+  }, [])
+
+  const [adminView, setAdminView] = useState<AdminView>('upload')
+  const [reportsList, setReportsList] = useState<ReportListItem[]>([])
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportsError, setReportsError] = useState('')
+
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
@@ -364,6 +391,53 @@ export default function App() {
     }
   }
 
+  const fetchReportsList = async () => {
+    setReportsLoading(true)
+    setReportsError('')
+
+    try {
+      const response = await fetch('/.netlify/functions/get-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: import.meta.env.VITE_ADMIN_PASSWORD,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.ok) {
+        setReportsList(data.reports || [])
+      } else {
+        setReportsError(data.error || 'Failed to fetch reports')
+      }
+    } catch (err) {
+      console.error('Fetch reports error:', err)
+      setReportsError('Failed to fetch reports')
+    } finally {
+      setReportsLoading(false)
+    }
+  }
+
+  const handleViewReport = async (item: ReportListItem) => {
+    if (!item.access_token) {
+      setReportsError('Missing access token for this report')
+      return
+    }
+
+    // Fetch the full report and display it
+    const reportData = await fetchReport(item.deck_id, item.access_token)
+    if (reportData) {
+      setReport(reportData.content)
+      setSlides(reportData.slides)
+      setSlideCount(item.slide_count)
+      setStatus('success')
+      setAdminView('upload') // Switch to upload view to show report
+    } else {
+      setReportsError('Failed to load report')
+    }
+  }
+
   const isProcessing = status === 'uploading' || status === 'processing'
   const isDisabled = isProcessing || !file || !email
 
@@ -504,55 +578,148 @@ export default function App() {
   // Determine if we're showing the report (wider layout)
   const showingReport = status === 'success' && report
 
-  // Main upload form
+  // Determine max width based on view and content
+  const getMaxWidth = () => {
+    if (adminView === 'reports') return '900px'
+    if (showingReport) return '720px'
+    return '440px'
+  }
+
+  // Main layout
   return (
     <div
       style={{
         minHeight: '100vh',
         display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
-        padding: '50px 24px 24px',
+        flexDirection: 'column',
         backgroundColor: '#f8f9fa',
         fontFamily,
       }}
     >
+      {/* Admin Header */}
+      {isAdmin && (
+        <div
+          style={{
+            width: '100%',
+            borderBottom: '1px solid #e5e7eb',
+            backgroundColor: '#ffffff',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: '900px',
+              margin: '0 auto',
+              padding: '12px 24px',
+              display: 'flex',
+              gap: '24px',
+              fontSize: '14px',
+              fontWeight: 500,
+            }}
+          >
+            <button
+              onClick={() => setAdminView('upload')}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                fontSize: '14px',
+                fontWeight: 500,
+                fontFamily,
+                color: adminView === 'upload' ? '#2563eb' : '#6b7280',
+                cursor: 'pointer',
+                textDecoration: adminView === 'upload' ? 'underline' : 'none',
+              }}
+            >
+              Upload
+            </button>
+            <button
+              onClick={() => {
+                setAdminView('reports')
+                fetchReportsList()
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                fontSize: '14px',
+                fontWeight: 500,
+                fontFamily,
+                color: adminView === 'reports' ? '#2563eb' : '#6b7280',
+                cursor: 'pointer',
+                textDecoration: adminView === 'reports' ? 'underline' : 'none',
+              }}
+            >
+              Reports
+            </button>
+            <button
+              onClick={() => setAdminView('delete')}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                fontSize: '14px',
+                fontWeight: 500,
+                fontFamily,
+                color: adminView === 'delete' ? '#dc2626' : '#6b7280',
+                cursor: 'pointer',
+                textDecoration: adminView === 'delete' ? 'underline' : 'none',
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
       <div
         style={{
-          width: '100%',
-          maxWidth: showingReport ? '720px' : '440px',
-          backgroundColor: '#ffffff',
-          borderRadius: '12px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
-          padding: showingReport ? '48px 40px' : '40px 32px',
-          transition: 'max-width 0.3s ease, padding 0.3s ease',
+          flex: 1,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          padding: isAdmin ? '32px 24px 24px' : '50px 24px 24px',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1
-            style={{
-              fontSize: '28px',
-              fontWeight: 600,
-              color: '#111827',
-              margin: '0 0 12px 0',
-              letterSpacing: '-0.025em',
-            }}
-          >
-            Pitch Deck Check
-          </h1>
-          <p
-            style={{
-              fontSize: '15px',
-              color: '#6b7280',
-              margin: 0,
-              lineHeight: 1.5,
-            }}
-          >
-            Upload your pitch deck to get an investor-readiness review.
-          </p>
-        </div>
+        <div
+          style={{
+            width: '100%',
+            maxWidth: getMaxWidth(),
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
+            padding: showingReport || adminView === 'reports' ? '48px 40px' : '40px 32px',
+            transition: 'max-width 0.3s ease, padding 0.3s ease',
+          }}
+        >
+          {/* Upload View */}
+          {(!isAdmin || adminView === 'upload') && (
+            <>
+              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                <h1
+                  style={{
+                    fontSize: '28px',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: '0 0 12px 0',
+                    letterSpacing: '-0.025em',
+                  }}
+                >
+                  Pitch Deck Check
+                </h1>
+                <p
+                  style={{
+                    fontSize: '15px',
+                    color: '#6b7280',
+                    margin: 0,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  Upload your pitch deck to get an investor-readiness review.
+                </p>
+              </div>
 
-        <form onSubmit={handleSubmit}>
+              <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
             <label
               htmlFor="email"
@@ -1085,125 +1252,434 @@ export default function App() {
           </div>
         )}
 
-        {/* Admin footer */}
-        <div style={{ marginTop: '32px', textAlign: 'center' }}>
-          <button
-            onClick={() => setShowAdmin(!showAdmin)}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: '12px',
-              color: '#9ca3af',
-              cursor: 'pointer',
-              fontFamily,
-            }}
-          >
-            {showAdmin ? 'Hide Admin' : 'Admin'}
-          </button>
-        </div>
-
-        {showAdmin && (
-          <div
-            style={{
-              marginTop: '16px',
-              padding: '16px',
-              backgroundColor: '#f9fafb',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-            }}
-          >
-            <p
-              style={{
-                margin: '0 0 12px 0',
-                fontSize: '13px',
-                fontWeight: 500,
-                color: '#374151',
-              }}
-            >
-              Delete Deck
-            </p>
-            <form onSubmit={handleDeleteDeck}>
-              <input
-                type="text"
-                value={deleteDeckId}
-                onChange={(e) => setDeleteDeckId(e.target.value)}
-                placeholder="Deck ID (UUID)"
-                required
-                disabled={deleteStatus === 'deleting'}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  fontSize: '13px',
-                  fontFamily,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  marginBottom: '8px',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Admin Password"
-                required
-                disabled={deleteStatus === 'deleting'}
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  fontSize: '13px',
-                  fontFamily,
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  marginBottom: '8px',
-                  boxSizing: 'border-box',
-                }}
-              />
+        {/* Admin footer - only show when not in admin mode */}
+        {!isAdmin && (
+          <>
+            <div style={{ marginTop: '32px', textAlign: 'center' }}>
               <button
-                type="submit"
-                disabled={deleteStatus === 'deleting' || !deleteDeckId || !adminPassword}
+                onClick={() => setShowAdmin(!showAdmin)}
                 style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  fontFamily,
-                  color: '#ffffff',
-                  backgroundColor:
-                    deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
-                      ? '#9ca3af'
-                      : '#dc2626',
+                  background: 'none',
                   border: 'none',
-                  borderRadius: '6px',
-                  cursor:
-                    deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
-                      ? 'not-allowed'
-                      : 'pointer',
+                  fontSize: '12px',
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  fontFamily,
                 }}
               >
-                {deleteStatus === 'deleting' ? 'Deleting...' : 'Delete Deck'}
+                {showAdmin ? 'Hide Admin' : 'Admin'}
               </button>
-            </form>
+            </div>
 
-            {deleteError && (
-              <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#dc2626' }}>
-                {deleteError}
-              </p>
-            )}
+            {showAdmin && (
+              <div
+                style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  backgroundColor: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                }}
+              >
+                <p
+                  style={{
+                    margin: '0 0 12px 0',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    color: '#374151',
+                  }}
+                >
+                  Delete Deck
+                </p>
+                <form onSubmit={handleDeleteDeck}>
+                  <input
+                    type="text"
+                    value={deleteDeckId}
+                    onChange={(e) => setDeleteDeckId(e.target.value)}
+                    placeholder="Deck ID (UUID)"
+                    required
+                    disabled={deleteStatus === 'deleting'}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      fontSize: '13px',
+                      fontFamily,
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      marginBottom: '8px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <input
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Admin Password"
+                    required
+                    disabled={deleteStatus === 'deleting'}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      fontSize: '13px',
+                      fontFamily,
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      marginBottom: '8px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={deleteStatus === 'deleting' || !deleteDeckId || !adminPassword}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      fontFamily,
+                      color: '#ffffff',
+                      backgroundColor:
+                        deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
+                          ? '#9ca3af'
+                          : '#dc2626',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor:
+                        deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
+                          ? 'not-allowed'
+                          : 'pointer',
+                    }}
+                  >
+                    {deleteStatus === 'deleting' ? 'Deleting...' : 'Delete Deck'}
+                  </button>
+                </form>
 
-            {deleteStatus === 'success' && deleteResult && (
-              <div style={{ marginTop: '8px', fontSize: '12px', color: '#166534' }}>
-                <p style={{ margin: '0 0 4px 0', fontWeight: 500 }}>Deleted successfully:</p>
-                <p style={{ margin: 0 }}>
-                  Files: {deleteResult.deleted?.deck_pdfs || 0} PDF, {deleteResult.deleted?.slide_images || 0} images
-                </p>
-                <p style={{ margin: 0 }}>
-                  Rows: {deleteResult.deleted?.db_rows.slides || 0} slides, {deleteResult.deleted?.db_rows.decks || 0} deck
-                </p>
+                {deleteError && (
+                  <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#dc2626' }}>
+                    {deleteError}
+                  </p>
+                )}
+
+                {deleteStatus === 'success' && deleteResult && (
+                  <div style={{ marginTop: '8px', fontSize: '12px', color: '#166534' }}>
+                    <p style={{ margin: '0 0 4px 0', fontWeight: 500 }}>Deleted successfully:</p>
+                    <p style={{ margin: 0 }}>
+                      Files: {deleteResult.deleted?.deck_pdfs || 0} PDF, {deleteResult.deleted?.slide_images || 0} images
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      Rows: {deleteResult.deleted?.db_rows.slides || 0} slides, {deleteResult.deleted?.db_rows.decks || 0} deck
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
+            </>
+          )}
+
+          {/* Reports View - Admin only */}
+          {isAdmin && adminView === 'reports' && (
+            <div>
+              <h2
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 20px 0',
+                }}
+              >
+                Reports
+              </h2>
+
+              {reportsLoading && (
+                <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading reports...</p>
+              )}
+
+              {reportsError && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: '14px', color: '#dc2626' }}>{reportsError}</p>
+                </div>
+              )}
+
+              {!reportsLoading && reportsList.length === 0 && !reportsError && (
+                <p style={{ color: '#6b7280', fontSize: '14px' }}>No reports found.</p>
+              )}
+
+              {reportsList.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {reportsList.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleViewReport(item)}
+                      style={{
+                        padding: '12px 16px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f9fafb'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#ffffff'
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: '200px' }}>
+                          <p
+                            style={{
+                              margin: '0 0 4px 0',
+                              fontSize: '14px',
+                              fontWeight: 500,
+                              color: '#111827',
+                            }}
+                          >
+                            {item.email || 'No email'}
+                          </p>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: '12px',
+                              color: '#6b7280',
+                            }}
+                          >
+                            {item.original_filename || 'Unknown file'} • {item.slide_count || 0} slides
+                          </p>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          {item.overall_grade && (
+                            <div
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '6px',
+                                backgroundColor:
+                                  item.overall_grade === 'A'
+                                    ? '#22c55e'
+                                    : item.overall_grade === 'B'
+                                      ? '#84cc16'
+                                      : item.overall_grade === 'C'
+                                        ? '#eab308'
+                                        : item.overall_grade === 'D'
+                                          ? '#f97316'
+                                          : '#ef4444',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                color: '#ffffff',
+                              }}
+                            >
+                              {item.overall_grade}
+                            </div>
+                          )}
+
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor:
+                                item.status === 'ready' ? '#dcfce7' : '#f3f4f6',
+                              color:
+                                item.status === 'ready' ? '#166534' : '#6b7280',
+                            }}
+                          >
+                            {item.status}
+                          </span>
+
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              color: '#9ca3af',
+                            }}
+                          >
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Delete View - Admin only */}
+          {isAdmin && adminView === 'delete' && (
+            <div>
+              <h2
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 20px 0',
+                }}
+              >
+                Delete Deck
+              </h2>
+
+              <form onSubmit={handleDeleteDeck}>
+                <div style={{ marginBottom: '16px' }}>
+                  <label
+                    htmlFor="delete-deck-id"
+                    style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      color: '#374151',
+                      marginBottom: '6px',
+                    }}
+                  >
+                    Deck ID (UUID)
+                  </label>
+                  <input
+                    id="delete-deck-id"
+                    type="text"
+                    value={deleteDeckId}
+                    onChange={(e) => setDeleteDeckId(e.target.value)}
+                    placeholder="e.g. 12345678-1234-1234-1234-123456789abc"
+                    required
+                    disabled={deleteStatus === 'deleting'}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '15px',
+                      fontFamily,
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '20px' }}>
+                  <label
+                    htmlFor="delete-admin-password"
+                    style={{
+                      display: 'block',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      color: '#374151',
+                      marginBottom: '6px',
+                    }}
+                  >
+                    Admin Password
+                  </label>
+                  <input
+                    id="delete-admin-password"
+                    type="password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Enter admin password"
+                    required
+                    disabled={deleteStatus === 'deleting'}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      fontSize: '15px',
+                      fontFamily,
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={deleteStatus === 'deleting' || !deleteDeckId || !adminPassword}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    fontSize: '15px',
+                    fontWeight: 500,
+                    fontFamily,
+                    color: '#ffffff',
+                    backgroundColor:
+                      deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
+                        ? '#9ca3af'
+                        : '#dc2626',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor:
+                      deleteStatus === 'deleting' || !deleteDeckId || !adminPassword
+                        ? 'not-allowed'
+                        : 'pointer',
+                  }}
+                >
+                  {deleteStatus === 'deleting' ? 'Deleting...' : 'Delete Deck'}
+                </button>
+              </form>
+
+              {deleteError && (
+                <div
+                  style={{
+                    marginTop: '16px',
+                    padding: '12px 16px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: '14px', color: '#dc2626' }}>{deleteError}</p>
+                </div>
+              )}
+
+              {deleteStatus === 'success' && deleteResult && (
+                <div
+                  style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: '0 0 8px 0',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      color: '#166534',
+                    }}
+                  >
+                    Deleted successfully
+                  </p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#15803d' }}>
+                    Files: {deleteResult.deleted?.deck_pdfs || 0} PDF, {deleteResult.deleted?.slide_images || 0} images
+                  </p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#15803d' }}>
+                    Rows: {deleteResult.deleted?.db_rows.slides || 0} slides, {deleteResult.deleted?.db_rows.decks || 0} deck
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Hover preview overlay */}
