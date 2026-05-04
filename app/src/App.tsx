@@ -210,7 +210,7 @@ export default function App() {
       startPolling(uploadData.deck_id, uploadData.access_token)
 
       // Fire and forget - trigger background processing
-      fetch('/.netlify/functions/start-processing-background', {
+      fetch('/.netlify/functions/extract-analyze-slides-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
