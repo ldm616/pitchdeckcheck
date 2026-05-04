@@ -180,8 +180,10 @@ exports.handler = async (event) => {
       const pngBuffer = canvasAndContext.canvas.toBuffer('image/png')
 
       const slideNumber = pageNum
-      const filename = `slide-${padNumber(slideNumber, 3)}.png`
-      const imagePath = `${deck_id}/${filename}`
+      const filename = 'slide-' + padNumber(slideNumber, 3) + '.png'
+      const imagePath = deck_id + '/' + filename
+
+      console.log('Uploading slide:', { slideNumber, filename, imagePath })
 
       const { error: uploadError } = await supabase.storage
         .from('slide-images')
@@ -200,13 +202,17 @@ exports.handler = async (event) => {
         }
       }
 
-      const { error: insertError } = await supabase.from('slides').insert({
-        deck_id,
+      const slideRow = {
+        deck_id: deck_id,
         slide_number: slideNumber,
         image_path: imagePath,
         extracted_text: null,
         inferred_type: null,
-      })
+      }
+
+      console.log('Inserting slide row:', slideRow)
+
+      const { error: insertError } = await supabase.from('slides').insert(slideRow)
 
       if (insertError) {
         console.error(`Failed to insert slide ${slideNumber}:`, insertError)
