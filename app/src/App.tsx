@@ -100,16 +100,15 @@ interface ReportListItem {
 
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 const SESSION_KEY = 'pdc_authenticated'
+const SESSION_PASSWORD_KEY = 'pdc_admin_pw'
 const POLL_INTERVAL_MS = 2000
 const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
 export default function App() {
-  // Check for admin mode via URL param
+  // Check for admin mode via URL param (user must already be authenticated)
   const isAdmin = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
-    const adminToken = params.get('admin')
-    const expectedToken = import.meta.env.VITE_ADMIN_PASSWORD
-    return adminToken !== null && adminToken === expectedToken
+    return params.has('admin')
   }, [])
 
   const [adminView, setAdminView] = useState<AdminView>('upload')
@@ -277,6 +276,7 @@ export default function App() {
 
       if (response.ok && data.ok) {
         sessionStorage.setItem(SESSION_KEY, 'true')
+        sessionStorage.setItem(SESSION_PASSWORD_KEY, password)
         setIsAuthenticated(true)
       } else {
         setPasswordError(data.error || 'Invalid password')
@@ -399,7 +399,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          admin_password: import.meta.env.VITE_ADMIN_PASSWORD,
+          admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
         }),
       })
 
