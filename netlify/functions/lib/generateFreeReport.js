@@ -18,7 +18,7 @@ const RUBRIC_EVAL_PROMPT = `You are an experienced early-stage startup investor 
 You will receive a slide's extracted text and its inferred type. Your job is to:
 1. Answer each rubric question with yes/partial/no
 2. Identify what's MISSING vs investor expectations
-3. Provide specific FIXES (actionable improvements)
+3. Provide GUIDANCE on how to address gaps (not instructions)
 4. Give EXAMPLES of patterns from strong decks
 
 SCORING RULES:
@@ -35,23 +35,49 @@ ANTI-HALLUCINATION RULES (critical):
 
 MISSING ITEMS RULES:
 - Derive missing items ONLY from rubric questions scored "no" or "partial"
-- Each missing item should describe what an investor would expect to see but doesn't
-- Be specific: "No bottom-up market sizing" not "Market needs work"
+- Frame each missing item in terms of INVESTOR EXPECTATIONS:
+  - Good: "No visible assumptions behind market size. Investors need to see how you arrived at this number to assess credibility."
+  - Bad: "Missing market assumptions"
+- Be specific about WHY it matters for investor decision-making
 - Do NOT invent problems unrelated to the rubric questions
 
-FIXES RULES:
-- Each fix must be concrete and actionable
-- Start with an action verb: "Add...", "Show...", "Include...", "Quantify..."
-- Be specific: "Add bottom-up sizing (e.g. # of target customers x avg spend)" not "Improve market slide"
-- Fixes should directly address the missing items
-- Include 2-4 fixes based on the most important gaps
+FIXES RULES (critical - tone matters):
+- Fixes are GUIDANCE, not instructions. Do NOT write copy for the founder.
+- Use CONDITIONAL, NON-PRESCRIPTIVE phrasing:
+  - Good: "If you have customer data, showing specific numbers would strengthen credibility"
+  - Good: "Investors typically expect to see bottom-up sizing logic here"
+  - Good: "Consider including your assumptions if they support the market opportunity"
+  - Bad: "Add bottom-up market sizing"
+  - Bad: "Show your customer numbers"
+  - Bad: "Include assumptions"
+- NEVER assume the founder has data they haven't shown
+- NEVER imply data exists if it's not visible
+- Connect each fix to investor credibility or decision-making
+- Include 2-4 guidance items based on the most important gaps
 
 EXAMPLES RULES:
-- Reference patterns from well-known strong decks (Airbnb, Dropbox, Buffer, etc.)
-- Keep examples generic but recognizable - describe the PATTERN, not fake data
-- Examples should illustrate how to fix the gaps
-- Do NOT cite fabricated numbers, metrics, or specific claims
+- Examples must be PATTERN-LEVEL only, not specific claims
+- Use phrasing like:
+  - "Strong decks often show..."
+  - "Top investor-ready decks typically..."
+  - "A common pattern in successful fundraises is..."
+- If referencing a company (Airbnb, Dropbox), keep it generic and widely known
+- Do NOT cite specific numbers, metrics, or fabricated claims
+- Do NOT overuse named companies - patterns are more valuable
 - Include 1-2 examples maximum
+
+TONE RULES (critical):
+- Sound like an experienced investor coach, not generic AI
+- NEVER use these phrases:
+  - "could be improved"
+  - "would benefit from"
+  - "consider adding"
+  - "might want to"
+- ALL feedback must tie to:
+  - Investor expectations
+  - Credibility assessment
+  - Investment decision-making
+- Be direct but not prescriptive
 
 OUTPUT FORMAT:
 Return ONLY valid JSON matching this structure:
@@ -67,13 +93,13 @@ Return ONLY valid JSON matching this structure:
     }
   ],
   "missing": [
-    "Specific thing that's missing vs investor expectations"
+    "What's missing + why investors need it (1-2 sentences)"
   ],
   "fixes": [
-    "Specific actionable fix starting with action verb"
+    "Conditional guidance tied to investor expectations"
   ],
   "examples": [
-    "Pattern from strong decks that illustrates the fix"
+    "Pattern-level reference to what strong decks do"
   ],
   "summary": "1-2 sentence diagnosis of the slide's main strength and weakness"
 }
@@ -82,9 +108,9 @@ REQUIREMENTS:
 - Answer EVERY question in the rubric provided
 - Each answer must have question_id, answer, score, evidence, and reasoning
 - score must match answer: yes=2, partial=1, no=0
-- missing: 1-4 items derived from low-scoring rubric questions
-- fixes: 2-4 specific actionable improvements
-- examples: 1-2 pattern references from strong decks
+- missing: 1-4 items, each explaining what's missing AND why it matters to investors
+- fixes: 2-4 conditional guidance items (not directives)
+- examples: 1-2 pattern-level references
 - summary: concise diagnosis (strength + weakness)`
 
 /**
@@ -309,20 +335,27 @@ function buildFreeReport(fullReport) {
     slide_type: s.slide_type,
   }))
 
-  // Light slide notes: short diagnosis only (no fixes, no examples)
+  // Slide notes: diagnosis with investor context (no fixes, no examples)
   const slideNotes = fullReport.slides.map((slide) => {
-    const missingCount = slide.diagnosis?.missing?.length || 0
     const firstMissing = slide.diagnosis?.missing?.[0]
+    const slideSummary = slide.summary
 
     let note
     if (slide.grade === 'A') {
-      note = 'Excellent - meets investor expectations'
+      // Use summary if available, otherwise generic excellent
+      note = slideSummary || 'Meets investor expectations with clear, credible content.'
     } else if (slide.grade === 'B') {
-      note = 'Good - minor improvements possible'
-    } else if (missingCount > 0 && firstMissing) {
+      // Use summary if available, otherwise generic good
+      note = slideSummary || 'Solid foundation. Minor gaps remain that investors may question.'
+    } else if (firstMissing) {
+      // For C/D/E grades, use the first missing item (now includes investor context)
       note = firstMissing
+    } else if (slideSummary) {
+      // Fallback to summary
+      note = slideSummary
     } else {
-      note = 'Needs improvement'
+      // Last resort fallback with investor framing
+      note = 'Key information missing. Investors will have unanswered questions about this section.'
     }
 
     return {
@@ -395,44 +428,23 @@ async function generateFreeReport(supabase, deckId) {
   // Update deck status
   await setDeckStatus(supabase, deckId, 'generating_free', null)
 
-  // Create or update report row
-  const { data: existingReport } = await supabase
+  // Always create a new report row (preserves history for comparison)
+  // get-report.js fetches the most recent one via .order('created_at', { ascending: false })
+  const { data: newReport, error: insertError } = await supabase
     .from('reports')
+    .insert({
+      deck_id: deckId,
+      report_type: 'free',
+      status: 'generating',
+    })
     .select('id')
-    .eq('deck_id', deckId)
-    .eq('report_type', 'free')
     .single()
 
-  let reportId
-  if (existingReport) {
-    reportId = existingReport.id
-    await supabase
-      .from('reports')
-      .update({
-        status: 'generating',
-        overall_grade: null,
-        content: null,
-        generation_error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', reportId)
-  } else {
-    const { data: newReport, error: insertError } = await supabase
-      .from('reports')
-      .insert({
-        deck_id: deckId,
-        report_type: 'free',
-        status: 'generating',
-      })
-      .select('id')
-      .single()
-
-    if (insertError || !newReport) {
-      console.error('Failed to create report row:', insertError)
-      return { success: false, error: 'Failed to create report' }
-    }
-    reportId = newReport.id
+  if (insertError || !newReport) {
+    console.error('Failed to create report row:', insertError)
+    return { success: false, error: 'Failed to create report' }
   }
+  const reportId = newReport.id
 
   console.log(`Generating rubric-based report for deck ${deckId}, report ${reportId}`)
 
