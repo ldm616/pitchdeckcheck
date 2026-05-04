@@ -50,6 +50,13 @@ interface ReportContent {
   }
 }
 
+interface SlideData {
+  slide_number: number
+  image_path: string | null
+  image_url: string | null
+  inferred_type: string
+}
+
 interface GetReportResult {
   deck_id: string
   report_type: string
@@ -57,6 +64,7 @@ interface GetReportResult {
   overall_grade?: string
   content?: ReportContent
   generation_error?: string
+  slides?: SlideData[]
 }
 
 interface DeleteResult {
@@ -94,6 +102,8 @@ export default function App() {
   const [slideCount, setSlideCount] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [report, setReport] = useState<ReportContent | null>(null)
+  const [slides, setSlides] = useState<SlideData[]>([])
+  const [hoveredSlideNumber, setHoveredSlideNumber] = useState<number | null>(null)
 
   // Store credentials for fetching report
   const deckCredentialsRef = useRef<{ deckId: string; accessToken: string } | null>(null)
@@ -159,7 +169,7 @@ export default function App() {
     }
   }
 
-  const fetchReport = async (deckId: string, accessToken: string): Promise<ReportContent | null> => {
+  const fetchReport = async (deckId: string, accessToken: string): Promise<{ content: ReportContent; slides: SlideData[] } | null> => {
     try {
       const response = await fetch('/.netlify/functions/get-report', {
         method: 'POST',
@@ -173,7 +183,10 @@ export default function App() {
 
       const data: GetReportResult = await response.json()
       if (data.status === 'ready' && data.content) {
-        return data.content
+        return {
+          content: data.content,
+          slides: data.slides || [],
+        }
       }
       return null
     } catch {
@@ -204,10 +217,11 @@ export default function App() {
 
       if (statusData.processing_status === 'ready') {
         stopPolling()
-        // Fetch the full report
-        const reportContent = await fetchReport(deckId, accessToken)
-        if (reportContent) {
-          setReport(reportContent)
+        // Fetch the full report with slides
+        const reportData = await fetchReport(deckId, accessToken)
+        if (reportData) {
+          setReport(reportData.content)
+          setSlides(reportData.slides)
         }
         setStatus('success')
       } else if (statusData.processing_status === 'failed') {
@@ -258,6 +272,8 @@ export default function App() {
     setErrorMessage(null)
     setProcessingStatus(null)
     setReport(null)
+    setSlides([])
+    setHoveredSlideNumber(null)
     deckCredentialsRef.current = null
     stopPolling()
 
@@ -905,69 +921,129 @@ export default function App() {
                   No slide-specific notes available.
                 </p>
               ) : (
-                report.slide_notes.map((note, idx) => (
-                  <div
-                    key={note.slide_number ?? idx}
-                    style={{
-                      padding: '12px 16px',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      marginBottom: '8px',
-                    }}
-                  >
+                report.slide_notes.map((note, idx) => {
+                  // Find matching slide data for image
+                  const slideData = slides.find(s => s.slide_number === note.slide_number)
+                  const imageUrl = slideData?.image_url
+
+                  return (
                     <div
+                      key={note.slide_number ?? idx}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '4px',
+                        gap: '16px',
+                        padding: '12px 16px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        marginBottom: '8px',
                       }}
                     >
-                      <span
+                      {/* Thumbnail */}
+                      <div
                         style={{
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          color: '#6b7280',
+                          flexShrink: 0,
+                          width: '120px',
                         }}
+                        onMouseEnter={() => imageUrl && setHoveredSlideNumber(note.slide_number)}
+                        onMouseLeave={() => setHoveredSlideNumber(null)}
                       >
-                        Slide {note.slide_number}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '11px',
-                          padding: '2px 6px',
-                          borderRadius: '3px',
-                          backgroundColor: '#f3f4f6',
-                          color: '#6b7280',
-                        }}
-                      >
-                        {note.inferred_type}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          color:
-                            note.grade === 'A'
-                              ? '#22c55e'
-                              : note.grade === 'B'
-                                ? '#84cc16'
-                                : note.grade === 'C'
-                                  ? '#eab308'
-                                  : note.grade === 'D'
-                                    ? '#f97316'
-                                    : '#ef4444',
-                        }}
-                      >
-                        {note.grade}
-                      </span>
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={`Slide ${note.slide_number}`}
+                            style={{
+                              width: '100%',
+                              height: 'auto',
+                              borderRadius: '4px',
+                              border: '1px solid #e5e7eb',
+                              cursor: 'pointer',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '100%',
+                              aspectRatio: '16/9',
+                              backgroundColor: '#f3f4f6',
+                              borderRadius: '4px',
+                              border: '1px solid #e5e7eb',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                color: '#9ca3af',
+                                textAlign: 'center',
+                                padding: '4px',
+                              }}
+                            >
+                              Slide image unavailable
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Note content */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '4px',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              color: '#6b7280',
+                            }}
+                          >
+                            Slide {note.slide_number}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 6px',
+                              borderRadius: '3px',
+                              backgroundColor: '#f3f4f6',
+                              color: '#6b7280',
+                            }}
+                          >
+                            {note.inferred_type}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              color:
+                                note.grade === 'A'
+                                  ? '#22c55e'
+                                  : note.grade === 'B'
+                                    ? '#84cc16'
+                                    : note.grade === 'C'
+                                      ? '#eab308'
+                                      : note.grade === 'D'
+                                        ? '#f97316'
+                                        : '#ef4444',
+                            }}
+                          >
+                            {note.grade}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '14px', color: '#4b5563', lineHeight: 1.5 }}>
+                          {note.note}
+                        </p>
+                      </div>
                     </div>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#4b5563', lineHeight: 1.5 }}>
-                      {note.note}
-                    </p>
-                  </div>
-                ))
+                  )
+                })
               )}
             </div>
 
@@ -1129,6 +1205,62 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* Hover preview overlay */}
+      {hoveredSlideNumber !== null && (() => {
+        const slideData = slides.find(s => s.slide_number === hoveredSlideNumber)
+        const imageUrl = slideData?.image_url
+        if (!imageUrl) return null
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.75)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              pointerEvents: 'none',
+            }}
+          >
+            <div
+              style={{
+                maxWidth: '80vw',
+                maxHeight: '80vh',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}
+            >
+              <img
+                src={imageUrl}
+                alt={`Slide ${hoveredSlideNumber} preview`}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: 'calc(80vh - 40px)',
+                  borderRadius: '8px',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                }}
+              />
+              <p
+                style={{
+                  marginTop: '12px',
+                  fontSize: '14px',
+                  color: '#ffffff',
+                  fontFamily,
+                }}
+              >
+                Slide {hoveredSlideNumber}
+              </p>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

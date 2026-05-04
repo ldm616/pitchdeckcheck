@@ -1,5 +1,8 @@
 const { getSupabaseClient, verifyDeckAccess } = require('./lib/supabase')
 
+// Signed URL expiration: 1 hour
+const SIGNED_URL_EXPIRATION_SECONDS = 3600
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -94,7 +97,46 @@ exports.handler = async (event) => {
     }
   }
 
-  // Report is ready - return full content
+  // Report is ready - fetch slides with image paths
+  const { data: slides, error: slidesError } = await supabase
+    .from('slides')
+    .select('slide_number, image_path, inferred_type')
+    .eq('deck_id', deck_id)
+    .order('slide_number', { ascending: true })
+
+  if (slidesError) {
+    console.error('Slides lookup error:', slidesError)
+    // Continue without slides - don't fail the whole request
+  }
+
+  // Generate signed URLs for each slide image
+  const slidesWithUrls = []
+  if (slides && slides.length > 0) {
+    for (const slide of slides) {
+      let image_url = null
+
+      if (slide.image_path) {
+        const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+          .from('slide-images')
+          .createSignedUrl(slide.image_path, SIGNED_URL_EXPIRATION_SECONDS)
+
+        if (signedUrlError) {
+          console.error(`Failed to generate signed URL for slide ${slide.slide_number}:`, signedUrlError)
+        } else {
+          image_url = signedUrlData.signedUrl
+        }
+      }
+
+      slidesWithUrls.push({
+        slide_number: slide.slide_number,
+        image_path: slide.image_path,
+        image_url,
+        inferred_type: slide.inferred_type,
+      })
+    }
+  }
+
+  // Return full content with slides
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -104,6 +146,7 @@ exports.handler = async (event) => {
       status: report.status,
       overall_grade: report.overall_grade,
       content: report.content,
+      slides: slidesWithUrls,
     }),
   }
 }
