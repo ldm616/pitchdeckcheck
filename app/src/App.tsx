@@ -345,9 +345,9 @@ export default function App() {
       style={{
         minHeight: '100vh',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: '24px',
+        padding: '50px 24px 24px',
         backgroundColor: '#f8f9fa',
         fontFamily,
       }}
