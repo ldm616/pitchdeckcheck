@@ -137,10 +137,15 @@ export default function App() {
   const timeoutRef = useRef<number | null>(null)
   const pollStartTimeRef = useRef<number | null>(null)
 
+  // Regen polling refs
+  const regenPollIntervalRef = useRef<number | null>(null)
+  const regenTimeoutRef = useRef<number | null>(null)
+
   // Admin action state (for delete/regenerate on reports)
   const [actionDeckId, setActionDeckId] = useState<string | null>(null)
   const [actionType, setActionType] = useState<'delete' | 'regenerate' | null>(null)
   const [actionError, setActionError] = useState('')
+  const [regenProgress, setRegenProgress] = useState<string | null>(null)
 
   useEffect(() => {
     const authenticated = sessionStorage.getItem(SESSION_KEY)
@@ -388,12 +393,85 @@ export default function App() {
     }
   }
 
+  const stopRegenPolling = () => {
+    if (regenPollIntervalRef.current) {
+      clearInterval(regenPollIntervalRef.current)
+      regenPollIntervalRef.current = null
+    }
+    if (regenTimeoutRef.current) {
+      clearTimeout(regenTimeoutRef.current)
+      regenTimeoutRef.current = null
+    }
+  }
+
+  const startRegenPolling = (deckId: string, accessToken: string) => {
+    stopRegenPolling()
+
+    // Update report status in list to show generating
+    setReportsList((prev) =>
+      prev.map((r) =>
+        r.deck_id === deckId ? { ...r, status: 'generating' } : r
+      )
+    )
+    setRegenProgress('Generating report...')
+
+    // Set timeout for 5 minutes
+    regenTimeoutRef.current = window.setTimeout(() => {
+      stopRegenPolling()
+      setActionError('Regeneration timed out')
+      setActionDeckId(null)
+      setActionType(null)
+      setRegenProgress(null)
+    }, 5 * 60 * 1000)
+
+    regenPollIntervalRef.current = window.setInterval(async () => {
+      const statusData = await pollDeckStatus(deckId, accessToken)
+
+      if (!statusData) {
+        return
+      }
+
+      // Update progress display
+      if (statusData.processing_status === 'generating_free') {
+        setRegenProgress('Generating report...')
+      }
+
+      if (statusData.processing_status === 'ready' && statusData.report?.status === 'ready') {
+        stopRegenPolling()
+        // Update report in list with new grade
+        setReportsList((prev) =>
+          prev.map((r) =>
+            r.deck_id === deckId
+              ? { ...r, status: 'ready', overall_grade: statusData.report?.overall_grade || r.overall_grade }
+              : r
+          )
+        )
+        setActionDeckId(null)
+        setActionType(null)
+        setRegenProgress(null)
+      } else if (statusData.processing_status === 'failed') {
+        stopRegenPolling()
+        setActionError(statusData.processing_error || 'Regeneration failed')
+        setReportsList((prev) =>
+          prev.map((r) =>
+            r.deck_id === deckId ? { ...r, status: 'failed' } : r
+          )
+        )
+        setActionDeckId(null)
+        setActionType(null)
+        setRegenProgress(null)
+      }
+    }, POLL_INTERVAL_MS)
+  }
+
   const handleRegenerateReport = async (deckId: string) => {
     setActionDeckId(deckId)
     setActionType('regenerate')
     setActionError('')
+    setRegenProgress('Starting...')
 
     try {
+      // Call regenerate endpoint to get credentials and set status
       const response = await fetch('/.netlify/functions/regenerate-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -405,24 +483,34 @@ export default function App() {
 
       const data = await response.json()
 
-      if (response.ok && data.ok) {
-        // Update the report in the list with new grade
-        setReportsList((prev) =>
-          prev.map((r) =>
-            r.deck_id === deckId
-              ? { ...r, status: 'ready', overall_grade: data.overall_grade }
-              : r
-          )
-        )
-      } else {
+      if (!response.ok || !data.ok) {
         setActionError(data.error || 'Regenerate failed')
+        setActionDeckId(null)
+        setActionType(null)
+        setRegenProgress(null)
+        return
       }
+
+      // Start polling for progress
+      startRegenPolling(deckId, data.access_token)
+
+      // Fire and forget - trigger background report generation
+      fetch('/.netlify/functions/generate-free-report-background', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deck_id: deckId,
+          access_token: data.access_token,
+        }),
+      }).catch((err) => {
+        console.error('Background regen trigger error:', err)
+      })
     } catch (err) {
       console.error('Regenerate error:', err)
       setActionError('Failed to regenerate report')
-    } finally {
       setActionDeckId(null)
       setActionType(null)
+      setRegenProgress(null)
     }
   }
 
@@ -1399,12 +1487,26 @@ export default function App() {
                               padding: '2px 8px',
                               borderRadius: '4px',
                               backgroundColor:
-                                item.status === 'ready' ? '#dcfce7' : '#f3f4f6',
+                                actionDeckId === item.deck_id && actionType === 'regenerate'
+                                  ? '#fef3c7'
+                                  : item.status === 'ready'
+                                    ? '#dcfce7'
+                                    : item.status === 'failed'
+                                      ? '#fef2f2'
+                                      : '#f3f4f6',
                               color:
-                                item.status === 'ready' ? '#166534' : '#6b7280',
+                                actionDeckId === item.deck_id && actionType === 'regenerate'
+                                  ? '#92400e'
+                                  : item.status === 'ready'
+                                    ? '#166534'
+                                    : item.status === 'failed'
+                                      ? '#dc2626'
+                                      : '#6b7280',
                             }}
                           >
-                            {item.status}
+                            {actionDeckId === item.deck_id && actionType === 'regenerate'
+                              ? regenProgress || 'Regenerating...'
+                              : item.status}
                           </span>
 
                           <span
@@ -1467,7 +1569,15 @@ export default function App() {
                               strokeWidth="2"
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              style={{ color: '#9ca3af', transition: 'color 0.15s' }}
+                              style={{
+                                color: actionDeckId === item.deck_id && actionType === 'regenerate'
+                                  ? '#22c55e'
+                                  : '#9ca3af',
+                                transition: 'color 0.15s',
+                                animation: actionDeckId === item.deck_id && actionType === 'regenerate'
+                                  ? 'spin 1s linear infinite'
+                                  : 'none',
+                              }}
                             >
                               <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
                               <path d="M21 3v5h-5" />

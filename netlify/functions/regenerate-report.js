@@ -1,5 +1,4 @@
-const { getSupabaseClient } = require('./lib/supabase')
-const { generateFreeReport } = require('./lib/generateFreeReport')
+const { getSupabaseClient, setDeckStatus } = require('./lib/supabase')
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -53,10 +52,10 @@ exports.handler = async (event) => {
     }
   }
 
-  // Verify deck exists
+  // Get deck with access_token
   const { data: deck, error: deckError } = await supabase
     .from('decks')
-    .select('id')
+    .select('id, access_token, processing_status')
     .eq('id', deck_id)
     .single()
 
@@ -68,25 +67,17 @@ exports.handler = async (event) => {
     }
   }
 
-  // Regenerate the report
-  const result = await generateFreeReport(supabase, deck_id)
+  // Set status to generating_free so polling can track progress
+  await setDeckStatus(supabase, deck_id, 'generating_free', null)
 
-  if (!result.success) {
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: result.error || 'Failed to regenerate report' }),
-    }
-  }
-
+  // Return credentials for polling - frontend will trigger background function
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       ok: true,
       deck_id,
-      report_id: result.reportId,
-      overall_grade: result.overallGrade,
+      access_token: deck.access_token,
     }),
   }
 }
