@@ -1,6 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
-import { createCanvas } from '@napi-rs/canvas'
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
+const { createClient } = require('@supabase/supabase-js')
+const { createCanvas } = require('@napi-rs/canvas')
 
 const TARGET_WIDTH = 1600
 
@@ -49,7 +48,7 @@ function padNumber(num, size) {
   return String(num).padStart(size, '0')
 }
 
-export const handler = async (event) => {
+exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
@@ -119,6 +118,9 @@ export const handler = async (event) => {
   await setDeckStatus(supabase, deck_id, 'extracting', null)
 
   try {
+    // Dynamic import for ESM-only pdfjs-dist
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+
     const { data: pdfData, error: downloadError } = await supabase.storage
       .from('deck-pdfs')
       .download(deck.file_path)
