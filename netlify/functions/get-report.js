@@ -1,4 +1,4 @@
-const { getSupabaseClient } = require('./lib/supabase')
+const { getSupabaseClient, verifyDeckAccess } = require('./lib/supabase')
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -42,69 +42,68 @@ exports.handler = async (event) => {
     }
   }
 
-  const { data: deck, error: deckError } = await supabase
-    .from('decks')
-    .select('id, access_token, processing_status, processing_error, slide_count')
-    .eq('id', deck_id)
-    .single()
+  const { valid, error: accessError } = await verifyDeckAccess(supabase, deck_id, access_token)
 
-  if (deckError || !deck) {
-    console.error('Deck lookup error:', deckError)
+  if (!valid) {
+    const statusCode = accessError === 'Deck not found' ? 404 : 403
     return {
-      statusCode: 404,
+      statusCode,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Deck not found' }),
+      body: JSON.stringify({ error: accessError }),
     }
   }
 
-  if (deck.access_token !== access_token) {
-    return {
-      statusCode: 403,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Invalid access token' }),
-    }
-  }
-
-  const { count: analyzedCount, error: countError } = await supabase
-    .from('slides')
-    .select('id', { count: 'exact', head: true })
-    .eq('deck_id', deck_id)
-    .not('extracted_text', 'is', null)
-
-  if (countError) {
-    console.error('Slide count error:', countError)
-  }
-
-  // Fetch latest free report status
+  // Fetch latest free report for this deck
   const { data: report, error: reportError } = await supabase
     .from('reports')
-    .select('status, overall_grade')
+    .select('id, report_type, status, overall_grade, content, generation_error, created_at')
     .eq('deck_id', deck_id)
     .eq('report_type', 'free')
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
 
-  if (reportError && reportError.code !== 'PGRST116') {
-    // PGRST116 is "no rows returned" - that's OK
+  if (reportError) {
+    if (reportError.code === 'PGRST116') {
+      // No rows returned
+      return {
+        statusCode: 404,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'No report found for this deck' }),
+      }
+    }
     console.error('Report lookup error:', reportError)
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Failed to fetch report' }),
+    }
   }
 
+  // If report is not ready, return status
+  if (report.status !== 'ready') {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deck_id,
+        report_type: report.report_type,
+        status: report.status,
+        generation_error: report.generation_error,
+      }),
+    }
+  }
+
+  // Report is ready - return full content
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      deck_id: deck.id,
-      processing_status: deck.processing_status,
-      processing_error: deck.processing_error,
-      slide_count: deck.slide_count,
-      analyzed_slide_count: analyzedCount || 0,
-      report: report
-        ? {
-            status: report.status,
-            overall_grade: report.overall_grade,
-          }
-        : null,
+      deck_id,
+      report_type: report.report_type,
+      status: report.status,
+      overall_grade: report.overall_grade,
+      content: report.content,
     }),
   }
 }

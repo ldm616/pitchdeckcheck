@@ -1,6 +1,7 @@
-const { getSupabaseClient, verifyDeckAccess } = require('./lib/supabase')
+const { getSupabaseClient, verifyDeckAccess, setDeckStatus } = require('./lib/supabase')
 const { extractSlides } = require('./lib/extractSlides')
 const { analyzeSlides } = require('./lib/analyzeSlides')
+const { generateFreeReport } = require('./lib/generateFreeReport')
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -93,6 +94,29 @@ exports.handler = async (event) => {
 
   console.log(`Analysis complete for deck ${deck_id}: ${analyzeResult.analyzedCount} slides analyzed`)
 
+  // Generate free report
+  console.log(`Starting free report generation for deck ${deck_id}`)
+  const reportResult = await generateFreeReport(supabase, deck_id)
+
+  if (!reportResult.success) {
+    console.error(`Report generation failed for deck ${deck_id}:`, reportResult.error)
+    await setDeckStatus(supabase, deck_id, 'failed', reportResult.error)
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ok: false,
+        deck_id,
+        error: reportResult.error,
+      }),
+    }
+  }
+
+  console.log(`Free report ready for deck ${deck_id}: grade ${reportResult.overallGrade}`)
+
+  // Set final status to ready
+  await setDeckStatus(supabase, deck_id, 'ready', null)
+
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -101,6 +125,8 @@ exports.handler = async (event) => {
       deck_id,
       slide_count: extractResult.slideCount,
       analyzed_count: analyzeResult.analyzedCount,
+      report_id: reportResult.reportId,
+      overall_grade: reportResult.overallGrade,
     }),
   }
 }

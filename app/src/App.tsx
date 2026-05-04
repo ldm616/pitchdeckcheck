@@ -14,6 +14,49 @@ interface DeckStatusResult {
   processing_error: string | null
   slide_count: number
   analyzed_slide_count: number
+  report: {
+    status: string
+    overall_grade: string | null
+  } | null
+}
+
+interface ReportStrength {
+  title: string
+  detail: string
+}
+
+interface ReportIssue {
+  title: string
+  detail: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+interface ReportSlideNote {
+  slide_number: number
+  inferred_type: string
+  grade: string
+  note: string
+}
+
+interface ReportContent {
+  overall_grade: string
+  summary: string
+  strengths: ReportStrength[]
+  biggest_issues: ReportIssue[]
+  slide_notes: ReportSlideNote[]
+  upgrade_teaser: {
+    title: string
+    bullets: string[]
+  }
+}
+
+interface GetReportResult {
+  deck_id: string
+  report_type: string
+  status: string
+  overall_grade?: string
+  content?: ReportContent
+  generation_error?: string
 }
 
 interface DeleteResult {
@@ -50,6 +93,10 @@ export default function App() {
   const [processingStatus, setProcessingStatus] = useState<string | null>(null)
   const [slideCount, setSlideCount] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [report, setReport] = useState<ReportContent | null>(null)
+
+  // Store credentials for fetching report
+  const deckCredentialsRef = useRef<{ deckId: string; accessToken: string } | null>(null)
 
   const pollIntervalRef = useRef<number | null>(null)
   const timeoutRef = useRef<number | null>(null)
@@ -112,6 +159,28 @@ export default function App() {
     }
   }
 
+  const fetchReport = async (deckId: string, accessToken: string): Promise<ReportContent | null> => {
+    try {
+      const response = await fetch('/.netlify/functions/get-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deck_id: deckId, access_token: accessToken }),
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const data: GetReportResult = await response.json()
+      if (data.status === 'ready' && data.content) {
+        return data.content
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
   const startPolling = (deckId: string, accessToken: string) => {
     stopPolling()
     pollStartTimeRef.current = Date.now()
@@ -131,17 +200,22 @@ export default function App() {
 
       // Update processing status for UI
       setProcessingStatus(statusData.processing_status)
+      setSlideCount(statusData.slide_count)
 
-      if (statusData.processing_status === 'analyzed') {
+      if (statusData.processing_status === 'ready') {
         stopPolling()
-        setSlideCount(statusData.slide_count)
+        // Fetch the full report
+        const reportContent = await fetchReport(deckId, accessToken)
+        if (reportContent) {
+          setReport(reportContent)
+        }
         setStatus('success')
       } else if (statusData.processing_status === 'failed') {
         stopPolling()
         setErrorMessage(statusData.processing_error || 'Processing failed')
         setStatus('error')
       }
-      // For extracting, extracted, analyzing - continue polling
+      // For extracting, extracted, analyzing, generating_free - continue polling
     }, POLL_INTERVAL_MS)
   }
 
@@ -183,6 +257,8 @@ export default function App() {
     setSlideCount(null)
     setErrorMessage(null)
     setProcessingStatus(null)
+    setReport(null)
+    deckCredentialsRef.current = null
     stopPolling()
 
     try {
@@ -285,6 +361,9 @@ export default function App() {
       }
       if (processingStatus === 'extracted' || processingStatus === 'analyzing') {
         return 'Analyzing slides...'
+      }
+      if (processingStatus === 'analyzed' || processingStatus === 'generating_free') {
+        return 'Generating your free report...'
       }
       return 'Processing...'
     }
@@ -605,49 +684,316 @@ export default function App() {
           </div>
         )}
 
-        {status === 'success' && slideCount !== null && (
-          <div
-            style={{
-              marginTop: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-            }}
-          >
+        {status === 'success' && report && (
+          <div style={{ marginTop: '24px' }}>
+            {/* Overall Grade */}
             <div
               style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                backgroundColor: '#22c55e',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
+                gap: '12px',
+                marginBottom: '16px',
               }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <div
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '8px',
+                  backgroundColor:
+                    report.overall_grade === 'A'
+                      ? '#22c55e'
+                      : report.overall_grade === 'B'
+                        ? '#84cc16'
+                        : report.overall_grade === 'C'
+                          ? '#eab308'
+                          : report.overall_grade === 'D'
+                            ? '#f97316'
+                            : '#ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  fontWeight: 700,
+                  color: '#ffffff',
+                }}
               >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+                {report.overall_grade}
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
+                  Overall Grade
+                </p>
+                <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
+                  {slideCount} slides analyzed
+                </p>
+              </div>
             </div>
-            <p
+
+            {/* Summary */}
+            <div
               style={{
-                margin: 0,
-                fontSize: '15px',
-                color: '#374151',
+                padding: '12px 16px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '8px',
+                marginBottom: '20px',
               }}
             >
-              Extracted and analyzed {slideCount} slides
-            </p>
+              <p style={{ margin: 0, fontSize: '14px', color: '#374151', lineHeight: 1.6 }}>
+                {report.summary}
+              </p>
+            </div>
+
+            {/* Strengths */}
+            <div style={{ marginBottom: '20px' }}>
+              <h3
+                style={{
+                  margin: '0 0 12px 0',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#111827',
+                }}
+              >
+                Strengths
+              </h3>
+              {report.strengths.map((strength, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '10px 12px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '6px',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: '0 0 4px 0',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      color: '#166534',
+                    }}
+                  >
+                    {strength.title}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#15803d' }}>
+                    {strength.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Biggest Issues */}
+            <div style={{ marginBottom: '20px' }}>
+              <h3
+                style={{
+                  margin: '0 0 12px 0',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#111827',
+                }}
+              >
+                Biggest Issues
+              </h3>
+              {report.biggest_issues.map((issue, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: '10px 12px',
+                    backgroundColor:
+                      issue.priority === 'high'
+                        ? '#fef2f2'
+                        : issue.priority === 'medium'
+                          ? '#fffbeb'
+                          : '#f9fafb',
+                    border: `1px solid ${
+                      issue.priority === 'high'
+                        ? '#fecaca'
+                        : issue.priority === 'medium'
+                          ? '#fde68a'
+                          : '#e5e7eb'
+                    }`,
+                    borderRadius: '6px',
+                    marginBottom: '8px',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        color:
+                          issue.priority === 'high'
+                            ? '#991b1b'
+                            : issue.priority === 'medium'
+                              ? '#92400e'
+                              : '#374151',
+                      }}
+                    >
+                      {issue.title}
+                    </p>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase',
+                        backgroundColor:
+                          issue.priority === 'high'
+                            ? '#fee2e2'
+                            : issue.priority === 'medium'
+                              ? '#fef3c7'
+                              : '#f3f4f6',
+                        color:
+                          issue.priority === 'high'
+                            ? '#dc2626'
+                            : issue.priority === 'medium'
+                              ? '#d97706'
+                              : '#6b7280',
+                      }}
+                    >
+                      {issue.priority}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: '13px',
+                      color:
+                        issue.priority === 'high'
+                          ? '#b91c1c'
+                          : issue.priority === 'medium'
+                            ? '#b45309'
+                            : '#4b5563',
+                    }}
+                  >
+                    {issue.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Slide Notes */}
+            <div style={{ marginBottom: '20px' }}>
+              <h3
+                style={{
+                  margin: '0 0 12px 0',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#111827',
+                }}
+              >
+                Slide-by-Slide Notes
+              </h3>
+              {report.slide_notes.map((note) => (
+                <div
+                  key={note.slide_number}
+                  style={{
+                    padding: '10px 12px',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    marginBottom: '6px',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: '#6b7280',
+                      }}
+                    >
+                      Slide {note.slide_number}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        backgroundColor: '#f3f4f6',
+                        color: '#6b7280',
+                      }}
+                    >
+                      {note.inferred_type}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color:
+                          note.grade === 'A'
+                            ? '#22c55e'
+                            : note.grade === 'B'
+                              ? '#84cc16'
+                              : note.grade === 'C'
+                                ? '#eab308'
+                                : note.grade === 'D'
+                                  ? '#f97316'
+                                  : '#ef4444',
+                      }}
+                    >
+                      {note.grade}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '13px', color: '#4b5563' }}>
+                    {note.note}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Upgrade Teaser */}
+            <div
+              style={{
+                padding: '16px',
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+              }}
+            >
+              <p
+                style={{
+                  margin: '0 0 8px 0',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#1e40af',
+                }}
+              >
+                {report.upgrade_teaser.title}
+              </p>
+              <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                {report.upgrade_teaser.bullets.map((bullet, idx) => (
+                  <li
+                    key={idx}
+                    style={{
+                      fontSize: '13px',
+                      color: '#1d4ed8',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 
