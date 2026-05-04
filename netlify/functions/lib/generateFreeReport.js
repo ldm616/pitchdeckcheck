@@ -1,233 +1,360 @@
 const OpenAI = require('openai')
 const { setDeckStatus } = require('./supabase')
+const {
+  RUBRIC_VERSION,
+  RUBRICS,
+  SLIDE_WEIGHTS,
+  computeSlideScore,
+  computeDeckScore,
+  generateFallbackAnswers,
+} = require('./rubrics')
 
-// Slide weights for weighted scoring
-// Higher weight = more impact on overall grade
-// 0 weight = excluded from scoring (non-impact slides)
-const SLIDE_WEIGHTS = {
-  problem: 1.3,
-  solution: 1.3,
-  market: 1.3,
-  traction: 1.5,
-  team: 1.3,
-  business_model: 1.2,
-  financials: 1.2,
-  ask: 1.2,
+/**
+ * Prompt for rubric-based slide evaluation with actionable feedback.
+ * Model answers each rubric question and provides missing/fixes/examples.
+ */
+const RUBRIC_EVAL_PROMPT = `You are an experienced early-stage startup investor evaluating a pitch deck slide for investor-readiness. You are skeptical by default and evaluate strictly.
 
-  product: 1.0,
-  competition: 1.0,
-  go_to_market: 1.0,
-  roadmap: 0.8,
-  investment_highlights: 0.6,
+You will receive a slide's extracted text and its inferred type. Your job is to:
+1. Answer each rubric question with yes/partial/no
+2. Identify what's MISSING vs investor expectations
+3. Provide specific FIXES (actionable improvements)
+4. Give EXAMPLES of patterns from strong decks
 
-  cover: 0.0,
-  contact: 0.0,
-  other: 0.5,
-}
-
-// Grade to numeric score mapping
-const GRADE_TO_SCORE = {
-  A: 5,
-  B: 4,
-  C: 3,
-  D: 2,
-  E: 1,
-}
-
-// Numeric score to grade mapping
-const scoreToGrade = (score) => {
-  if (score >= 4.5) return 'A'
-  if (score >= 3.5) return 'B'
-  if (score >= 2.5) return 'C'
-  if (score >= 1.5) return 'D'
-  return 'E'
-}
-
-const REPORT_PROMPT = `You are an experienced early-stage startup investor reviewing a pitch deck for investor-readiness. You are skeptical by default and grade strictly.
-
-You will receive the extracted text and inferred type for each slide in a pitch deck. Your job is to evaluate the deck and produce a structured JSON report.
-
-EVALUATION CRITERIA:
-- Clarity: Is each slide easy to understand without prior context?
-- Narrative flow: Does the deck tell a coherent, compelling story?
-- Completeness: Are the essential slides present (problem, solution, market, traction, team, ask)?
-- Investor relevance: Does each slide answer an obvious investor question with evidence?
-- Credibility: Are claims supported by visible data, not just assertions?
-- Differentiation: Is it clear why this company wins vs. alternatives?
-
-GRADING SCALE (grade strictly):
-- A: RARE. Highly investor-ready. Clear, concise, differentiated, credible, low-friction. Strong evidence for market, traction, team, product, and business model. Few meaningful unanswered investor questions. Most decks do NOT deserve an A.
-- B: Strong deck with good foundation. Mostly clear and credible. Some gaps or friction remain. Likely worth an investor's time, but not fully optimized.
-- C: Understandable but meaningfully incomplete. Several important investor questions remain unanswered. Needs significant improvement before fundraising.
-- D: Hard to understand, thin, vague, or poorly structured. Many important investor questions unanswered.
-- E: Not investor-ready. Very incomplete or confusing.
-
-SLIDE-LEVEL RUBRIC (grade each slide based on how well it answers the implied investor question):
-- problem: Is the problem clear, specific, and meaningful? Does it establish urgency?
-- solution: Is the solution clear, differentiated, and obviously tied to the problem?
-- market: Is the market credible, well-defined, and supported with data?
-- traction: Is there real evidence of demand (users, revenue, pilots, waitlist)?
-- team: Does the team inspire confidence in execution ability?
-- financials: Are projections credible with visible assumptions?
-- ask: Is the raise amount clear and justified with use of funds?
-- product: Is the product understandable and compelling?
-- competition: Is competitive positioning honest and differentiated?
-- business_model: Is monetization clear and believable?
-- go_to_market: Is the distribution strategy concrete?
-- roadmap: Are milestones specific and achievable?
-
-SLIDE GRADING RULES:
-- Grade each slide based on investor usefulness, not just completeness.
-- A grade requires strong evidence AND clarity, not just presence of information.
-- cover and contact slides are low-impact. They should rarely exceed B. Do not inflate their grades.
-- High-impact slides (problem, solution, market, traction, team, ask) need evidence to earn A.
-- Vague or generic content should be C or below.
-
-GRADING RULES:
-- Do NOT give an A just because the deck has all major sections. Completeness alone is not excellence.
-- Do NOT reward vague claims, unsupported projections, unclear assumptions, weak differentiation, or generic market framing.
-- The default grade for a decent but imperfect early-stage deck should usually be B or C, not A.
-- Only assign A if the deck would create very little investor friction and demonstrates clear evidence across all key areas.
-- Be honest. Founders benefit more from accurate feedback than false encouragement.
+SCORING RULES:
+- "yes" (score 2): The criterion is clearly met with specific, visible evidence in the extracted text.
+- "partial" (score 1): The criterion is partially met or implied but lacks specificity, clarity, or strong evidence.
+- "no" (score 0): The criterion is not met or no relevant evidence is visible in the extracted text.
 
 ANTI-HALLUCINATION RULES (critical):
-- Base your report ONLY on the extracted slide text and inferred slide types provided.
-- Do NOT invent or assume traction numbers, revenue figures, customer names, team credentials, or business claims not visible in the text.
-- If financial projections are shown but the assumptions behind them are not visible, note that as a gap.
-- If a slide references materials "available on request" or "in appendix," treat that as a gap for the deck itself.
-- If a slide's extracted_text is empty, "(No text extracted)", or very sparse, note that confidence is limited for that slide.
-- Do NOT praise specificity or evidence that is not actually visible in the extracted text.
+- Base your evaluation ONLY on the extracted slide text provided.
+- Do NOT invent or assume facts, numbers, names, or claims not visible in the text.
+- If the slide text is empty or "(No text extracted)", score all questions as "no" and note limited confidence.
+- If something is implied but not explicitly stated, score as "partial" at best.
+- Do NOT reward claims that lack visible supporting evidence.
 
-FEEDBACK QUALITY RULES:
-- Strengths must cite specific evidence visible in the extracted text. Avoid generic titles like "Comprehensive Coverage" unless the detail is very specific.
-- Issues must be concrete and actionable. Explain what is missing, unclear, or unsupported. Avoid vague issues like "could be clearer" unless paired with specific detail about what needs clarification.
-- Summary should be balanced, not promotional. Include both the deck's strongest signal and the main investor friction.
+MISSING ITEMS RULES:
+- Derive missing items ONLY from rubric questions scored "no" or "partial"
+- Each missing item should describe what an investor would expect to see but doesn't
+- Be specific: "No bottom-up market sizing" not "Market needs work"
+- Do NOT invent problems unrelated to the rubric questions
+
+FIXES RULES:
+- Each fix must be concrete and actionable
+- Start with an action verb: "Add...", "Show...", "Include...", "Quantify..."
+- Be specific: "Add bottom-up sizing (e.g. # of target customers x avg spend)" not "Improve market slide"
+- Fixes should directly address the missing items
+- Include 2-4 fixes based on the most important gaps
+
+EXAMPLES RULES:
+- Reference patterns from well-known strong decks (Airbnb, Dropbox, Buffer, etc.)
+- Keep examples generic but recognizable - describe the PATTERN, not fake data
+- Examples should illustrate how to fix the gaps
+- Do NOT cite fabricated numbers, metrics, or specific claims
+- Include 1-2 examples maximum
 
 OUTPUT FORMAT:
-Return ONLY valid JSON matching this exact structure:
+Return ONLY valid JSON matching this structure:
 
 {
-  "overall_grade": "A|B|C|D|E",
-  "summary": "One short paragraph (2-4 sentences) explaining the overall investor-readiness. Include the strongest positive signal and the main friction point.",
-  "strengths": [
+  "answers": [
     {
-      "title": "Specific strength title",
-      "detail": "1-2 sentence explanation citing visible evidence from the slides"
-    },
-    {
-      "title": "Specific strength title",
-      "detail": "1-2 sentence explanation citing visible evidence from the slides"
-    },
-    {
-      "title": "Specific strength title",
-      "detail": "1-2 sentence explanation citing visible evidence from the slides"
+      "question_id": "problem_01",
+      "answer": "yes|partial|no",
+      "score": 2|1|0,
+      "evidence": "Brief quote or reference from the slide text that supports this score",
+      "reasoning": "1 sentence explaining why this score was given"
     }
   ],
-  "biggest_issues": [
-    {
-      "title": "Specific issue title",
-      "detail": "1-2 sentence explanation of what is missing, unclear, or unsupported",
-      "priority": "high|medium|low"
-    },
-    {
-      "title": "Specific issue title",
-      "detail": "1-2 sentence explanation of what is missing, unclear, or unsupported",
-      "priority": "high|medium|low"
-    },
-    {
-      "title": "Specific issue title",
-      "detail": "1-2 sentence explanation of what is missing, unclear, or unsupported",
-      "priority": "high|medium|low"
-    }
+  "missing": [
+    "Specific thing that's missing vs investor expectations"
   ],
-  "slide_notes": [
-    {
-      "slide_number": 1,
-      "inferred_type": "cover",
-      "grade": "A|B|C|D|E",
-      "note": "1-2 sentence slide-specific feedback"
-    },
-    {
-      "slide_number": 2,
-      "inferred_type": "problem",
-      "grade": "A|B|C|D|E",
-      "note": "1-2 sentence slide-specific feedback"
-    }
+  "fixes": [
+    "Specific actionable fix starting with action verb"
   ],
-  "upgrade_teaser": {
-    "title": "What the full report adds",
-    "bullets": [
-      "Slide-by-slide scoring against investor questions",
-      "Specific rewrite recommendations",
-      "Prioritized fixes based on likely investor impact"
-    ]
+  "examples": [
+    "Pattern from strong decks that illustrates the fix"
+  ],
+  "summary": "1-2 sentence diagnosis of the slide's main strength and weakness"
+}
+
+REQUIREMENTS:
+- Answer EVERY question in the rubric provided
+- Each answer must have question_id, answer, score, evidence, and reasoning
+- score must match answer: yes=2, partial=1, no=0
+- missing: 1-4 items derived from low-scoring rubric questions
+- fixes: 2-4 specific actionable improvements
+- examples: 1-2 pattern references from strong decks
+- summary: concise diagnosis (strength + weakness)`
+
+/**
+ * Prompt for generating the deck summary after all slides are evaluated.
+ */
+const SUMMARY_PROMPT = `You are an experienced early-stage startup investor. You have just evaluated a pitch deck slide-by-slide using a structured rubric. Now summarize the overall findings.
+
+RULES:
+- Be balanced and honest. Include both strengths and weaknesses.
+- The summary should be 2-4 sentences covering: the strongest positive signal, the main investor friction, and overall investor-readiness.
+- Do NOT invent facts not in the slide data. Base all observations on the evaluation results.
+
+OUTPUT FORMAT:
+Return ONLY valid JSON:
+
+{
+  "summary": "2-4 sentence summary of the deck's investor-readiness."
+}`
+
+/**
+ * Generate fallback diagnosis when evaluation fails.
+ */
+function generateFallbackDiagnosis(rubric) {
+  return {
+    missing: ['Unable to evaluate slide content'],
+    fixes: ['Ensure slide has clear, readable content'],
+    examples: [],
+    summary: 'Evaluation failed due to processing error.',
   }
 }
 
-CRITICAL REQUIREMENTS:
-- strengths: EXACTLY 3 items
-- biggest_issues: EXACTLY 3 items
-- slide_notes: EXACTLY ONE item per slide in the deck. If the deck has 17 slides, return 17 slide_notes. If it has 5 slides, return 5 slide_notes.
-- All grades must be single letters: A, B, C, D, or E (no plus/minus)
-- upgrade_teaser should always have exactly the 3 bullets shown above`
+/**
+ * Evaluate a single slide against its rubric with actionable feedback.
+ */
+async function evaluateSlide(openai, slide, rubric) {
+  const rubricQuestions = rubric.map((q) => ({
+    question_id: q.id,
+    question: q.question,
+  }))
+
+  const userMessage = `SLIDE TYPE: ${slide.inferred_type}
+SLIDE NUMBER: ${slide.slide_number}
+
+EXTRACTED TEXT:
+${slide.extracted_text || '(No text extracted)'}
+
+RUBRIC QUESTIONS TO ANSWER:
+${JSON.stringify(rubricQuestions, null, 2)}
+
+Evaluate this slide by answering each rubric question, then provide missing items, fixes, examples, and a summary.`
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: RUBRIC_EVAL_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      max_tokens: 2500,
+      response_format: { type: 'json_object' },
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) {
+      throw new Error('Empty response from OpenAI')
+    }
+
+    const result = JSON.parse(content)
+
+    if (!Array.isArray(result.answers)) {
+      throw new Error('Invalid answers array in response')
+    }
+
+    // Validate and normalize answers
+    const validatedAnswers = result.answers.map((a) => {
+      const score =
+        a.answer === 'yes' ? 2 : a.answer === 'partial' ? 1 : a.answer === 'no' ? 0 : a.score ?? 0
+      return {
+        question_id: a.question_id,
+        answer: a.answer,
+        score,
+        evidence: a.evidence || '',
+        reasoning: a.reasoning || '',
+      }
+    })
+
+    // Validate and normalize actionable feedback
+    const missing = Array.isArray(result.missing) ? result.missing.filter((m) => typeof m === 'string' && m.trim()) : []
+    const fixes = Array.isArray(result.fixes) ? result.fixes.filter((f) => typeof f === 'string' && f.trim()) : []
+    const examples = Array.isArray(result.examples) ? result.examples.filter((e) => typeof e === 'string' && e.trim()) : []
+    const summary = typeof result.summary === 'string' ? result.summary : ''
+
+    return {
+      success: true,
+      answers: validatedAnswers,
+      missing,
+      fixes,
+      examples,
+      summary,
+    }
+  } catch (err) {
+    console.error(`Slide ${slide.slide_number} evaluation error:`, err.message)
+    const fallback = generateFallbackDiagnosis(rubric)
+    return {
+      success: false,
+      answers: generateFallbackAnswers(rubric),
+      ...fallback,
+    }
+  }
+}
 
 /**
- * Compute weighted deck score from slide notes.
- * @param {Array} slideNotes - Array of slide note objects with inferred_type and grade
- * @returns {{deckScore: number, totalWeight: number, slideCountUsed: number, overallGrade: string}}
+ * Generate deck summary from slide evaluations.
  */
-function computeWeightedScore(slideNotes) {
-  let totalWeightedScore = 0
-  let totalWeight = 0
-  let slideCountUsed = 0
+async function generateDeckSummary(openai, slideEvaluations, overallGrade, deckScore) {
+  const slideOverview = slideEvaluations.map((s) => ({
+    slide_number: s.slide_number,
+    type: s.type,
+    grade: s.grade,
+    missing_count: s.diagnosis?.missing?.length || 0,
+    fix_count: s.fixes?.length || 0,
+  }))
 
-  for (const note of slideNotes) {
-    const type = note.inferred_type || 'other'
-    const weight = SLIDE_WEIGHTS[type] ?? 0.5
-    const grade = note.grade
+  const userMessage = `DECK EVALUATION RESULTS:
+Overall Grade: ${overallGrade}
+Deck Score: ${deckScore.toFixed(2)} / 5.0
 
-    // Skip slides with zero weight (cover, contact)
-    if (weight === 0) {
-      continue
+SLIDE GRADES:
+${JSON.stringify(slideOverview, null, 2)}
+
+Generate a summary of this deck's investor-readiness.`
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: SUMMARY_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) {
+      throw new Error('Empty response from OpenAI')
     }
 
-    const score = GRADE_TO_SCORE[grade]
-    if (score === undefined) {
-      console.warn(`Invalid grade "${grade}" for slide ${note.slide_number}, skipping`)
-      continue
-    }
+    const result = JSON.parse(content)
+    return result.summary || 'Unable to generate summary.'
+  } catch (err) {
+    console.error('Summary generation error:', err.message)
+    return `This deck received an overall grade of ${overallGrade}. Review the slide-by-slide feedback for details.`
+  }
+}
 
-    totalWeightedScore += score * weight
-    totalWeight += weight
-    slideCountUsed++
+/**
+ * Build free report subset from full report.
+ * Exposes limited info: fix_count, short diagnosis. No fixes/examples leaked.
+ */
+function buildFreeReport(fullReport) {
+  // Collect issues from slides with their fix counts
+  const slideIssues = []
+  for (const slide of fullReport.slides) {
+    const weight = SLIDE_WEIGHTS[slide.type] ?? 0.5
+    if (weight === 0) continue // Skip cover/contact
+
+    // Get missing items for this slide
+    const missingItems = slide.diagnosis?.missing || []
+    const fixCount = slide.fixes?.length || 0
+
+    for (const missing of missingItems) {
+      slideIssues.push({
+        title: missing,
+        slide_type: slide.type,
+        slide_number: slide.slide_number,
+        slide_weight: weight,
+        fix_count: fixCount,
+        grade: slide.grade,
+      })
+    }
   }
 
-  // Avoid division by zero
-  if (totalWeight === 0) {
+  // Sort by slide weight (higher impact slides first), then by grade (worse first)
+  const gradeOrder = { E: 0, D: 1, C: 2, B: 3, A: 4 }
+  slideIssues.sort((a, b) => {
+    if (b.slide_weight !== a.slide_weight) return b.slide_weight - a.slide_weight
+    return (gradeOrder[a.grade] || 2) - (gradeOrder[b.grade] || 2)
+  })
+
+  // Top 3 biggest issues with fix_count
+  const topIssues = slideIssues.slice(0, 3).map((issue) => ({
+    title: issue.title,
+    detail: `${issue.slide_type} slide needs improvement`,
+    slide_type: issue.slide_type,
+    fix_count: issue.fix_count,
+    priority: issue.slide_weight >= 1.2 ? 'high' : issue.slide_weight >= 0.8 ? 'medium' : 'low',
+  }))
+
+  // Collect strengths from high-scoring slides
+  const slideStrengths = []
+  for (const slide of fullReport.slides) {
+    const weight = SLIDE_WEIGHTS[slide.type] ?? 0.5
+    if (weight === 0) continue
+    if (slide.grade !== 'A' && slide.grade !== 'B') continue
+
+    // Use slide summary as strength indicator
+    if (slide.summary) {
+      slideStrengths.push({
+        title: `Strong ${slide.type} slide`,
+        detail: slide.summary,
+        slide_type: slide.type,
+        slide_weight: weight,
+      })
+    }
+  }
+
+  slideStrengths.sort((a, b) => b.slide_weight - a.slide_weight)
+  const topStrengths = slideStrengths.slice(0, 3).map((s) => ({
+    title: s.title,
+    detail: s.detail,
+    slide_type: s.slide_type,
+  }))
+
+  // Light slide notes: short diagnosis only (no fixes, no examples)
+  const slideNotes = fullReport.slides.map((slide) => {
+    const missingCount = slide.diagnosis?.missing?.length || 0
+    const firstMissing = slide.diagnosis?.missing?.[0]
+
+    let note
+    if (slide.grade === 'A') {
+      note = 'Excellent - meets investor expectations'
+    } else if (slide.grade === 'B') {
+      note = 'Good - minor improvements possible'
+    } else if (missingCount > 0 && firstMissing) {
+      note = firstMissing
+    } else {
+      note = 'Needs improvement'
+    }
+
     return {
-      deckScore: 3.0, // Default to C
-      totalWeight: 0,
-      slideCountUsed: 0,
-      overallGrade: 'C',
+      slide_number: slide.slide_number,
+      inferred_type: slide.type,
+      grade: slide.grade,
+      note,
     }
-  }
-
-  const deckScore = totalWeightedScore / totalWeight
-  const overallGrade = scoreToGrade(deckScore)
+  })
 
   return {
-    deckScore: Math.round(deckScore * 100) / 100, // Round to 2 decimal places
-    totalWeight: Math.round(totalWeight * 100) / 100,
-    slideCountUsed,
-    overallGrade,
+    overall_grade: fullReport.overall_grade,
+    deck_score: fullReport.deck_score,
+    summary: fullReport.summary,
+    strengths: topStrengths,
+    biggest_issues: topIssues,
+    slide_notes: slideNotes,
+    upgrade_teaser: {
+      title: 'Unlock the full report',
+      bullets: [
+        'Specific fixes for each weak slide',
+        'Examples from successful pitch decks',
+        'Detailed rubric scoring with evidence',
+        'Prioritized action items by investor impact',
+      ],
+    },
   }
 }
 
 /**
- * Generate a free investor-readiness report for a deck.
- * @param {object} supabase - Supabase client
- * @param {string} deckId - Deck ID
- * @returns {Promise<{success: boolean, reportId?: string, overallGrade?: string, error?: string}>}
+ * Generate a full rubric-based report with actionable feedback, then derive the free subset.
+ * Stores both full_report and free_report in reports.content.
  */
 async function generateFreeReport(supabase, deckId) {
   const openaiKey = process.env.OPENAI_API_KEY
@@ -265,10 +392,10 @@ async function generateFreeReport(supabase, deckId) {
     return { success: false, error: 'No slides found for this deck' }
   }
 
-  // Update deck status to generating_free
+  // Update deck status
   await setDeckStatus(supabase, deckId, 'generating_free', null)
 
-  // Create or update report row with status = generating
+  // Create or update report row
   const { data: existingReport } = await supabase
     .from('reports')
     .select('id')
@@ -307,109 +434,85 @@ async function generateFreeReport(supabase, deckId) {
     reportId = newReport.id
   }
 
-  console.log(`Generating free report for deck ${deckId}, report ${reportId}`)
+  console.log(`Generating rubric-based report for deck ${deckId}, report ${reportId}`)
 
   try {
     const openai = new OpenAI.default({ apiKey: openaiKey })
 
-    // Prepare slide data for the prompt
-    const slideData = slides.map((slide) => ({
-      slide_number: slide.slide_number,
-      inferred_type: slide.inferred_type || 'other',
-      extracted_text: slide.extracted_text || '(No text extracted)',
-    }))
+    // Evaluate each slide
+    const slideEvaluations = []
 
-    const userMessage = `Here is the pitch deck to evaluate:
+    for (const slide of slides) {
+      const slideType = slide.inferred_type || 'other'
+      const rubric = RUBRICS[slideType] || RUBRICS.other
 
-DECK OVERVIEW:
-- Total slides: ${slides.length}
+      console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-SLIDE DATA:
-${JSON.stringify(slideData, null, 2)}
+      const evalResult = await evaluateSlide(openai, slide, rubric)
 
-IMPORTANT: This deck has exactly ${slides.length} slides. Your slide_notes array MUST contain exactly ${slides.length} items, one for each slide numbered 1 through ${slides.length}.
+      // Compute deterministic slide score
+      const slideScoreResult = computeSlideScore(evalResult.answers, rubric)
 
-Please evaluate this deck and return your report as JSON.`
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: REPORT_PROMPT,
+      slideEvaluations.push({
+        slide_number: slide.slide_number,
+        type: slideType,
+        rubric_answers: evalResult.answers,
+        weighted_score: slideScoreResult.weightedScore,
+        max_score: slideScoreResult.maxScore,
+        normalized: slideScoreResult.normalized,
+        grade: slideScoreResult.grade,
+        diagnosis: {
+          missing: evalResult.missing,
         },
-        {
-          role: 'user',
-          content: userMessage,
-        },
-      ],
-      max_tokens: 4000,
-      response_format: { type: 'json_object' },
-    })
-
-    const content = response.choices[0]?.message?.content
-    if (!content) {
-      throw new Error('Empty response from OpenAI')
+        fixes: evalResult.fixes,
+        examples: evalResult.examples,
+        summary: evalResult.summary,
+      })
     }
 
-    const report = JSON.parse(content)
-
-    // Validate required fields
-    if (!report.overall_grade || !['A', 'B', 'C', 'D', 'E'].includes(report.overall_grade)) {
-      throw new Error('Invalid overall_grade in report')
-    }
-
-    if (!report.summary || typeof report.summary !== 'string') {
-      throw new Error('Invalid summary in report')
-    }
-
-    if (!Array.isArray(report.strengths) || report.strengths.length !== 3) {
-      throw new Error('Report must have exactly 3 strengths')
-    }
-
-    if (!Array.isArray(report.biggest_issues) || report.biggest_issues.length !== 3) {
-      throw new Error('Report must have exactly 3 biggest_issues')
-    }
-
-    if (!Array.isArray(report.slide_notes)) {
-      throw new Error('Report must have slide_notes array')
-    }
-
-    if (report.slide_notes.length !== slides.length) {
-      console.warn(
-        `slide_notes count mismatch: got ${report.slide_notes.length}, expected ${slides.length}`
-      )
-      // Don't fail, but log the issue - the model sometimes gets this wrong
-    }
-
-    // Compute weighted score from slide notes
-    const scoringResult = computeWeightedScore(report.slide_notes)
-    const modelGrade = report.overall_grade
-    const computedGrade = scoringResult.overallGrade
+    // Compute deck-level score
+    const deckScoreResult = computeDeckScore(slideEvaluations)
 
     console.log(
-      `Scoring: model_grade=${modelGrade}, computed_grade=${computedGrade}, ` +
-        `deck_score=${scoringResult.deckScore}, slides_used=${scoringResult.slideCountUsed}`
+      `Deck scoring: grade=${deckScoreResult.overallGrade}, ` +
+        `score=${deckScoreResult.deckScore}, slides_used=${deckScoreResult.slideCountUsed}`
     )
 
-    // Override model's overall_grade with computed grade (deterministic)
-    report.overall_grade = computedGrade
+    // Generate summary
+    const summary = await generateDeckSummary(
+      openai,
+      slideEvaluations,
+      deckScoreResult.overallGrade,
+      deckScoreResult.deckScore
+    )
 
-    // Add scoring debug fields to report content
-    report.scoring = {
-      deck_score: scoringResult.deckScore,
-      total_weight: scoringResult.totalWeight,
-      slide_count_used: scoringResult.slideCountUsed,
-      model_grade: modelGrade, // Keep track of what the model thought
+    // Build full report
+    const fullReport = {
+      rubric_version: RUBRIC_VERSION,
+      overall_grade: deckScoreResult.overallGrade,
+      deck_score: deckScoreResult.deckScore,
+      total_weight: deckScoreResult.totalWeight,
+      slide_count_used: deckScoreResult.slideCountUsed,
+      summary,
+      slides: slideEvaluations,
     }
 
-    // Update report row with results
+    // Build free report subset
+    const freeReport = buildFreeReport(fullReport)
+
+    // Store both in content
+    const reportContent = {
+      full_report: fullReport,
+      free_report: freeReport,
+    }
+
+    // Update report row
     const { error: updateError } = await supabase
       .from('reports')
       .update({
         status: 'ready',
-        overall_grade: report.overall_grade,
-        content: report,
+        overall_grade: fullReport.overall_grade,
+        content: reportContent,
         generation_error: null,
         updated_at: new Date().toISOString(),
       })
@@ -420,18 +523,17 @@ Please evaluate this deck and return your report as JSON.`
       throw new Error('Failed to save report')
     }
 
-    console.log(`Free report generated successfully: grade ${report.overall_grade}`)
+    console.log(`Report generated successfully: grade ${fullReport.overall_grade}`)
 
     return {
       success: true,
       reportId,
-      overallGrade: report.overall_grade,
+      overallGrade: fullReport.overall_grade,
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown error during report generation'
     console.error('Report generation failed:', errorMessage)
 
-    // Update report row with failure
     await supabase
       .from('reports')
       .update({
@@ -447,9 +549,9 @@ Please evaluate this deck and return your report as JSON.`
 
 module.exports = {
   generateFreeReport,
-  computeWeightedScore,
-  REPORT_PROMPT,
-  SLIDE_WEIGHTS,
-  GRADE_TO_SCORE,
-  scoreToGrade,
+  evaluateSlide,
+  generateDeckSummary,
+  buildFreeReport,
+  RUBRIC_EVAL_PROMPT,
+  SUMMARY_PROMPT,
 }
