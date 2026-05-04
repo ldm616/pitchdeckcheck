@@ -428,23 +428,45 @@ async function generateFreeReport(supabase, deckId) {
   // Update deck status
   await setDeckStatus(supabase, deckId, 'generating_free', null)
 
-  // Always create a new report row (preserves history for comparison)
-  // get-report.js fetches the most recent one via .order('created_at', { ascending: false })
-  const { data: newReport, error: insertError } = await supabase
+  // Create or update report row
+  // Note: DB has unique constraint on (deck_id, report_type), so we update existing
+  const { data: existingReport } = await supabase
     .from('reports')
-    .insert({
-      deck_id: deckId,
-      report_type: 'free',
-      status: 'generating',
-    })
     .select('id')
+    .eq('deck_id', deckId)
+    .eq('report_type', 'free')
     .single()
 
-  if (insertError || !newReport) {
-    console.error('Failed to create report row:', insertError)
-    return { success: false, error: 'Failed to create report' }
+  let reportId
+  if (existingReport) {
+    reportId = existingReport.id
+    await supabase
+      .from('reports')
+      .update({
+        status: 'generating',
+        overall_grade: null,
+        content: null,
+        generation_error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', reportId)
+  } else {
+    const { data: newReport, error: insertError } = await supabase
+      .from('reports')
+      .insert({
+        deck_id: deckId,
+        report_type: 'free',
+        status: 'generating',
+      })
+      .select('id')
+      .single()
+
+    if (insertError || !newReport) {
+      console.error('Failed to create report row:', insertError)
+      return { success: false, error: 'Failed to create report' }
+    }
+    reportId = newReport.id
   }
-  const reportId = newReport.id
 
   console.log(`Generating rubric-based report for deck ${deckId}, report ${reportId}`)
 
