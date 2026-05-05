@@ -79,8 +79,25 @@ async function fetchRulePack(supabase, versionKey = DEFAULT_V3_VERSION_KEY, allo
       return null
     }
 
+    // Compute rule aggregations for debug output
+    const ruleList = rules || []
+    const ruleKeys = ruleList.map((r) => r.rule_key)
+    const ruleTypeCounts = {}
+    const categoryCounts = {}
+
+    for (const rule of ruleList) {
+      // Count by rule_type
+      const ruleType = rule.rule_type || 'general'
+      ruleTypeCounts[ruleType] = (ruleTypeCounts[ruleType] || 0) + 1
+
+      // Count by category (derived from rule_key prefix or slide_type)
+      const category = rule.slide_type || rule.rule_key?.split('_')[0] || 'general'
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1
+    }
+
     return {
       id: pack.id,
+      packKey: pack.pack_key || pack.name?.toLowerCase().replace(/\s+/g, '_'),
       versionKey: pack.version_key,
       name: pack.name,
       description: pack.description,
@@ -89,8 +106,11 @@ async function fetchRulePack(supabase, versionKey = DEFAULT_V3_VERSION_KEY, allo
       architectureVersion: pack.architecture_version,
       reportVersion: pack.report_version,
       metadata: pack.metadata,
-      rules: rules || [],
-      ruleCount: rules?.length || 0,
+      rules: ruleList,
+      ruleCount: ruleList.length,
+      ruleKeys,
+      ruleTypeCounts,
+      categoryCounts,
       source: 'supabase',
     }
   } catch (err) {
@@ -243,7 +263,17 @@ function getFallbackRulePack(packKey) {
     return null
   }
 
+  const ruleList = pack.rules.map((rule, idx) => ({
+    rule_key: `fallback_rule_${idx + 1}`,
+    rule_type: 'general',
+    title: `Rule ${idx + 1}`,
+    instruction: rule,
+    priority: idx + 1,
+    is_active: true,
+  }))
+
   return {
+    packKey,
     versionKey: RULE_PACK_VERSION,
     name: pack.name,
     description: pack.description,
@@ -251,15 +281,11 @@ function getFallbackRulePack(packKey) {
     isActive: true,
     architectureVersion: 'v2',
     reportVersion: null,
-    rules: pack.rules.map((rule, idx) => ({
-      rule_key: `fallback_rule_${idx + 1}`,
-      rule_type: 'general',
-      title: `Rule ${idx + 1}`,
-      instruction: rule,
-      priority: idx + 1,
-      is_active: true,
-    })),
-    ruleCount: pack.rules.length,
+    rules: ruleList,
+    ruleCount: ruleList.length,
+    ruleKeys: ruleList.map((r) => r.rule_key),
+    ruleTypeCounts: { general: ruleList.length },
+    categoryCounts: { general: ruleList.length },
     source: 'hardcoded_fallback',
   }
 }

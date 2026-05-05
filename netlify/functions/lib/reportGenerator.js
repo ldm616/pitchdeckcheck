@@ -916,10 +916,19 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
       slide.extracted_text
     )
 
-    return { success: true, answers: guardrailedAnswers }
+    // Build debug info for v3
+    const debug = evalContext ? {
+      prompt_source: promptSource,
+      system_prompt_preview: systemPrompt.slice(0, 1500) + (systemPrompt.length > 1500 ? '...' : ''),
+      user_prompt_preview: userMessage.slice(0, 1000) + (userMessage.length > 1000 ? '...' : ''),
+      system_prompt_length: systemPrompt.length,
+      user_prompt_length: userMessage.length,
+    } : null
+
+    return { success: true, answers: guardrailedAnswers, debug }
   } catch (err) {
     console.error(`Slide ${slide.slide_number} evaluation error:`, err.message)
-    return { success: false, answers: generateFallbackAnswers(rubric) }
+    return { success: false, answers: generateFallbackAnswers(rubric), debug: null }
   }
 }
 
@@ -1007,7 +1016,16 @@ For each thesis question, evaluate how well the COMPLETE DECK answers it. Look a
       }
     }
 
-    return { success: true, thesis }
+    // Build debug info for v3
+    const debug = evalContext ? {
+      prompt_source: promptSource,
+      system_prompt_preview: systemPrompt.slice(0, 1500) + (systemPrompt.length > 1500 ? '...' : ''),
+      user_prompt_preview: userMessage.slice(0, 1000) + (userMessage.length > 1000 ? '...' : ''),
+      system_prompt_length: systemPrompt.length,
+      user_prompt_length: userMessage.length,
+    } : null
+
+    return { success: true, thesis, debug }
   } catch (err) {
     console.error('Investment thesis evaluation error:', err.message)
 
@@ -1023,7 +1041,7 @@ For each thesis question, evaluate how well the COMPLETE DECK answers it. Look a
       }
     }
 
-    return { success: false, thesis: fallbackThesis }
+    return { success: false, thesis: fallbackThesis, debug: null }
   }
 }
 
@@ -1433,6 +1451,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
     // Evaluate each slide
     const slideEvaluations = []
+    const slideDebugInfo = [] // Collect debug info from each slide evaluation
 
     for (const slide of slides) {
       const slideType = slide.inferred_type || 'other'
@@ -1450,6 +1469,15 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
       const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext)
       const answers = result.answers
+
+      // Capture debug info for v3
+      if (result.debug && evalContext) {
+        slideDebugInfo.push({
+          slide_number: slide.slide_number,
+          slide_type: slideType,
+          ...result.debug,
+        })
+      }
 
       // Compute deterministic slide score (0-5 scale)
       const slideScoreResult = computeSlideScore(answers, rubric)
@@ -1495,7 +1523,9 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
     // Evaluate deck-level investment thesis
     console.log('Evaluating investment thesis...')
-    const { thesis: investmentThesis } = await evaluateInvestmentThesis(openai, slides, slideEvaluations, evalContext)
+    const thesisResult = await evaluateInvestmentThesis(openai, slides, slideEvaluations, evalContext)
+    const investmentThesis = thesisResult.thesis
+    const thesisDebugInfo = thesisResult.debug
 
     // Log thesis scores
     const thesisScores = Object.entries(investmentThesis)
@@ -1529,6 +1559,56 @@ async function generateFullReport(supabase, deckId, options = {}) {
       fallback_reason: evalContext?.fallbackReason || null,
     }
 
+    // Build v3 debug object with full diagnostic info
+    let debugInfo = null
+    if (evalArchitecture === 'v3' && evalContext) {
+      // Build rule injection summary from evalContext
+      const ruleInjectionSummary = {
+        rule_pack_key: evalContext.rulePack?.packKey || null,
+        rule_pack_version: evalContext.rulePack?.versionKey || null,
+        rule_keys: evalContext.rulePack?.ruleKeys || [],
+        rule_type_counts: evalContext.rulePack?.ruleTypeCounts || {},
+        category_counts: evalContext.rulePack?.categoryCounts || {},
+        total_rules: evalContext.rulePack?.ruleCount || 0,
+      }
+
+      // Build prompt info
+      const slidePrompt = getPromptByType(evalContext.promptVersions || [], 'slide_analysis')
+      const deckPrompt = getPromptByType(evalContext.promptVersions || [], 'deck_analysis')
+
+      const promptInfo = {
+        slide_analysis: slidePrompt ? {
+          source: 'database',
+          version_key: slidePrompt.versionKey || null,
+          prompt_preview: slidePrompt.promptText?.slice(0, 2000) + (slidePrompt.promptText?.length > 2000 ? '...' : ''),
+          prompt_length: slidePrompt.promptText?.length || 0,
+        } : {
+          source: 'hardcoded',
+          prompt_preview: RUBRIC_EVAL_PROMPT.slice(0, 2000) + '...',
+          prompt_length: RUBRIC_EVAL_PROMPT.length,
+        },
+        deck_analysis: deckPrompt ? {
+          source: 'database',
+          version_key: deckPrompt.versionKey || null,
+          prompt_preview: deckPrompt.promptText?.slice(0, 2000) + (deckPrompt.promptText?.length > 2000 ? '...' : ''),
+          prompt_length: deckPrompt.promptText?.length || 0,
+        } : {
+          source: 'hardcoded',
+          prompt_preview: THESIS_EVAL_PROMPT.slice(0, 2000) + '...',
+          prompt_length: THESIS_EVAL_PROMPT.length,
+        },
+      }
+
+      debugInfo = {
+        generated_at: new Date().toISOString(),
+        architecture: architectureMetadata,
+        rule_injection: ruleInjectionSummary,
+        prompts: promptInfo,
+        slide_evaluations: slideDebugInfo,
+        thesis_evaluation: thesisDebugInfo,
+      }
+    }
+
     // Determine report version based on architecture
     const reportVersion = evalArchitecture === 'v3' ? REPORT_VERSION_V3 : REPORT_VERSION
 
@@ -1550,10 +1630,15 @@ async function generateFullReport(supabase, deckId, options = {}) {
     // Derive free report subset from full report
     const freeReport = deriveFreeReport(fullReport)
 
-    // Store both in content
+    // Store both in content (plus debug for v3)
     const reportContent = {
       full_report: fullReport,
       free_report: freeReport,
+    }
+
+    // Add debug info for v3 reports
+    if (debugInfo) {
+      reportContent.debug = debugInfo
     }
 
     // Update report row
