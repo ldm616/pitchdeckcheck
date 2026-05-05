@@ -519,11 +519,12 @@ export default function App() {
 
       if (statusData.processing_status === 'ready' && statusData.report?.status === 'ready') {
         stopRegenPolling()
-        // Update report in list with new grade
+        // Update report in list with new grade and current timestamp
+        const now = new Date().toISOString()
         setReportsList((prev) =>
           prev.map((r) =>
             r.deck_id === deckId
-              ? { ...r, status: 'ready', overall_grade: statusData.report?.overall_grade || r.overall_grade }
+              ? { ...r, status: 'ready', overall_grade: statusData.report?.overall_grade || r.overall_grade, report_created_at: now }
               : r
           )
         )
