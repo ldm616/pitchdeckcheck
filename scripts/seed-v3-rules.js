@@ -1174,7 +1174,7 @@ async function main() {
       version_key: 'v2.7',
       title: 'Rubric Evaluation Prompt (v2.7) - Legacy',
       prompt_text: RUBRIC_EVAL_PROMPT,
-      status: 'deprecated',
+      status: 'archived', // Valid status: draft, active, archived
       is_active: false,
       metadata: {
         source: 'reportGenerator.js',
@@ -1190,7 +1190,7 @@ async function main() {
       version_key: 'v2.7',
       title: 'Thesis Evaluation Prompt (v2.7) - Legacy',
       prompt_text: THESIS_EVAL_PROMPT,
-      status: 'deprecated',
+      status: 'archived', // Valid status: draft, active, archived
       is_active: false,
       metadata: {
         source: 'reportGenerator.js',
