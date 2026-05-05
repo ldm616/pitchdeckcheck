@@ -4,7 +4,8 @@
   "private": true,
   "description": "Scripts for PitchDeckCheck administration",
   "scripts": {
-    "seed:rubrics": "node seed-rubrics.js"
+    "seed:rubrics": "node seed-rubrics.js",
+    "seed:patterns": "node seed-patterns.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0"

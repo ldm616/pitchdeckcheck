@@ -448,9 +448,44 @@ When changing rubric questions:
 
 ---
 
+## Canonical Investor Patterns
+
+The canonical patterns source of truth is:
+
+```
+/netlify/functions/lib/canonicalPatterns.js
+```
+
+A database copy exists in `patterns`, `pattern_sources`, and `pattern_rubric_map` tables for:
+- Traceability and version history
+- Future retrieval and querying
+- Pattern-to-rubric mapping lookups
+
+**Key principles:**
+
+1. **Patterns are derived from investment memos, not pitch deck aesthetics**
+   - Sources: YouTube/Sequoia 2005, Shopify/BVP 2010, SendGrid/BVP 2011
+   - Each pattern captures reusable investor reasoning, not generic advice
+
+2. **Patterns map to specific rubric questions, not broad topics**
+   - Each mapping includes a `strength` score (1-3) indicating relevance
+   - Mappings are validated against `rubric_questions` during seeding
+
+3. **Code is the source of truth, database is the copy**
+   - Edit `canonicalPatterns.js` first
+   - Run `npm run seed:patterns` to sync to database
+
+When changing patterns:
+1. Edit `canonicalPatterns.js` first
+2. Run `npm run seed:patterns` in `/scripts` to sync to database
+3. Update `PATTERN_VERSION` if pattern structure changes
+
+---
+
 ## Version History
 
 | Version | Date | Description |
 |---------|------|-------------|
 | v1.0 | 2026-05-04 | Initial evaluation framework |
 | v1.1 | 2026-05-04 | Add expected findings, regression checks, golden checks |
+| v1.2 | 2026-05-04 | Add canonical investor patterns documentation |
