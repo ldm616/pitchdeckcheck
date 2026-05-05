@@ -157,8 +157,11 @@ interface ReportListItem {
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 const SESSION_KEY = 'pdc_authenticated'
 const SESSION_PASSWORD_KEY = 'pdc_admin_pw'
+const EVAL_ARCH_KEY = 'evaluation_architecture'
 const POLL_INTERVAL_MS = 2000
 const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
+
+type EvalArchitecture = 'v2' | 'v3'
 
 export default function App() {
   // Check for admin mode via URL param (user must already be authenticated)
@@ -171,6 +174,17 @@ export default function App() {
   const [reportsList, setReportsList] = useState<ReportListItem[]>([])
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsError, setReportsError] = useState('')
+
+  // Dev-only: Evaluation architecture toggle (v2/v3)
+  const [evalArch, setEvalArch] = useState<EvalArchitecture>(() => {
+    const stored = localStorage.getItem(EVAL_ARCH_KEY)
+    return stored === 'v3' ? 'v3' : 'v2'
+  })
+
+  const handleEvalArchToggle = (arch: EvalArchitecture) => {
+    setEvalArch(arch)
+    localStorage.setItem(EVAL_ARCH_KEY, arch)
+  }
 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState('')
@@ -539,7 +553,10 @@ export default function App() {
     // Background function returns 202 immediately, runs in background
     fetch('/.netlify/functions/generate-report-background', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-evaluation-architecture': evalArch,
+      },
       body: JSON.stringify({
         deck_id: deckId,
         admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
@@ -838,8 +855,50 @@ export default function App() {
                 Reports
               </button>
             </div>
-            {/* Spacer to balance the title on the left */}
-            <div style={{ width: '120px' }} />
+            {/* Dev toggle: Evaluation architecture v2/v3 */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontFamily,
+              }}
+            >
+              <span style={{ color: '#9ca3af' }}>Eval:</span>
+              <button
+                onClick={() => handleEvalArchToggle('v2')}
+                style={{
+                  background: evalArch === 'v2' ? '#e5e7eb' : 'none',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '3px',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  fontFamily,
+                  color: evalArch === 'v2' ? '#111827' : '#6b7280',
+                  cursor: 'pointer',
+                  fontWeight: evalArch === 'v2' ? 600 : 400,
+                }}
+              >
+                v2
+              </button>
+              <button
+                onClick={() => handleEvalArchToggle('v3')}
+                style={{
+                  background: evalArch === 'v3' ? '#dbeafe' : 'none',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '3px',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  fontFamily,
+                  color: evalArch === 'v3' ? '#1d4ed8' : '#6b7280',
+                  cursor: 'pointer',
+                  fontWeight: evalArch === 'v3' ? 600 : 400,
+                }}
+              >
+                v3
+              </button>
+            </div>
           </div>
         </div>
       )}

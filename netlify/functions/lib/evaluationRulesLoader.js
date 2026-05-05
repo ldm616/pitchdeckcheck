@@ -38,22 +38,31 @@ function isV3Enabled() {
 /**
  * Fetch a rule pack from Supabase by version_key.
  *
+ * When EVALUATION_ARCHITECTURE=v3, we load the pack even if is_active=false
+ * to support testing draft rule packs.
+ *
  * @param {Object} supabase - Supabase client
  * @param {string} versionKey - Rule pack version key (e.g., 'v3.0.0-draft')
+ * @param {boolean} allowInactive - If true, load even if is_active=false (for v3 testing)
  * @returns {Promise<Object|null>} - Rule pack with metadata and rules, or null on error
  */
-async function fetchRulePack(supabase, versionKey = DEFAULT_V3_VERSION_KEY) {
+async function fetchRulePack(supabase, versionKey = DEFAULT_V3_VERSION_KEY, allowInactive = false) {
   try {
     // Fetch the rule pack metadata by version_key
-    const { data: pack, error: packError } = await supabase
+    // When allowInactive=true (v3 mode), we don't filter by is_active
+    let query = supabase
       .from('evaluation_rule_packs')
       .select('*')
       .eq('version_key', versionKey)
-      .eq('is_active', true)
-      .single()
+
+    if (!allowInactive) {
+      query = query.eq('is_active', true)
+    }
+
+    const { data: pack, error: packError } = await query.single()
 
     if (packError || !pack) {
-      console.log(`[v3] Rule pack '${versionKey}' not found or not active`)
+      console.log(`[v3] Rule pack '${versionKey}' not found${allowInactive ? '' : ' or not active'}`)
       return null
     }
 
@@ -154,19 +163,29 @@ async function fetchAllRulePacks(supabase) {
 /**
  * Fetch prompt versions for a rule pack from Supabase.
  *
+ * When allowInactive=true (v3 mode), we load prompts even if is_active=false
+ * to support testing draft prompts.
+ *
  * @param {Object} supabase - Supabase client
  * @param {string} rulePackId - Rule pack ID
- * @param {string} promptType - Optional prompt type filter (e.g., 'rubric_eval', 'thesis_eval')
+ * @param {Object} options - Fetch options
+ * @param {string} options.promptType - Optional prompt type filter (e.g., 'slide_analysis', 'deck_analysis')
+ * @param {boolean} options.allowInactive - If true, load even if is_active=false (for v3 testing)
  * @returns {Promise<Object[]>} - Array of prompt versions, or empty array on error
  */
-async function fetchPromptVersions(supabase, rulePackId, promptType = null) {
+async function fetchPromptVersions(supabase, rulePackId, options = {}) {
+  const { promptType = null, allowInactive = false } = options
+
   try {
     let query = supabase
       .from('evaluation_prompt_versions')
       .select('*')
       .eq('rule_pack_id', rulePackId)
-      .eq('is_active', true)
       .order('created_at', { ascending: false })
+
+    if (!allowInactive) {
+      query = query.eq('is_active', true)
+    }
 
     if (promptType) {
       query = query.eq('prompt_type', promptType)
@@ -196,6 +215,20 @@ async function fetchPromptVersions(supabase, rulePackId, promptType = null) {
     console.error(`[v3] Exception fetching prompt versions:`, err.message)
     return []
   }
+}
+
+/**
+ * Get a specific prompt by type from loaded prompt versions.
+ *
+ * @param {Object[]} promptVersions - Array of prompt version objects
+ * @param {string} promptType - Prompt type to find (e.g., 'slide_analysis', 'deck_analysis')
+ * @returns {Object|null} - Prompt version or null if not found
+ */
+function getPromptByType(promptVersions, promptType) {
+  if (!promptVersions || promptVersions.length === 0) {
+    return null
+  }
+  return promptVersions.find((p) => p.promptType === promptType) || null
 }
 
 /**
@@ -271,14 +304,16 @@ async function loadEvaluationContext(supabase, options = {}) {
   console.log(`[eval] Architecture: v3 - loading rule pack '${versionKey}'`)
 
   // Try to load from Supabase
-  const rulePack = await fetchRulePack(supabase, versionKey)
+  // For v3, allow loading inactive packs (draft mode)
+  const rulePack = await fetchRulePack(supabase, versionKey, true)
 
   if (rulePack) {
     result.rulePack = rulePack
 
     // Load prompt versions if requested
+    // For v3, allow loading inactive prompts (draft mode)
     if (loadPrompts) {
-      const promptVersions = await fetchPromptVersions(supabase, rulePack.id)
+      const promptVersions = await fetchPromptVersions(supabase, rulePack.id, { allowInactive: true })
       result.promptVersions = promptVersions
       result.promptVersionCount = promptVersions.length
     }
@@ -376,6 +411,7 @@ module.exports = {
 
   // Prompt version loading
   fetchPromptVersions,
+  getPromptByType,
 
   // Main entry point
   loadEvaluationContext,

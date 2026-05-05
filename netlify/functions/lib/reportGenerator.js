@@ -32,6 +32,8 @@ const {
   loadEvaluationContext,
   getEvaluationArchitecture,
   detectRulePack,
+  getPromptByType,
+  formatRulesForPrompt,
 } = require('./evaluationRulesLoader')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
@@ -780,8 +782,17 @@ function applyGradeCalibrationCap(deckScoreResult, slideEvaluations) {
 /**
  * Evaluate a single slide against its investor questions with deck context.
  * Fetches relevant patterns to enhance gap/fix reasoning.
+ *
+ * When evalContext is provided (v3 mode), uses DB-loaded prompts if available.
+ *
+ * @param {Object} openai - OpenAI client
+ * @param {Object} supabase - Supabase client
+ * @param {Object} slide - Slide object with extracted_text, inferred_type, slide_number
+ * @param {Object[]} rubric - Array of rubric questions for this slide type
+ * @param {Object[]} deckOutline - Compact deck outline for cross-slide context
+ * @param {Object|null} evalContext - v3 evaluation context with promptVersions (optional)
  */
-async function evaluateSlide(openai, supabase, slide, rubric, deckOutline) {
+async function evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext = null) {
   // Sort questions by importance for display
   const sortedRubric = sortByImportance(rubric)
 
@@ -838,11 +849,23 @@ ${JSON.stringify(
 
 Evaluate each question. Include assessment, gap, investor_impact, fix, and confidence for each.`
 
+  // Determine which prompt to use: DB (v3) or hardcoded (v2)
+  let systemPrompt = RUBRIC_EVAL_PROMPT
+  let promptSource = 'hardcoded'
+
+  if (evalContext && evalContext.promptVersions && evalContext.promptVersions.length > 0) {
+    const dbPrompt = getPromptByType(evalContext.promptVersions, 'slide_analysis')
+    if (dbPrompt && dbPrompt.promptText) {
+      systemPrompt = dbPrompt.promptText
+      promptSource = 'database'
+    }
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: RUBRIC_EVAL_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
       max_tokens: 3000,
@@ -902,8 +925,15 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
 /**
  * Evaluate deck-level investment thesis questions.
  * Synthesizes evidence from all slides to answer core investor questions.
+ *
+ * When evalContext is provided (v3 mode), uses DB-loaded prompts if available.
+ *
+ * @param {Object} openai - OpenAI client
+ * @param {Object[]} slides - Array of slide objects
+ * @param {Object[]} slideEvaluations - Array of evaluated slide results
+ * @param {Object|null} evalContext - v3 evaluation context with promptVersions (optional)
  */
-async function evaluateInvestmentThesis(openai, slides, slideEvaluations) {
+async function evaluateInvestmentThesis(openai, slides, slideEvaluations, evalContext = null) {
   // Build comprehensive deck content for thesis evaluation
   const deckContent = slides.map((slide) => {
     const evaluation = slideEvaluations.find((e) => e.slide_number === slide.slide_number)
@@ -933,11 +963,23 @@ ${JSON.stringify(thesisContext, null, 2)}
 
 For each thesis question, evaluate how well the COMPLETE DECK answers it. Look across ALL relevant slides and synthesize the evidence.`
 
+  // Determine which prompt to use: DB (v3) or hardcoded (v2)
+  let systemPrompt = THESIS_EVAL_PROMPT
+  let promptSource = 'hardcoded'
+
+  if (evalContext && evalContext.promptVersions && evalContext.promptVersions.length > 0) {
+    const dbPrompt = getPromptByType(evalContext.promptVersions, 'deck_analysis')
+    if (dbPrompt && dbPrompt.promptText) {
+      systemPrompt = dbPrompt.promptText
+      promptSource = 'database'
+    }
+  }
+
   try {
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: THESIS_EVAL_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ],
       max_tokens: 2500,
@@ -1279,9 +1321,12 @@ function deriveFreeReport(fullReport) {
  *
  * @param {Object} supabase - Supabase client
  * @param {string} deckId - Deck UUID
+ * @param {Object} options - Optional settings
+ * @param {string} options.architectureOverride - Override evaluation architecture ('v2' or 'v3')
  * @returns {Object} - { success, reportId, overallGrade } or { success: false, error }
  */
-async function generateFullReport(supabase, deckId) {
+async function generateFullReport(supabase, deckId, options = {}) {
+  const { architectureOverride = null } = options
   const openaiKey = process.env.OPENAI_API_KEY
 
   if (!openaiKey) {
@@ -1356,26 +1401,32 @@ async function generateFullReport(supabase, deckId) {
     // Build deck outline for cross-slide context
     const deckOutline = buildDeckOutline(slides)
 
-    // ===== V3 Architecture: Load evaluation context (read-only) =====
-    // This loads rule packs from Supabase when EVALUATION_ARCHITECTURE=v3
-    // Currently read-only - does not modify evaluation behavior yet
-    const evalArchitecture = getEvaluationArchitecture()
-    console.log(`[eval] Using architecture: ${evalArchitecture}`)
+    // ===== V3 Architecture: Load evaluation context =====
+    // Use override from request header if provided, otherwise fall back to env
+    const evalArchitecture = architectureOverride || getEvaluationArchitecture()
+    const archSource = architectureOverride ? 'header override' : 'env'
+    console.log(`[eval] Using architecture: ${evalArchitecture} (${archSource})`)
 
     let evalContext = null
     if (evalArchitecture === 'v3') {
       // Detect appropriate rule pack version based on deck characteristics
       const detectedVersionKey = detectRulePack({ slides, deckOutline })
 
-      // Load evaluation context (rule pack + optional prompt versions)
+      // Load evaluation context (rule pack + prompt versions from DB)
       evalContext = await loadEvaluationContext(supabase, {
         versionKey: detectedVersionKey,
         fallbackPackKey: 'modern_seed_deck',
-        loadPrompts: false, // Not using DB prompts yet
+        loadPrompts: true, // Load DB prompts for v3
       })
 
-      // Diagnostic logging is handled inside loadEvaluationContext
-      // No additional logging needed here - context box is printed by loader
+      // Log prompt sources for debugging
+      if (evalContext.promptVersionCount > 0) {
+        const slidePrompt = getPromptByType(evalContext.promptVersions, 'slide_analysis')
+        const deckPrompt = getPromptByType(evalContext.promptVersions, 'deck_analysis')
+        console.log(`[v3] Prompts loaded: slide_analysis=${slidePrompt ? 'DB' : 'hardcoded'}, deck_analysis=${deckPrompt ? 'DB' : 'hardcoded'}`)
+      } else {
+        console.log(`[v3] No DB prompts loaded - using hardcoded prompts`)
+      }
     }
     // ===== End V3 Architecture block =====
 
@@ -1396,7 +1447,7 @@ async function generateFullReport(supabase, deckId) {
 
       console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-      const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline)
+      const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext)
       const answers = result.answers
 
       // Compute deterministic slide score (0-5 scale)
@@ -1443,7 +1494,7 @@ async function generateFullReport(supabase, deckId) {
 
     // Evaluate deck-level investment thesis
     console.log('Evaluating investment thesis...')
-    const { thesis: investmentThesis } = await evaluateInvestmentThesis(openai, slides, slideEvaluations)
+    const { thesis: investmentThesis } = await evaluateInvestmentThesis(openai, slides, slideEvaluations, evalContext)
 
     // Log thesis scores
     const thesisScores = Object.entries(investmentThesis)
@@ -1465,10 +1516,23 @@ async function generateFullReport(supabase, deckId) {
     )
     console.log(`Generated ${recommendedHighlights.bullets?.length || 0} recommended investment highlights`)
 
+    // Build architecture metadata for tracking
+    const architectureMetadata = {
+      architecture_version: evalArchitecture,
+      architecture_source: archSource,
+      rule_pack_version_key: evalContext?.rulePack?.versionKey || null,
+      prompt_source: evalContext?.promptVersionCount > 0 ? 'database' : 'hardcoded',
+      rules_loaded_count: evalContext?.rulePack?.ruleCount || 0,
+      prompt_versions_loaded_count: evalContext?.promptVersionCount || 0,
+      fallback_used: evalContext?.fallbackUsed || false,
+      fallback_reason: evalContext?.fallbackReason || null,
+    }
+
     // Build full report
     const fullReport = {
       report_version: REPORT_VERSION,
       rubric_version: RUBRIC_VERSION,
+      architecture: architectureMetadata,
       overall_grade: deckScoreResult.overallGrade,
       deck_score: deckScoreResult.deckScore,
       total_weight: deckScoreResult.totalWeight,
@@ -1505,7 +1569,18 @@ async function generateFullReport(supabase, deckId) {
       throw new Error('Failed to save report')
     }
 
-    console.log(`Report generated successfully: grade ${fullReport.overall_grade}`)
+    // Log final report generation summary
+    console.log(`[eval] ┌─────────────────────────────────────────`)
+    console.log(`[eval] │ Report Generated Successfully`)
+    console.log(`[eval] │ Grade: ${fullReport.overall_grade}`)
+    console.log(`[eval] │ Architecture: ${architectureMetadata.architecture_version}`)
+    console.log(`[eval] │ Prompt source: ${architectureMetadata.prompt_source}`)
+    if (evalArchitecture === 'v3') {
+      console.log(`[eval] │ Rule pack: ${architectureMetadata.rule_pack_version_key || 'none'}`)
+      console.log(`[eval] │ Rules loaded: ${architectureMetadata.rules_loaded_count}`)
+      console.log(`[eval] │ Prompt versions: ${architectureMetadata.prompt_versions_loaded_count}`)
+    }
+    console.log(`[eval] └─────────────────────────────────────────`)
 
     return {
       success: true,

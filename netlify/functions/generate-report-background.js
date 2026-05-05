@@ -35,6 +35,10 @@ exports.handler = async (event) => {
 
   const { deck_id, admin_password } = body
 
+  // Read optional architecture override from header
+  const archHeader = event.headers['x-evaluation-architecture']
+  const architectureOverride = archHeader === 'v3' ? 'v3' : archHeader === 'v2' ? 'v2' : null
+
   if (!deck_id) {
     return {
       statusCode: 400,
@@ -88,10 +92,10 @@ exports.handler = async (event) => {
     }
   }
 
-  console.log(`Starting report regeneration for deck ${deck_id}`)
+  console.log(`Starting report regeneration for deck ${deck_id}${architectureOverride ? ` (architecture: ${architectureOverride})` : ''}`)
 
-  // Generate full report
-  const result = await generateFullReport(supabase, deck_id)
+  // Generate full report with optional architecture override
+  const result = await generateFullReport(supabase, deck_id, { architectureOverride })
 
   if (result.success) {
     await setDeckStatus(supabase, deck_id, 'ready', null)
