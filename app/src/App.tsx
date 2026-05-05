@@ -1881,6 +1881,10 @@ export default function App() {
                               }
                             }}
                             onMouseLeave={(e) => {
+                              // Don't reset colors if regenerating - keep blue
+                              if (actionDeckId === item.deck_id && actionType === 'regenerate') {
+                                return
+                              }
                               const svg = e.currentTarget.querySelector('svg')
                               const label = e.currentTarget.querySelector('span')
                               if (svg) svg.style.color = '#9ca3af'
