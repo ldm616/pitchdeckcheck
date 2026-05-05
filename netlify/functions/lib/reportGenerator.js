@@ -28,6 +28,11 @@ const {
   sortByImportance,
   sortAnswersByImportance,
 } = require('./rubrics')
+const {
+  loadEvaluationContext,
+  getEvaluationArchitecture,
+  detectRulePack,
+} = require('./evaluationRulesLoader')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
@@ -1350,6 +1355,33 @@ async function generateFullReport(supabase, deckId) {
 
     // Build deck outline for cross-slide context
     const deckOutline = buildDeckOutline(slides)
+
+    // ===== V3 Architecture: Load evaluation context (read-only) =====
+    // This loads rule packs from Supabase when EVALUATION_ARCHITECTURE=v3
+    // Currently read-only - does not modify evaluation behavior yet
+    const evalArchitecture = getEvaluationArchitecture()
+    console.log(`[eval] Using architecture: ${evalArchitecture}`)
+
+    let evalContext = null
+    if (evalArchitecture === 'v3') {
+      // Detect appropriate rule pack based on deck characteristics
+      const detectedPackKey = detectRulePack({ slides, deckOutline })
+
+      // Load evaluation context (rule pack + optional prompt version)
+      evalContext = await loadEvaluationContext(supabase, {
+        packKey: detectedPackKey,
+        loadPrompt: false, // Not using DB prompts yet
+      })
+
+      // Log v3 context for debugging (no behavior change)
+      if (evalContext.rulePack) {
+        console.log(`[v3] Rule pack loaded: ${evalContext.rulePack.name} (${evalContext.rulePack.ruleCount} rules)`)
+        if (evalContext.fallbackUsed) {
+          console.log(`[v3] Fallback used: ${evalContext.fallbackReason}`)
+        }
+      }
+    }
+    // ===== End V3 Architecture block =====
 
     // Evaluate each slide
     const slideEvaluations = []
