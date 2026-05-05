@@ -68,12 +68,30 @@ interface FullReportSlide {
   questions: SlideQuestion[]
 }
 
+interface ThesisElement {
+  question: string
+  score: number
+  assessment: string
+  gaps: string
+  verdict: string
+}
+
+interface InvestmentThesis {
+  why_this_market: ThesisElement
+  why_this_product: ThesisElement
+  why_this_team: ThesisElement
+  why_now: ThesisElement
+}
+
 interface ReportContent {
   // Common fields
   overall_grade: string
   summary: string
   deck_score?: number
   rubric_version?: string
+
+  // Investment thesis (deck-level)
+  investment_thesis?: InvestmentThesis
 
   // Full report format
   slides?: FullReportSlide[]
@@ -1108,6 +1126,119 @@ export default function App() {
                 {report.summary}
               </p>
             </div>
+
+            {/* Investment Thesis */}
+            {report.investment_thesis && (
+              <div style={{ marginBottom: '32px' }}>
+                <h3
+                  style={{
+                    margin: '0 0 16px 0',
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: '#111827',
+                  }}
+                >
+                  Investment Thesis
+                </h3>
+                <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: '#6b7280' }}>
+                  How well the deck answers core investor questions
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {Object.entries(report.investment_thesis).map(([key, thesis]) => {
+                    const thesisElement = thesis as ThesisElement
+                    const label = key === 'why_this_market' ? 'Why This Market?'
+                      : key === 'why_this_product' ? 'Why This Product?'
+                      : key === 'why_this_team' ? 'Why This Team?'
+                      : 'Why Now?'
+
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Thesis Header */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '12px 16px',
+                            backgroundColor: thesisElement.score >= 4 ? '#f0fdf4'
+                              : thesisElement.score <= 2 ? '#fef2f2'
+                              : '#fffbeb',
+                            borderBottom: '1px solid #e5e7eb',
+                          }}
+                        >
+                          <span style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>
+                            {label}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '14px',
+                              fontWeight: 600,
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: thesisElement.score >= 4 ? '#22c55e'
+                                : thesisElement.score <= 2 ? '#ef4444'
+                                : '#eab308',
+                              color: '#ffffff',
+                            }}
+                          >
+                            {thesisElement.score}/5
+                          </span>
+                        </div>
+
+                        {/* Thesis Content */}
+                        <div style={{ padding: '14px 16px' }}>
+                          {/* Verdict */}
+                          <div style={{ marginBottom: '12px' }}>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: '14px',
+                                fontWeight: 500,
+                                color: thesisElement.score >= 4 ? '#166534'
+                                  : thesisElement.score <= 2 ? '#991b1b'
+                                  : '#92400e',
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {thesisElement.verdict}
+                            </p>
+                          </div>
+
+                          {/* Assessment */}
+                          <div style={{ marginBottom: '10px' }}>
+                            <p style={{ margin: '0 0 3px 0', fontSize: '11px', fontWeight: 500, color: '#6b7280', textTransform: 'uppercase' }}>
+                              Evidence
+                            </p>
+                            <p style={{ margin: 0, fontSize: '13px', color: '#374151', lineHeight: 1.5 }}>
+                              {thesisElement.assessment}
+                            </p>
+                          </div>
+
+                          {/* Gaps */}
+                          {thesisElement.gaps && thesisElement.gaps !== 'None - thesis is well-supported' && (
+                            <div>
+                              <p style={{ margin: '0 0 3px 0', fontSize: '11px', fontWeight: 500, color: '#dc2626', textTransform: 'uppercase' }}>
+                                Gaps
+                              </p>
+                              <p style={{ margin: 0, fontSize: '13px', color: '#991b1b', lineHeight: 1.5 }}>
+                                {thesisElement.gaps}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Full Report: Slide-by-Slide with Questions */}
             {report.slides && report.slides.length > 0 && (

@@ -15,6 +15,125 @@ const {
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
 
 /**
+ * Deck-level investment thesis questions.
+ * These evaluate the entire deck against core investor questions.
+ */
+const THESIS_QUESTIONS = {
+  why_this_market: {
+    question: 'Why is this the right market to pursue?',
+    criteria: [
+      'Is the market large enough for venture-scale outcomes?',
+      'Is the market growing?',
+      'Are there strong tailwinds or drivers?',
+      'Is the pain urgent or economically meaningful?',
+      'Is there evidence the opportunity is real and timely?',
+    ],
+    relevant_slides: ['market', 'problem', 'traction'],
+  },
+  why_this_product: {
+    question: 'Why is this product likely to win?',
+    criteria: [
+      'Is the product significantly better than current alternatives?',
+      'Is the value proposition clear and compelling?',
+      'Are there current advantages competitors will find hard to copy?',
+      'Are there future advantages or compounding moats?',
+      'Is differentiation specific rather than generic?',
+    ],
+    relevant_slides: ['solution', 'product', 'competition'],
+  },
+  why_this_team: {
+    question: 'Why is this the right team to build this?',
+    criteria: [
+      'Does the team have relevant domain expertise?',
+      'Does the team have relevant product/technical expertise?',
+      'Does the team have GTM or sales experience?',
+      'Is there evidence of past success or credibility?',
+      'Does team composition match what the business needs?',
+    ],
+    relevant_slides: ['team'],
+  },
+  why_now: {
+    question: 'Why is now the right time for this?',
+    criteria: [
+      'Are there market or technology shifts creating this opportunity?',
+      'Is there urgency or a window closing?',
+      'Is there early traction validating timing?',
+      'Are incumbents unable or unwilling to address this now?',
+      'Is the market ready for this solution?',
+    ],
+    relevant_slides: ['problem', 'market', 'traction', 'solution'],
+  },
+}
+
+/**
+ * Prompt for deck-level investment thesis evaluation.
+ */
+const THESIS_EVAL_PROMPT = `You are an experienced early-stage startup investor evaluating a pitch deck at the thesis level. You are evaluating whether the FULL DECK answers the core investor questions that determine fundability.
+
+This is NOT about individual slides. This is about whether the complete deck builds a convincing case for each thesis question.
+
+For each thesis question, you must provide:
+- score (0-5): How well the FULL DECK answers this question
+- assessment: What evidence exists across the deck (be specific, cite slides)
+- gaps: What is missing or unconvincing
+- verdict: One-sentence investor takeaway
+
+SCORING SCALE (0-5):
+5 = Compelling answer with strong, specific evidence across the deck
+4 = Good answer, minor gaps or areas that could be stronger
+3 = Partial answer, meaningful gaps in the argument
+2 = Weak answer, major gaps undermine the thesis
+1 = Barely addressed across the deck
+0 = Not addressed / no evidence found
+
+SCORING DISCIPLINE:
+- Most decks score 2-3 on thesis questions
+- Score 5 is rare - requires exceptional evidence and clarity
+- Evaluate the CUMULATIVE case across all slides, not individual slides
+- A strong market slide with no traction is still a weak "why this market" answer
+
+ASSESSMENT RULES:
+- Reference specific slides and content
+- Quote or paraphrase actual evidence when possible
+- Be specific about what contributes to the thesis
+- If evidence is scattered, note which slides contribute
+
+GAP RULES:
+- Identify what would make the thesis answer stronger
+- Be specific about missing evidence or weak arguments
+- If score is 5, gaps should be "None - thesis is well-supported"
+
+VERDICT RULES:
+- One sentence summary of how an investor would view this thesis element
+- Be direct and honest
+- Examples:
+  - "The market opportunity is clear but timing justification is missing."
+  - "Strong domain expertise but no evidence of GTM capability."
+  - "Differentiation claims lack specificity - could apply to any competitor."
+
+OUTPUT FORMAT:
+Return ONLY valid JSON:
+
+{
+  "why_this_market": {
+    "score": 3,
+    "assessment": "The market slide (slide 4) shows a $2B TAM with growth projections. The problem slide (slide 2) establishes pain around manual processes. However, no bottom-up sizing or assumptions are visible.",
+    "gaps": "Market size lacks supporting assumptions. No evidence of market timing or why this opportunity exists now vs. 5 years ago.",
+    "verdict": "Market size is claimed but not defended - investors will question the methodology."
+  },
+  "why_this_product": {...},
+  "why_this_team": {...},
+  "why_now": {...}
+}
+
+REQUIREMENTS:
+- Evaluate ALL four thesis questions
+- Each must have: score, assessment, gaps, verdict
+- Score must be integer 0-5
+- Assessment must reference specific slides/content
+- Be strict - most thesis elements score 2-3`
+
+/**
  * Prompt for investor question evaluation with 0-5 scoring.
  * Each question gets: score, assessment, gap, investor_impact, fix, confidence.
  */
@@ -233,6 +352,91 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
   } catch (err) {
     console.error(`Slide ${slide.slide_number} evaluation error:`, err.message)
     return { success: false, answers: generateFallbackAnswers(rubric) }
+  }
+}
+
+/**
+ * Evaluate deck-level investment thesis questions.
+ * Synthesizes evidence from all slides to answer core investor questions.
+ */
+async function evaluateInvestmentThesis(openai, slides, slideEvaluations) {
+  // Build comprehensive deck content for thesis evaluation
+  const deckContent = slides.map((slide) => {
+    const evaluation = slideEvaluations.find((e) => e.slide_number === slide.slide_number)
+    return {
+      slide_number: slide.slide_number,
+      type: slide.inferred_type || 'other',
+      extracted_text: slide.extracted_text || '(empty)',
+      grade: evaluation?.grade || 'N/A',
+    }
+  })
+
+  // Build thesis questions context
+  const thesisContext = Object.entries(THESIS_QUESTIONS).map(([key, config]) => ({
+    key,
+    question: config.question,
+    criteria: config.criteria,
+    relevant_slides: config.relevant_slides,
+  }))
+
+  const userMessage = `FULL DECK CONTENT:
+${deckContent.map((s) => `--- Slide ${s.slide_number} (${s.type}, Grade: ${s.grade}) ---
+${s.extracted_text}
+`).join('\n')}
+
+THESIS QUESTIONS TO EVALUATE:
+${JSON.stringify(thesisContext, null, 2)}
+
+For each thesis question, evaluate how well the COMPLETE DECK answers it. Look across ALL relevant slides and synthesize the evidence.`
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: THESIS_EVAL_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      max_tokens: 2500,
+      response_format: { type: 'json_object' },
+    })
+
+    const content = response.choices[0]?.message?.content
+    if (!content) {
+      throw new Error('Empty response from OpenAI')
+    }
+
+    const result = JSON.parse(content)
+
+    // Validate and normalize each thesis answer
+    const thesis = {}
+    for (const key of Object.keys(THESIS_QUESTIONS)) {
+      const answer = result[key] || {}
+      thesis[key] = {
+        question: THESIS_QUESTIONS[key].question,
+        score: Math.min(5, Math.max(0, Math.round(answer.score) || 0)),
+        assessment: answer.assessment || 'Unable to evaluate thesis element.',
+        gaps: answer.gaps || 'Unable to determine gaps.',
+        verdict: answer.verdict || 'Unable to provide verdict.',
+      }
+    }
+
+    return { success: true, thesis }
+  } catch (err) {
+    console.error('Investment thesis evaluation error:', err.message)
+
+    // Return fallback thesis
+    const fallbackThesis = {}
+    for (const key of Object.keys(THESIS_QUESTIONS)) {
+      fallbackThesis[key] = {
+        question: THESIS_QUESTIONS[key].question,
+        score: 0,
+        assessment: 'Evaluation failed due to processing error.',
+        gaps: 'Unable to evaluate - please regenerate report.',
+        verdict: 'Unable to assess this thesis element.',
+      }
+    }
+
+    return { success: false, thesis: fallbackThesis }
   }
 }
 
@@ -568,6 +772,16 @@ async function generateFreeReport(supabase, deckId) {
         `score=${deckScoreResult.deckScore}, slides_used=${deckScoreResult.slideCountUsed}`
     )
 
+    // Evaluate deck-level investment thesis
+    console.log('Evaluating investment thesis...')
+    const { thesis: investmentThesis } = await evaluateInvestmentThesis(openai, slides, slideEvaluations)
+
+    // Log thesis scores
+    const thesisScores = Object.entries(investmentThesis)
+      .map(([k, v]) => `${k}=${v.score}`)
+      .join(', ')
+    console.log(`Thesis scores: ${thesisScores}`)
+
     // Generate deterministic summary (no model call)
     const summary = generateDeterministicSummary(
       slideEvaluations,
@@ -583,6 +797,7 @@ async function generateFreeReport(supabase, deckId) {
       total_weight: deckScoreResult.totalWeight,
       slide_count_used: deckScoreResult.slideCountUsed,
       summary,
+      investment_thesis: investmentThesis,
       slides: slideEvaluations,
     }
 
@@ -639,9 +854,12 @@ async function generateFreeReport(supabase, deckId) {
 module.exports = {
   generateFreeReport,
   evaluateSlide,
+  evaluateInvestmentThesis,
   generateDeterministicSummary,
   buildFreeReport,
   buildDeckOutline,
   RUBRIC_EVAL_PROMPT,
+  THESIS_EVAL_PROMPT,
+  THESIS_QUESTIONS,
   HIGH_IMPACT_TYPES,
 }
