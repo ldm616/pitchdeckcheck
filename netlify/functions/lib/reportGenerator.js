@@ -1436,6 +1436,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
         versionKey: detectedVersionKey,
         fallbackPackKey: 'modern_seed_deck',
         loadPrompts: true, // Load DB prompts for v3
+        architectureOverride: evalArchitecture, // Pass the resolved architecture
       })
 
       // Log prompt sources for debugging

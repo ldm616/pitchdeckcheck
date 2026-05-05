@@ -301,15 +301,19 @@ function getFallbackRulePack(packKey) {
  * @param {string} options.versionKey - Rule pack version key to load (default: v3.0.0-draft)
  * @param {string} options.fallbackPackKey - Hardcoded pack key to use as fallback
  * @param {boolean} options.loadPrompts - Whether to load prompt versions
+ * @param {string} options.architectureOverride - Override architecture detection (e.g., from header)
  * @returns {Promise<Object>} - Evaluation context with rulePack, promptVersions, and metadata
  */
 async function loadEvaluationContext(supabase, options = {}) {
-  const architecture = getEvaluationArchitecture()
   const {
     versionKey = DEFAULT_V3_VERSION_KEY,
     fallbackPackKey = 'modern_seed_deck',
     loadPrompts = false,
+    architectureOverride = null,
   } = options
+
+  // Use override if provided, otherwise check env
+  const architecture = architectureOverride || getEvaluationArchitecture()
 
   const result = {
     architecture,
