@@ -1,4 +1,17 @@
-const { getSupabaseClient, verifyDeckAccess, setDeckStatus } = require('./lib/supabase')
+/**
+ * Regenerate report for an existing deck.
+ *
+ * This is a background function (15-minute timeout) that:
+ * 1. Verifies admin password
+ * 2. Validates deck exists and is analyzed
+ * 3. Sets status to generating
+ * 4. Generates full report
+ * 5. Sets final status
+ *
+ * Returns 202 immediately (background function behavior).
+ * Frontend should poll get-deck-status with admin_password to track progress.
+ */
+const { getSupabaseClient, setDeckStatus } = require('./lib/supabase')
 const { generateFullReport } = require('./lib/reportGenerator')
 
 exports.handler = async (event) => {
@@ -21,13 +34,23 @@ exports.handler = async (event) => {
     }
   }
 
-  const { deck_id, access_token } = body
+  const { deck_id, admin_password } = body
 
-  if (!deck_id || !access_token) {
+  if (!deck_id) {
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'deck_id and access_token are required' }),
+      body: JSON.stringify({ error: 'deck_id is required' }),
+    }
+  }
+
+  // Verify admin password
+  const expectedPassword = process.env.ADMIN_PASSWORD
+  if (!expectedPassword || admin_password !== expectedPassword) {
+    return {
+      statusCode: 403,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Invalid admin password' }),
     }
   }
 
@@ -43,39 +66,37 @@ exports.handler = async (event) => {
     }
   }
 
-  const { valid, error: accessError, deck } = await verifyDeckAccess(supabase, deck_id, access_token)
-
-  if (!valid) {
-    const statusCode = accessError === 'Deck not found' ? 404 : 403
-    return {
-      statusCode,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: accessError }),
-    }
-  }
-
-  // Verify deck is analyzed
-  const { data: deckStatus } = await supabase
+  // Verify deck exists and is analyzed
+  const { data: deck, error: deckError } = await supabase
     .from('decks')
-    .select('processing_status')
+    .select('id, processing_status')
     .eq('id', deck_id)
     .single()
 
-  if (!deckStatus || !['analyzed', 'ready', 'generating_free'].includes(deckStatus.processing_status)) {
+  if (deckError || !deck) {
     return {
-      statusCode: 400,
+      statusCode: 404,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Deck must be analyzed before generating report' }),
+      body: JSON.stringify({ error: 'Deck not found' }),
     }
   }
 
-  console.log(`Starting report generation for deck ${deck_id}`)
+  if (!['analyzed', 'ready', 'failed'].includes(deck.processing_status)) {
+    return {
+      statusCode: 400,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'Deck must be analyzed before regenerating report' }),
+    }
+  }
 
+  console.log(`Starting report regeneration for deck ${deck_id}`)
+
+  // Generate full report
   const result = await generateFullReport(supabase, deck_id)
 
   if (result.success) {
     await setDeckStatus(supabase, deck_id, 'ready', null)
-    console.log(`Report ready for deck ${deck_id}: grade ${result.overallGrade}`)
+    console.log(`Report regenerated for deck ${deck_id}: grade ${result.overallGrade}`)
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -88,7 +109,7 @@ exports.handler = async (event) => {
     }
   } else {
     await setDeckStatus(supabase, deck_id, 'failed', result.error)
-    console.error(`Report generation failed for deck ${deck_id}:`, result.error)
+    console.error(`Report regeneration failed for deck ${deck_id}:`, result.error)
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },

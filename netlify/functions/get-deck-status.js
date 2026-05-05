@@ -1,3 +1,10 @@
+/**
+ * Get deck processing status for polling.
+ *
+ * Accepts either:
+ * - access_token (for user polling their own deck)
+ * - admin_password (for admin polling any deck)
+ */
 const { getSupabaseClient } = require('./lib/supabase')
 
 exports.handler = async (event) => {
@@ -20,13 +27,22 @@ exports.handler = async (event) => {
     }
   }
 
-  const { deck_id, access_token } = body
+  const { deck_id, access_token, admin_password } = body
 
-  if (!deck_id || !access_token) {
+  if (!deck_id) {
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'deck_id and access_token are required' }),
+      body: JSON.stringify({ error: 'deck_id is required' }),
+    }
+  }
+
+  // Must provide either access_token or admin_password
+  if (!access_token && !admin_password) {
+    return {
+      statusCode: 400,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error: 'access_token or admin_password is required' }),
     }
   }
 
@@ -42,6 +58,7 @@ exports.handler = async (event) => {
     }
   }
 
+  // Fetch deck
   const { data: deck, error: deckError } = await supabase
     .from('decks')
     .select('id, access_token, processing_status, processing_error, slide_count')
@@ -57,14 +74,29 @@ exports.handler = async (event) => {
     }
   }
 
-  if (deck.access_token !== access_token) {
-    return {
-      statusCode: 403,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Invalid access token' }),
+  // Verify authorization
+  if (admin_password) {
+    // Admin auth
+    const expectedPassword = process.env.ADMIN_PASSWORD
+    if (!expectedPassword || admin_password !== expectedPassword) {
+      return {
+        statusCode: 403,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Invalid admin password' }),
+      }
+    }
+  } else if (access_token) {
+    // User auth
+    if (deck.access_token !== access_token) {
+      return {
+        statusCode: 403,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Invalid access token' }),
+      }
     }
   }
 
+  // Count analyzed slides
   const { count: analyzedCount, error: countError } = await supabase
     .from('slides')
     .select('id', { count: 'exact', head: true })
@@ -75,12 +107,11 @@ exports.handler = async (event) => {
     console.error('Slide count error:', countError)
   }
 
-  // Fetch latest free report status
+  // Fetch latest report status
   const { data: report, error: reportError } = await supabase
     .from('reports')
     .select('status, overall_grade')
     .eq('deck_id', deck_id)
-    .eq('report_type', 'free')
     .order('created_at', { ascending: false })
     .limit(1)
     .single()

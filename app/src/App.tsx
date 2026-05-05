@@ -234,12 +234,15 @@ export default function App() {
     pollStartTimeRef.current = null
   }
 
-  const pollDeckStatus = async (deckId: string, accessToken: string): Promise<DeckStatusResult | null> => {
+  const pollDeckStatus = async (
+    deckId: string,
+    auth: { access_token: string } | { admin_password: string }
+  ): Promise<DeckStatusResult | null> => {
     try {
       const response = await fetch('/.netlify/functions/get-deck-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deck_id: deckId, access_token: accessToken }),
+        body: JSON.stringify({ deck_id: deckId, ...auth }),
       })
 
       if (!response.ok) {
@@ -289,7 +292,7 @@ export default function App() {
     }, TIMEOUT_MS)
 
     pollIntervalRef.current = window.setInterval(async () => {
-      const statusData = await pollDeckStatus(deckId, accessToken)
+      const statusData = await pollDeckStatus(deckId, { access_token: accessToken })
 
       if (!statusData) {
         return
@@ -461,7 +464,7 @@ export default function App() {
     }
   }
 
-  const startRegenPolling = (deckId: string, accessToken: string) => {
+  const startRegenPolling = (deckId: string) => {
     stopRegenPolling()
 
     // Update report status in list to show generating
@@ -481,8 +484,10 @@ export default function App() {
       setRegenProgress(null)
     }, 5 * 60 * 1000)
 
+    const adminPassword = sessionStorage.getItem(SESSION_PASSWORD_KEY) || ''
+
     regenPollIntervalRef.current = window.setInterval(async () => {
-      const statusData = await pollDeckStatus(deckId, accessToken)
+      const statusData = await pollDeckStatus(deckId, { admin_password: adminPassword })
 
       if (!statusData) {
         return
@@ -527,48 +532,25 @@ export default function App() {
     setActionError('')
     setRegenProgress('Starting...')
 
-    try {
-      // Call regenerate endpoint to get credentials and set status
-      const response = await fetch('/.netlify/functions/regenerate-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deck_id: deckId,
-          admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
-        }),
-      })
+    // Start polling immediately
+    startRegenPolling(deckId)
 
-      const data = await response.json()
-
-      if (!response.ok || !data.ok) {
-        setActionError(data.error || 'Regenerate failed')
-        setActionDeckId(null)
-        setActionType(null)
-        setRegenProgress(null)
-        return
-      }
-
-      // Start polling for progress
-      startRegenPolling(deckId, data.access_token)
-
-      // Fire and forget - trigger background report generation
-      fetch('/.netlify/functions/generate-report-background', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deck_id: deckId,
-          access_token: data.access_token,
-        }),
-      }).catch((err) => {
-        console.error('Background regen trigger error:', err)
-      })
-    } catch (err) {
-      console.error('Regenerate error:', err)
-      setActionError('Failed to regenerate report')
+    // Trigger background regeneration (fire and forget)
+    // Background function returns 202 immediately, runs in background
+    fetch('/.netlify/functions/regenerate-report-background', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deck_id: deckId,
+        admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
+      }),
+    }).catch((err) => {
+      console.error('Background regen trigger error:', err)
+      setActionError('Failed to trigger regeneration')
       setActionDeckId(null)
       setActionType(null)
       setRegenProgress(null)
-    }
+    })
   }
 
   const fetchReportsList = async () => {
