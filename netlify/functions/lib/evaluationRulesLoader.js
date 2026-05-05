@@ -426,6 +426,304 @@ ${ruleLines.join('\n')}
 `
 }
 
+// ============================================================
+// Deck Context Inference
+// ============================================================
+
+/**
+ * Universal rule categories that always apply to v3 evaluations.
+ */
+const UNIVERSAL_CATEGORIES = [
+  'core_calibration',
+  'core',
+  'language_rules',
+  'language',
+  'guardrail',
+  'evidence',
+  'suggestions',
+  'general_evidence',
+  'modern_seed_deck',
+]
+
+/**
+ * Conditional categories with their detection signals.
+ * Each category has keywords to look for in deck content.
+ */
+const CONDITIONAL_CATEGORIES = {
+  sparse_high_signal_deck: {
+    displayName: 'Sparse Deck',
+    // Detected by deck structure analysis, not keywords
+    structuralDetection: true,
+  },
+  marketplace: {
+    displayName: 'Marketplace',
+    keywords: [
+      'marketplace', 'two-sided', 'buyers and sellers', 'supply and demand',
+      'liquidity', 'transaction fee', 'take rate', 'gmv', 'gross merchandise',
+      'matching', 'platform connecting', 'connects buyers', 'connects sellers',
+      'listing', 'booking', 'commission',
+    ],
+  },
+  local_services_marketplace: {
+    displayName: 'Local Services',
+    keywords: [
+      'local service', 'home service', 'on-demand', 'gig economy', 'tasker',
+      'service provider', 'handyman', 'cleaning', 'delivery', 'courier',
+      'local market', 'neighborhood', 'hyperlocal', 'same-day',
+    ],
+  },
+  consumer_network: {
+    displayName: 'Consumer/Network',
+    keywords: [
+      'social', 'community', 'user-generated', 'viral', 'network effect',
+      'consumer app', 'mobile app', 'engagement', 'dau', 'mau', 'daily active',
+      'monthly active', 'retention', 'sharing', 'invite', 'referral',
+      'content creator', 'influencer', 'follower',
+    ],
+  },
+  saas: {
+    displayName: 'SaaS',
+    keywords: [
+      'saas', 'software as a service', 'subscription', 'mrr', 'arr',
+      'recurring revenue', 'churn', 'net revenue retention', 'nrr',
+      'enterprise', 'smb', 'seats', 'per user', 'monthly fee', 'annual contract',
+      'acv', 'ltv', 'cac', 'payback', 'expansion revenue', 'upsell',
+      'b2b software', 'cloud platform', 'dashboard', 'analytics platform',
+    ],
+  },
+  infrastructure_developer: {
+    displayName: 'Infrastructure/Developer',
+    keywords: [
+      'api', 'sdk', 'developer', 'infrastructure', 'devtool', 'dev tool',
+      'open source', 'github', 'integration', 'backend', 'middleware',
+      'database', 'cloud infrastructure', 'serverless', 'microservice',
+      'ci/cd', 'deployment', 'orchestration', 'kubernetes', 'docker',
+      'developer experience', 'dx', 'documentation', 'developer adoption',
+    ],
+  },
+}
+
+/**
+ * Infer deck context from slide content.
+ * Analyzes slide text and types to determine relevant rule categories.
+ *
+ * @param {Object[]} slides - Array of slide objects with extracted_text and inferred_type
+ * @param {Object} options - Additional options
+ * @returns {Object} - Deck context classification with categories and reasons
+ */
+function inferDeckContext(slides, options = {}) {
+  const result = {
+    included_categories: [...UNIVERSAL_CATEGORIES],
+    excluded_categories: [],
+    category_reasons: {},
+    deck_signals: {
+      is_sparse: false,
+      detected_models: [],
+      keyword_matches: {},
+    },
+  }
+
+  // Combine all slide text for analysis
+  const allText = slides
+    .map((s) => (s.extracted_text || '').toLowerCase())
+    .join(' ')
+
+  // Get slide types present
+  const slideTypes = slides.map((s) => s.inferred_type).filter(Boolean)
+
+  // Check for sparse deck (fewer than 8 substantive slides or limited text)
+  const substantiveSlides = slides.filter((s) => {
+    const text = s.extracted_text || ''
+    const type = s.inferred_type || ''
+    // Exclude cover, contact, appendix from substantive count
+    const isSubstantive = !['cover', 'contact', 'appendix', 'other'].includes(type)
+    const hasContent = text.length > 50
+    return isSubstantive && hasContent
+  })
+
+  const avgTextLength = slides.reduce((sum, s) => sum + (s.extracted_text || '').length, 0) / Math.max(slides.length, 1)
+
+  if (substantiveSlides.length < 8 || avgTextLength < 200) {
+    result.deck_signals.is_sparse = true
+    result.included_categories.push('sparse_high_signal_deck')
+    result.category_reasons['sparse_high_signal_deck'] = `Detected sparse deck: ${substantiveSlides.length} substantive slides, avg ${Math.round(avgTextLength)} chars/slide`
+  } else {
+    result.excluded_categories.push('sparse_high_signal_deck')
+    result.category_reasons['sparse_high_signal_deck'] = `Not sparse: ${substantiveSlides.length} substantive slides, avg ${Math.round(avgTextLength)} chars/slide`
+  }
+
+  // Check each conditional category for keyword matches
+  for (const [categoryKey, categoryConfig] of Object.entries(CONDITIONAL_CATEGORIES)) {
+    // Skip sparse_high_signal_deck (handled above via structural detection)
+    if (categoryConfig.structuralDetection) continue
+
+    const keywords = categoryConfig.keywords || []
+    const matches = []
+
+    for (const keyword of keywords) {
+      if (allText.includes(keyword.toLowerCase())) {
+        matches.push(keyword)
+      }
+    }
+
+    result.deck_signals.keyword_matches[categoryKey] = matches
+
+    // Include category if we have 2+ keyword matches (stronger signal)
+    if (matches.length >= 2) {
+      result.included_categories.push(categoryKey)
+      result.deck_signals.detected_models.push(categoryConfig.displayName)
+      result.category_reasons[categoryKey] = `Detected ${categoryConfig.displayName}: matched keywords [${matches.slice(0, 5).join(', ')}${matches.length > 5 ? '...' : ''}]`
+    } else if (matches.length === 1) {
+      // Weak signal - still exclude but note the match
+      result.excluded_categories.push(categoryKey)
+      result.category_reasons[categoryKey] = `Weak signal for ${categoryConfig.displayName}: only 1 keyword match [${matches[0]}]`
+    } else {
+      result.excluded_categories.push(categoryKey)
+      result.category_reasons[categoryKey] = `No ${categoryConfig.displayName} signals detected`
+    }
+  }
+
+  // Deduplicate included categories
+  result.included_categories = [...new Set(result.included_categories)]
+
+  return result
+}
+
+/**
+ * Filter rules based on inferred deck context.
+ * Only includes rules whose category matches the inferred context.
+ *
+ * @param {Object[]} rules - Array of rule objects with metadata.category
+ * @param {Object} deckContext - Deck context from inferDeckContext()
+ * @returns {Object} - Filtered rules and debug info
+ */
+function filterRulesByContext(rules, deckContext) {
+  if (!rules || rules.length === 0) {
+    return {
+      filteredRules: [],
+      all_rules_count: 0,
+      injected_rules_count: 0,
+      filtered_out_count: 0,
+      rules_by_category: {},
+    }
+  }
+
+  const includedCategories = new Set(deckContext.included_categories.map((c) => c.toLowerCase()))
+  const rulesByCategory = {}
+  const filteredRules = []
+  const filteredOutRules = []
+
+  for (const rule of rules) {
+    // Get rule category from metadata or rule_key prefix
+    const category = (
+      rule.metadata?.category ||
+      rule.category ||
+      rule.rule_key?.split('_').slice(0, -1).join('_') ||
+      'general'
+    ).toLowerCase()
+
+    // Track rules by category for debug
+    if (!rulesByCategory[category]) {
+      rulesByCategory[category] = { included: 0, excluded: 0 }
+    }
+
+    // Check if this rule's category is included
+    const categoryIncluded = includedCategories.has(category) ||
+      // Also check if any included category is a prefix/suffix match
+      [...includedCategories].some((inc) => category.includes(inc) || inc.includes(category))
+
+    if (categoryIncluded) {
+      filteredRules.push(rule)
+      rulesByCategory[category].included++
+    } else {
+      filteredOutRules.push(rule)
+      rulesByCategory[category].excluded++
+    }
+  }
+
+  return {
+    filteredRules,
+    all_rules_count: rules.length,
+    injected_rules_count: filteredRules.length,
+    filtered_out_count: filteredOutRules.length,
+    rules_by_category: rulesByCategory,
+  }
+}
+
+/**
+ * Apply deck context filtering to evaluation context.
+ * Filters rules based on inferred deck context and updates evalContext.
+ *
+ * @param {Object} evalContext - Evaluation context from loadEvaluationContext
+ * @param {Object[]} slides - Array of slide objects
+ * @returns {Object} - Updated evalContext with filtered rules and context debug info
+ */
+function applyDeckContextFiltering(evalContext, slides) {
+  if (!evalContext || !evalContext.rulePack) {
+    return {
+      ...evalContext,
+      deckContext: null,
+      contextFilteringApplied: false,
+    }
+  }
+
+  // Infer deck context from slides
+  const deckContext = inferDeckContext(slides)
+
+  // Filter rules based on context
+  const filterResult = filterRulesByContext(evalContext.rulePack.rules, deckContext)
+
+  // Create filtered rule pack
+  const filteredRulePack = {
+    ...evalContext.rulePack,
+    rules: filterResult.filteredRules,
+    ruleCount: filterResult.injected_rules_count,
+    // Preserve original counts for debug
+    originalRuleCount: evalContext.rulePack.ruleCount,
+    // Recompute aggregations for filtered rules
+    ruleKeys: filterResult.filteredRules.map((r) => r.rule_key),
+    ruleTypeCounts: {},
+    categoryCounts: {},
+  }
+
+  // Recompute type and category counts for filtered rules
+  for (const rule of filterResult.filteredRules) {
+    const ruleType = rule.rule_type || 'general'
+    filteredRulePack.ruleTypeCounts[ruleType] = (filteredRulePack.ruleTypeCounts[ruleType] || 0) + 1
+
+    const category = rule.metadata?.category || rule.rule_key?.split('_')[0] || 'general'
+    filteredRulePack.categoryCounts[category] = (filteredRulePack.categoryCounts[category] || 0) + 1
+  }
+
+  // Build context debug info
+  const contextDebug = {
+    deck_context_classification: {
+      is_sparse: deckContext.deck_signals.is_sparse,
+      detected_models: deckContext.deck_signals.detected_models,
+    },
+    included_rule_categories: deckContext.included_categories,
+    excluded_rule_categories: deckContext.excluded_categories,
+    category_reasons: deckContext.category_reasons,
+    all_rules_loaded_count: filterResult.all_rules_count,
+    injected_rules_count: filterResult.injected_rules_count,
+    filtered_out_count: filterResult.filtered_out_count,
+    rules_by_category: filterResult.rules_by_category,
+  }
+
+  console.log(`[v3] Context filtering: ${filterResult.injected_rules_count}/${filterResult.all_rules_count} rules injected`)
+  console.log(`[v3] Included categories: ${deckContext.included_categories.join(', ')}`)
+  if (deckContext.deck_signals.detected_models.length > 0) {
+    console.log(`[v3] Detected models: ${deckContext.deck_signals.detected_models.join(', ')}`)
+  }
+
+  return {
+    ...evalContext,
+    rulePack: filteredRulePack,
+    deckContext: contextDebug,
+    contextFilteringApplied: true,
+  }
+}
+
 module.exports = {
   // Constants
   DEFAULT_V3_VERSION_KEY,
@@ -448,6 +746,11 @@ module.exports = {
 
   // Context detection (placeholder)
   detectRulePack,
+
+  // Deck context inference and rule filtering
+  inferDeckContext,
+  filterRulesByContext,
+  applyDeckContextFiltering,
 
   // Formatting helpers
   formatRulesForPrompt,

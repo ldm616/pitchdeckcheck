@@ -34,6 +34,7 @@ const {
   detectRulePack,
   getPromptByType,
   formatRulesForPrompt,
+  applyDeckContextFiltering,
 } = require('./evaluationRulesLoader')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
@@ -1439,6 +1440,11 @@ async function generateFullReport(supabase, deckId, options = {}) {
         architectureOverride: evalArchitecture, // Pass the resolved architecture
       })
 
+      // Apply deck context filtering to inject only relevant rules
+      if (evalContext && evalContext.rulePack) {
+        evalContext = applyDeckContextFiltering(evalContext, slides)
+      }
+
       // Log prompt sources for debugging
       if (evalContext.promptVersionCount > 0) {
         const slidePrompt = getPromptByType(evalContext.promptVersions, 'slide_analysis')
@@ -1554,10 +1560,12 @@ async function generateFullReport(supabase, deckId, options = {}) {
       architecture_source: archSource,
       rule_pack_version_key: evalContext?.rulePack?.versionKey || null,
       prompt_source: evalContext?.promptVersionCount > 0 ? 'database' : 'hardcoded',
-      rules_loaded_count: evalContext?.rulePack?.ruleCount || 0,
+      all_rules_loaded_count: evalContext?.rulePack?.originalRuleCount || evalContext?.rulePack?.ruleCount || 0,
+      injected_rules_count: evalContext?.rulePack?.ruleCount || 0,
       prompt_versions_loaded_count: evalContext?.promptVersionCount || 0,
       fallback_used: evalContext?.fallbackUsed || false,
       fallback_reason: evalContext?.fallbackReason || null,
+      context_filtering_applied: evalContext?.contextFilteringApplied || false,
     }
 
     // Build v3 debug object with full diagnostic info
@@ -1567,11 +1575,15 @@ async function generateFullReport(supabase, deckId, options = {}) {
       const ruleInjectionSummary = {
         rule_pack_key: evalContext.rulePack?.packKey || null,
         rule_pack_version: evalContext.rulePack?.versionKey || null,
+        all_rules_loaded_count: evalContext.rulePack?.originalRuleCount || evalContext.rulePack?.ruleCount || 0,
+        injected_rules_count: evalContext.rulePack?.ruleCount || 0,
         rule_keys: evalContext.rulePack?.ruleKeys || [],
         rule_type_counts: evalContext.rulePack?.ruleTypeCounts || {},
         category_counts: evalContext.rulePack?.categoryCounts || {},
-        total_rules: evalContext.rulePack?.ruleCount || 0,
       }
+
+      // Include deck context classification if filtering was applied
+      const deckContextDebug = evalContext.deckContext || null
 
       // Build prompt info
       const slidePrompt = getPromptByType(evalContext.promptVersions || [], 'slide_analysis')
@@ -1603,6 +1615,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
       debugInfo = {
         generated_at: new Date().toISOString(),
         architecture: architectureMetadata,
+        deck_context: deckContextDebug,
         rule_injection: ruleInjectionSummary,
         prompts: promptInfo,
         slide_evaluations: slideDebugInfo,

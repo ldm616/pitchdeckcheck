@@ -87,6 +87,7 @@ interface InvestmentThesis {
 interface V3DebugOutput {
   generated_at?: string
   architecture?: Record<string, unknown>
+  deck_context?: Record<string, unknown>
   rule_injection?: Record<string, unknown>
   prompts?: Record<string, unknown>
   slide_evaluations?: Array<Record<string, unknown>>
@@ -1725,6 +1726,28 @@ export default function App() {
                           maxHeight: '200px',
                         }}>
                           {JSON.stringify(report.debug.architecture, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Deck Context */}
+                    {report.debug.deck_context && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase' }}>
+                          Deck Context Classification
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '300px',
+                        }}>
+                          {JSON.stringify(report.debug.deck_context, null, 2)}
                         </pre>
                       </div>
                     )}
