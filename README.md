@@ -120,4 +120,4 @@ Safe to rerun - uses upsert based on `(version_key, question_key)`.
 
 Reports include `report_version` for tracking. Format: `report_vX.Y`
 
-Current: `report_v2.3`
+Current: `report_v2.4`
