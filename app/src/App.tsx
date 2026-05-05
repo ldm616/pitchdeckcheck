@@ -119,6 +119,7 @@ interface GetReportResult {
   report_type: string
   status: string
   overall_grade?: string
+  report_created_at?: string
   content?: ReportContent
   generation_error?: string
   slides?: SlideData[]
@@ -147,7 +148,8 @@ interface ReportListItem {
   report_type: string
   status: string
   overall_grade: string | null
-  created_at: string
+  report_created_at: string
+  deck_created_at: string | null
   email: string | null
   original_filename: string | null
   slide_count: number | null
@@ -198,6 +200,7 @@ export default function App() {
   const [slideCount, setSlideCount] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [report, setReport] = useState<ReportContent | null>(null)
+  const [reportCreatedAt, setReportCreatedAt] = useState<string | null>(null)
   const [slides, setSlides] = useState<SlideData[]>([])
   const [hoveredSlideNumber, setHoveredSlideNumber] = useState<number | null>(null)
 
@@ -270,7 +273,7 @@ export default function App() {
     }
   }
 
-  const fetchReport = async (deckId: string, accessToken: string): Promise<{ content: ReportContent; slides: SlideData[] } | null> => {
+  const fetchReport = async (deckId: string, accessToken: string): Promise<{ content: ReportContent; slides: SlideData[]; report_created_at?: string } | null> => {
     try {
       const response = await fetch('/.netlify/functions/get-report', {
         method: 'POST',
@@ -287,6 +290,7 @@ export default function App() {
         return {
           content: data.content,
           slides: data.slides || [],
+          report_created_at: data.report_created_at,
         }
       }
       return null
@@ -322,6 +326,7 @@ export default function App() {
         const reportData = await fetchReport(deckId, accessToken)
         if (reportData) {
           setReport(reportData.content)
+          setReportCreatedAt(reportData.report_created_at || null)
           setSlides(reportData.slides)
         }
         setStatus('success')
@@ -608,6 +613,7 @@ export default function App() {
     const reportData = await fetchReport(item.deck_id, item.access_token)
     if (reportData) {
       setReport(reportData.content)
+      setReportCreatedAt(reportData.report_created_at || null)
       setSlides(reportData.slides)
       setSlideCount(item.slide_count)
       setStatus('success')
@@ -1157,6 +1163,19 @@ export default function App() {
                   {slideCount || report.slides?.length || 0} slides analyzed
                   {report.report_version && (
                     <span style={{ marginLeft: '8px' }}>• {report.report_version}</span>
+                  )}
+                  {reportCreatedAt && (
+                    <span style={{ marginLeft: '8px' }}>
+                      • {new Date(reportCreatedAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}{' '}
+                      {new Date(reportCreatedAt).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                      })}
+                    </span>
                   )}
                 </p>
               </div>
@@ -1800,21 +1819,39 @@ export default function App() {
 
                           <span
                             style={{
-                              fontSize: '12px',
+                              fontSize: '11px',
                               color: '#9ca3af',
-                              minWidth: '120px',
+                              minWidth: '160px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '2px',
                             }}
                           >
-                            {new Date(item.created_at).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric',
-                            })}{' '}
-                            {new Date(item.created_at).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true,
-                            })}
+                            <span>
+                              Uploaded:{' '}
+                              {item.deck_created_at
+                                ? `${new Date(item.deck_created_at).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })} ${new Date(item.deck_created_at).toLocaleTimeString('en-US', {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true,
+                                  })}`
+                                : '—'}
+                            </span>
+                            <span>
+                              Report:{' '}
+                              {new Date(item.report_created_at).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              })}{' '}
+                              {new Date(item.report_created_at).toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                                hour12: true,
+                              })}
+                            </span>
                           </span>
 
                           <button

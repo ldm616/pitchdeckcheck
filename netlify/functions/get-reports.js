@@ -59,7 +59,8 @@ exports.handler = async (event) => {
         email,
         original_filename,
         slide_count,
-        access_token
+        access_token,
+        created_at
       )
     `)
     .order('created_at', { ascending: false })
@@ -81,7 +82,8 @@ exports.handler = async (event) => {
     report_type: report.report_type,
     status: report.status,
     overall_grade: report.overall_grade,
-    created_at: report.created_at,
+    report_created_at: report.created_at,
+    deck_created_at: report.decks?.created_at || null,
     email: report.decks?.email || null,
     original_filename: report.decks?.original_filename || null,
     slide_count: report.decks?.slide_count || null,

@@ -149,6 +149,7 @@ exports.handler = async (event) => {
       report_type: report.report_type,
       status: report.status,
       overall_grade: report.overall_grade,
+      report_created_at: report.created_at,
       content: reportContent,
       slides: slidesWithUrls,
     }),
