@@ -388,22 +388,24 @@ Do not assign high confidence when the extracted text is thin or ambiguous.
 
 ## Output format
 
-Return strict JSON only.
-
-For each rubric question, return:
+Return strict JSON only. Wrap all answers in an "answers" array:
 
 {
-  "question_id": "...",
-  "score": 0,
-  "assessment": "...",
-  "gap": "...",
-  "investor_impact": "...",
-  "fix": "...",
-  "confidence": "low"
+  "answers": [
+    {
+      "question_id": "market_01",
+      "score": 3,
+      "assessment": "The slide states a $2B TAM but does not show calculation methodology.",
+      "gap": "No visible assumptions or bottom-up sizing. Without methodology, investors cannot verify the opportunity.",
+      "investor_impact": "Investors cannot assess whether the opportunity is realistically venture-scale.",
+      "fix": "If available, showing bottom-up sizing would help investors verify the opportunity is real.",
+      "confidence": "medium"
+    }
+  ]
 }
 
 Rules:
-- Include every rubric question.
+- Include every rubric question in the answers array.
 - Do not include markdown.
 - Do not include commentary outside JSON.
 - Do not include pattern names or source names.
