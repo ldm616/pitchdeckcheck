@@ -626,7 +626,7 @@ async function main() {
     {
       rule_pack_id: rulePackId,
       prompt_key: 'rubric_eval_v2.7',
-      prompt_type: 'rubric_eval',
+      prompt_type: 'slide_analysis', // Evaluates individual slides against rubric questions
       version_key: 'v2.7',
       title: 'Rubric Evaluation Prompt (v2.7)',
       prompt_text: RUBRIC_EVAL_PROMPT,
@@ -635,13 +635,14 @@ async function main() {
       metadata: {
         source: 'reportGenerator.js',
         report_version: 'report_v2.7',
+        original_prompt_type: 'rubric_eval',
         seeded_at: new Date().toISOString(),
       },
     },
     {
       rule_pack_id: rulePackId,
       prompt_key: 'thesis_eval_v2.7',
-      prompt_type: 'thesis_eval',
+      prompt_type: 'deck_analysis', // Evaluates full deck against investment thesis
       version_key: 'v2.7',
       title: 'Thesis Evaluation Prompt (v2.7)',
       prompt_text: THESIS_EVAL_PROMPT,
@@ -650,6 +651,7 @@ async function main() {
       metadata: {
         source: 'reportGenerator.js',
         report_version: 'report_v2.7',
+        original_prompt_type: 'thesis_eval',
         seeded_at: new Date().toISOString(),
       },
     },
