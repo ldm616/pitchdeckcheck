@@ -1680,8 +1680,8 @@ export default function App() {
               </div>
             )}
 
-            {/* V3 Debug Output (admin only) */}
-            {isAdmin && report.debug && (
+            {/* V3 Debug Output (admin only - show if admin password is set or ?admin mode) */}
+            {(isAdmin || sessionStorage.getItem(SESSION_PASSWORD_KEY)) && report.debug && (
               <div style={{ marginTop: '32px', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
                 <button
                   onClick={() => setDebugExpanded(!debugExpanded)}
