@@ -1,3 +1,21 @@
+/**
+ * Report Generator
+ *
+ * ARCHITECTURE:
+ * - generateFullReport() is the main generator that creates the full source-of-truth report
+ * - deriveFreeReport() derives a limited free version from the full report
+ *
+ * The full report is the source of truth for all analysis.
+ * The free report is a derived subset used for product packaging/monetization.
+ *
+ * Current optimization focus: full_report quality
+ * - Detailed, insightful, actionable investor-grade feedback
+ * - What is missing vs investor expectations
+ * - Why each gap matters
+ * - How to close each gap
+ * - Investor reasoning patterns where relevant
+ */
+
 const OpenAI = require('openai')
 const { setDeckStatus } = require('./supabase')
 const {
@@ -12,7 +30,7 @@ const {
 } = require('./rubrics')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
-const REPORT_VERSION = 'report_v2.1'
+const REPORT_VERSION = 'report_v2.2'
 
 // High-impact slide types for summary generation (ignore cover/contact)
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
@@ -146,11 +164,12 @@ You will receive:
 1. The current slide's extracted text and type
 2. A compact deck outline showing all slides (for cross-slide context)
 3. Investor questions to evaluate
+4. Investor reasoning patterns (when available) to guide your gap and fix analysis
 
 For each question, you must provide:
 - score (0-5)
 - assessment (what IS present)
-- gap (what is MISSING)
+- gap (what is MISSING and why it matters to investors)
 - investor_impact (why the gap matters to investors)
 - fix (conditional guidance)
 - confidence (evaluation reliability)
@@ -185,11 +204,41 @@ ASSESSMENT RULES:
 - If nothing relevant is present, say "Not addressed in slide"
 - Keep to 1-2 sentences
 
-GAP RULES:
+INVESTOR REASONING CONTEXT:
+You may receive investor reasoning patterns derived from real investment memos. These represent how experienced investors actually evaluate companies.
+
+Use patterns to:
+- Explain why a gap matters to an investor (credibility, risk, growth potential, defensibility, scalability)
+- Make fixes more grounded in how investors actually evaluate companies
+- Connect missing information to specific investor concerns
+
+Do NOT:
+- Mention patterns or pattern names in your output
+- Reference that you received reasoning guidance
+- Add generic advice not tied to the specific gap
+
+GAP RULES (CRITICAL):
 - Describe what an investor would expect to see but doesn't
-- Be specific about what's missing
+- Explain WHY the missing information matters to investors
+- Connect to specific investor concerns:
+  - Credibility: Can investors trust claims without supporting evidence?
+  - Risk assessment: Does missing information create uncertainty about execution?
+  - Growth potential: Can investors model the opportunity without key data?
+  - Defensibility: Is the competitive position unclear without this?
+  - Scalability: Are there questions about unit economics or expansion?
+- Be specific about what's missing and the investor concern it creates
 - If score is 5, gap should be "None - fully addressed"
 - Keep to 1-2 sentences
+
+Avoid generic gap statements like:
+- "investors want more detail"
+- "this could be improved"
+- "more information would help"
+
+Instead, be specific:
+- "Without visible CAC payback, investors cannot assess whether growth is sustainable"
+- "Missing customer segment definition makes it unclear which market the company can actually win"
+- "Lack of competitive differentiation specifics makes the moat claim unverifiable"
 
 INVESTOR IMPACT RULES (CRITICAL):
 - Explain WHY the gap matters to an investor's decision
@@ -213,18 +262,26 @@ Fix phrasing MUST be:
 - Conditional and non-prescriptive
 - Specific enough to act on
 - Tied directly to the stated gap
+- Grounded in how investors actually evaluate (use reasoning patterns if provided)
 - NOT generic phrases like "provide more detail" or "add more information"
 
 Use phrases like:
-- "If this data exists, it would help to show..."
-- "Investors would expect to see..."
-- "Consider including X if available..."
-- "If true, adding Y would strengthen..."
+- "If this data exists, showing X would help investors assess Y..."
+- "Investors typically expect to see X because it demonstrates Y..."
+- "If available, including X would reduce investor uncertainty about Y..."
+- "Showing X would help demonstrate Y, which investors use to evaluate Z..."
+
+Focus fixes on:
+- Closing the specific gap identified
+- Increasing credibility with investors
+- Reducing uncertainty about key assumptions
+- Demonstrating evidence that investors actually look for
 
 NEVER:
 - Write exact copy for the founder
 - Assume facts not visible in the deck
 - Use vague phrases like "make this clearer" or "strengthen the slide"
+- Invent data or metrics the founder should include
 
 CROSS-SLIDE CONSISTENCY (CRITICAL):
 - Check the deck outline before making claims about what's missing from the whole deck
@@ -247,9 +304,9 @@ Return ONLY valid JSON:
       "question_id": "market_01",
       "score": 3,
       "assessment": "The slide states a $2B TAM but does not show calculation methodology.",
-      "gap": "No visible assumptions or bottom-up sizing.",
+      "gap": "No visible assumptions or bottom-up sizing. Without the methodology, investors cannot verify whether the market opportunity is realistically addressable or just a top-down estimate.",
       "investor_impact": "Without the assumptions, investors cannot judge whether the opportunity is realistically venture-scale or just a top-down estimate.",
-      "fix": "If available, showing bottom-up sizing (e.g. customer count × average spend) would strengthen credibility.",
+      "fix": "If available, showing bottom-up sizing (e.g. customer count × average spend) would help investors verify the opportunity is real and addressable.",
       "confidence": "medium"
     }
   ]
@@ -261,6 +318,91 @@ REQUIREMENTS:
 - Score must be an integer from 0 to 5
 - Confidence must be "high", "medium", or "low"
 - All text fields must be 1-2 sentences, clear and specific`
+
+/**
+ * Fetch patterns relevant to a specific rubric question.
+ * Returns array of pattern objects with name and description.
+ */
+async function getPatternsForQuestion(supabase, questionKey) {
+  try {
+    const { data, error } = await supabase
+      .from('pattern_rubric_map')
+      .select(`
+        strength,
+        patterns (
+          id,
+          pattern_key,
+          name,
+          description,
+          category
+        )
+      `)
+      .eq('question_key', questionKey)
+      .order('strength', { ascending: false })
+
+    if (error || !data) {
+      return []
+    }
+
+    // Extract patterns and filter out nulls
+    return data
+      .map((d) => d.patterns)
+      .filter(Boolean)
+      .map((p) => ({
+        name: p.name,
+        description: p.description,
+      }))
+  } catch (err) {
+    console.error(`Error fetching patterns for ${questionKey}:`, err.message)
+    return []
+  }
+}
+
+/**
+ * Batch fetch patterns for multiple questions.
+ * Returns a map of question_key -> patterns array.
+ */
+async function getPatternsForQuestions(supabase, questionKeys) {
+  try {
+    const { data, error } = await supabase
+      .from('pattern_rubric_map')
+      .select(`
+        question_key,
+        strength,
+        patterns (
+          id,
+          pattern_key,
+          name,
+          description,
+          category
+        )
+      `)
+      .in('question_key', questionKeys)
+      .order('strength', { ascending: false })
+
+    if (error || !data) {
+      return {}
+    }
+
+    // Group patterns by question_key
+    const patternMap = {}
+    for (const row of data) {
+      if (!row.patterns) continue
+      if (!patternMap[row.question_key]) {
+        patternMap[row.question_key] = []
+      }
+      patternMap[row.question_key].push({
+        name: row.patterns.name,
+        description: row.patterns.description,
+      })
+    }
+
+    return patternMap
+  } catch (err) {
+    console.error('Error fetching patterns batch:', err.message)
+    return {}
+  }
+}
 
 /**
  * Build compact deck outline for cross-slide context.
@@ -282,15 +424,45 @@ function buildDeckOutline(slides) {
 
 /**
  * Evaluate a single slide against its investor questions with deck context.
+ * Fetches relevant patterns to enhance gap/fix reasoning.
  */
-async function evaluateSlide(openai, slide, rubric, deckOutline) {
+async function evaluateSlide(openai, supabase, slide, rubric, deckOutline) {
   // Sort questions by importance for display
   const sortedRubric = sortByImportance(rubric)
 
-  const questions = sortedRubric.map((q) => ({
-    question_id: q.id,
-    question: q.question,
-  }))
+  // Fetch patterns for all questions in this rubric
+  const questionKeys = sortedRubric.map((q) => q.id)
+  const patternMap = await getPatternsForQuestions(supabase, questionKeys)
+
+  // Build questions array with patterns
+  const questions = sortedRubric.map((q) => {
+    const patterns = patternMap[q.id] || []
+    return {
+      question_id: q.id,
+      question: q.question,
+      patterns: patterns.length > 0 ? patterns : undefined,
+    }
+  })
+
+  // Build pattern context section if any patterns exist
+  const hasPatterns = questions.some((q) => q.patterns && q.patterns.length > 0)
+  let patternContext = ''
+  if (hasPatterns) {
+    patternContext = `
+
+INVESTOR REASONING PATTERNS (use to improve gap/fix quality):
+${questions
+  .filter((q) => q.patterns && q.patterns.length > 0)
+  .map((q) => {
+    const patternList = q.patterns
+      .map((p) => `  - ${p.name}: ${p.description}`)
+      .join('\n')
+    return `For "${q.question}":\n${patternList}`
+  })
+  .join('\n\n')}
+
+Use these patterns to explain WHY gaps matter and HOW to address them. Do NOT mention pattern names in output.`
+  }
 
   const userMessage = `CURRENT SLIDE:
 Type: ${slide.inferred_type}
@@ -303,7 +475,11 @@ DECK OUTLINE (for cross-slide context):
 ${JSON.stringify(deckOutline, null, 2)}
 
 INVESTOR QUESTIONS TO EVALUATE:
-${JSON.stringify(questions, null, 2)}
+${JSON.stringify(
+  questions.map((q) => ({ question_id: q.question_id, question: q.question })),
+  null,
+  2
+)}${patternContext}
 
 Evaluate each question. Include assessment, gap, investor_impact, fix, and confidence for each.`
 
@@ -516,11 +692,18 @@ function generateDeterministicSummary(slideEvaluations, overallGrade, deckScore)
 }
 
 /**
- * Build free report subset from full report.
+ * Derive free report from the full report.
+ *
+ * The free report is a LIMITED SUBSET of the full report for product packaging.
+ * It does NOT call OpenAI, rescore, or create independent feedback.
+ *
  * Shows: question, score, assessment, gap, investor_impact
- * Hides: fix
+ * Hides: fix (reserved for paid report)
+ *
+ * @param {Object} fullReport - The complete full_report object
+ * @returns {Object} - The derived free_report subset
  */
-function buildFreeReport(fullReport) {
+function deriveFreeReport(fullReport) {
   // Collect biggest issues (lowest scoring questions from high-weight slides)
   const allIssues = []
   for (const slide of fullReport.slides) {
@@ -637,10 +820,24 @@ function buildFreeReport(fullReport) {
 }
 
 /**
- * Generate a full report with investor question evaluation, then derive the free subset.
- * Stores both full_report and free_report in reports.content.
+ * Generate the full investor-grade report, then derive the free subset.
+ *
+ * This is the main report generator. It:
+ * 1. Fetches deck and slides
+ * 2. Evaluates each slide against investor questions (with pattern context)
+ * 3. Computes deterministic scores
+ * 4. Evaluates deck-level investment thesis
+ * 5. Builds the full_report (source of truth)
+ * 6. Derives the free_report (limited subset)
+ * 7. Stores both in reports.content
+ *
+ * The full report optimizes for detailed, insightful, actionable investor-grade feedback.
+ *
+ * @param {Object} supabase - Supabase client
+ * @param {string} deckId - Deck UUID
+ * @returns {Object} - { success, reportId, overallGrade } or { success: false, error }
  */
-async function generateFreeReport(supabase, deckId) {
+async function generateFullReport(supabase, deckId) {
   const openaiKey = process.env.OPENAI_API_KEY
 
   if (!openaiKey) {
@@ -679,44 +876,33 @@ async function generateFreeReport(supabase, deckId) {
   // Update deck status
   await setDeckStatus(supabase, deckId, 'generating_free', null)
 
-  // Create or update report row
-  const { data: existingReport } = await supabase
+  // Delete all existing reports for this deck
+  const { error: deleteError } = await supabase
     .from('reports')
-    .select('id')
+    .delete()
     .eq('deck_id', deckId)
-    .eq('report_type', 'free')
+
+  if (deleteError) {
+    console.error('Failed to delete existing reports:', deleteError)
+    // Continue anyway - not fatal
+  }
+
+  // Create new report row
+  const { data: newReport, error: insertError } = await supabase
+    .from('reports')
+    .insert({
+      deck_id: deckId,
+      report_type: 'free',
+      status: 'generating',
+    })
+    .select('id')
     .single()
 
-  let reportId
-  if (existingReport) {
-    reportId = existingReport.id
-    await supabase
-      .from('reports')
-      .update({
-        status: 'generating',
-        overall_grade: null,
-        content: null,
-        generation_error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', reportId)
-  } else {
-    const { data: newReport, error: insertError } = await supabase
-      .from('reports')
-      .insert({
-        deck_id: deckId,
-        report_type: 'free',
-        status: 'generating',
-      })
-      .select('id')
-      .single()
-
-    if (insertError || !newReport) {
-      console.error('Failed to create report row:', insertError)
-      return { success: false, error: 'Failed to create report' }
-    }
-    reportId = newReport.id
+  if (insertError || !newReport) {
+    console.error('Failed to create report row:', insertError)
+    return { success: false, error: 'Failed to create report' }
   }
+  const reportId = newReport.id
 
   console.log(`Generating report for deck ${deckId}, report ${reportId}`)
 
@@ -735,7 +921,7 @@ async function generateFreeReport(supabase, deckId) {
 
       console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-      const { answers } = await evaluateSlide(openai, slide, rubric, deckOutline)
+      const { answers } = await evaluateSlide(openai, supabase, slide, rubric, deckOutline)
 
       // Compute deterministic slide score (0-5 scale)
       const slideScoreResult = computeSlideScore(answers, rubric)
@@ -805,8 +991,8 @@ async function generateFreeReport(supabase, deckId) {
       slides: slideEvaluations,
     }
 
-    // Build free report subset
-    const freeReport = buildFreeReport(fullReport)
+    // Derive free report subset from full report
+    const freeReport = deriveFreeReport(fullReport)
 
     // Store both in content
     const reportContent = {
@@ -856,12 +1042,18 @@ async function generateFreeReport(supabase, deckId) {
 }
 
 module.exports = {
-  generateFreeReport,
+  // Main generator - creates full report and derives free report
+  generateFullReport,
+  // Derivation helper - creates free report subset from full report
+  deriveFreeReport,
+  // Internal helpers (exported for testing)
   evaluateSlide,
   evaluateInvestmentThesis,
   generateDeterministicSummary,
-  buildFreeReport,
   buildDeckOutline,
+  getPatternsForQuestion,
+  getPatternsForQuestions,
+  // Constants
   REPORT_VERSION,
   RUBRIC_EVAL_PROMPT,
   THESIS_EVAL_PROMPT,

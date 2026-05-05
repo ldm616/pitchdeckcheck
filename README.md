@@ -56,9 +56,33 @@ See `/docs/EVALS.md` for full details.
 | File | Purpose |
 |------|---------|
 | `netlify/functions/lib/rubrics.js` | Rubric questions, weights, scoring (source of truth) |
-| `netlify/functions/lib/generateFreeReport.js` | Report generation logic |
+| `netlify/functions/lib/generateFreeReport.js` | Report generation (`generateFullReport` + `deriveFreeReport`) |
+| `netlify/functions/lib/canonicalPatterns.js` | Investor reasoning patterns (source of truth) |
 | `scripts/seed-rubrics.js` | Seed rubric questions to database |
+| `scripts/seed-patterns.js` | Seed investor patterns to database |
 | `docs/EVALS.md` | Evaluation framework |
+
+## Report Generation Architecture
+
+Runtime generates a **full structured report** first, then derives the free report.
+
+```
+generateFullReport(supabase, deckId)
+    ├── Evaluates slides with investor questions
+    ├── Uses pattern context for gap/fix quality
+    ├── Computes deterministic scores
+    ├── Evaluates investment thesis
+    ├── Builds full_report (source of truth)
+    └── Derives free_report (limited subset)
+```
+
+**Current optimization focus:** full_report quality
+
+The full report should provide detailed, insightful, actionable investor-grade feedback:
+- What is missing vs investor expectations
+- Why each gap matters
+- How to close each gap
+- Investor reasoning patterns where relevant
 
 ## Rubric Management
 

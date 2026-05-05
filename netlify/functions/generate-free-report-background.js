@@ -1,5 +1,5 @@
 const { getSupabaseClient, verifyDeckAccess, setDeckStatus } = require('./lib/supabase')
-const { generateFreeReport } = require('./lib/generateFreeReport')
+const { generateFullReport } = require('./lib/generateFreeReport')
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -69,13 +69,13 @@ exports.handler = async (event) => {
     }
   }
 
-  console.log(`Starting free report generation for deck ${deck_id}`)
+  console.log(`Starting report generation for deck ${deck_id}`)
 
-  const result = await generateFreeReport(supabase, deck_id)
+  const result = await generateFullReport(supabase, deck_id)
 
   if (result.success) {
     await setDeckStatus(supabase, deck_id, 'ready', null)
-    console.log(`Free report ready for deck ${deck_id}: grade ${result.overallGrade}`)
+    console.log(`Report ready for deck ${deck_id}: grade ${result.overallGrade}`)
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -88,7 +88,7 @@ exports.handler = async (event) => {
     }
   } else {
     await setDeckStatus(supabase, deck_id, 'failed', result.error)
-    console.error(`Free report failed for deck ${deck_id}:`, result.error)
+    console.error(`Report generation failed for deck ${deck_id}:`, result.error)
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },

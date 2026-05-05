@@ -482,6 +482,50 @@ When changing patterns:
 
 ---
 
+## Report Generation Architecture
+
+The report generator source of truth is:
+
+```
+/netlify/functions/lib/generateFreeReport.js
+```
+
+**Key functions:**
+
+| Function | Purpose |
+|----------|---------|
+| `generateFullReport(supabase, deckId)` | Main generator - creates full report and derives free report |
+| `deriveFreeReport(fullReport)` | Derives limited free report from full report |
+
+**Flow:**
+
+```
+generateFullReport()
+    ├── Fetch deck and slides
+    ├── Evaluate slides against investor questions (with pattern context)
+    ├── Compute deterministic scores
+    ├── Evaluate deck-level investment thesis
+    ├── Build full_report (source of truth)
+    ├── Derive free_report (limited subset)
+    └── Store both in reports.content
+```
+
+**Architecture principle:**
+
+- `full_report` is the source of truth for all analysis
+- `free_report` is a derived subset for product packaging/monetization
+- Current optimization focus: `full_report` quality
+
+**Full report quality goals:**
+
+- Detailed, insightful, actionable investor-grade feedback
+- What is missing vs investor expectations
+- Why each gap matters to investors
+- How to close each gap
+- Investor reasoning patterns where relevant
+
+---
+
 ## Version History
 
 | Version | Date | Description |
@@ -489,3 +533,4 @@ When changing patterns:
 | v1.0 | 2026-05-04 | Initial evaluation framework |
 | v1.1 | 2026-05-04 | Add expected findings, regression checks, golden checks |
 | v1.2 | 2026-05-04 | Add canonical investor patterns documentation |
+| v1.3 | 2026-05-05 | Add report generation architecture, clarify full/free report separation |
