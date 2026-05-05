@@ -2055,7 +2055,8 @@ export default function App() {
                               background: 'none',
                               border: 'none',
                               cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
-                              opacity: actionDeckId === item.deck_id ? 0.5 : 1,
+                              // Don't fade during regeneration - keep full opacity so blue stays vibrant
+                              opacity: actionDeckId === item.deck_id && actionType !== 'regenerate' ? 0.5 : 1,
                             }}
                             onMouseEnter={(e) => {
                               if (actionDeckId !== item.deck_id) {
@@ -2076,28 +2077,33 @@ export default function App() {
                               if (label) label.style.color = '#9ca3af'
                             }}
                           >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
+                            <div
                               style={{
-                                color: actionDeckId === item.deck_id && actionType === 'regenerate'
-                                  ? '#2563eb'
-                                  : '#9ca3af',
-                                transition: 'color 0.15s',
                                 animation: actionDeckId === item.deck_id && actionType === 'regenerate'
                                   ? 'pulse-slow 1s ease-in-out infinite'
                                   : 'none',
                               }}
                             >
-                              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-                              <path d="M21 3v5h-5" />
-                            </svg>
+                              <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{
+                                  color: actionDeckId === item.deck_id && actionType === 'regenerate'
+                                    ? '#2563eb'
+                                    : '#9ca3af',
+                                  transition: 'color 0.15s',
+                                }}
+                              >
+                                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                                <path d="M21 3v5h-5" />
+                              </svg>
+                            </div>
                             <span
                               style={{
                                 fontSize: '10px',
