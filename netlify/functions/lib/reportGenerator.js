@@ -38,6 +38,7 @@ const {
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
+const REPORT_VERSION_V3 = 'report_v3.0.0-draft'
 
 // High-impact slide types for summary generation (ignore cover/contact)
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
@@ -1528,9 +1529,12 @@ async function generateFullReport(supabase, deckId, options = {}) {
       fallback_reason: evalContext?.fallbackReason || null,
     }
 
+    // Determine report version based on architecture
+    const reportVersion = evalArchitecture === 'v3' ? REPORT_VERSION_V3 : REPORT_VERSION
+
     // Build full report
     const fullReport = {
-      report_version: REPORT_VERSION,
+      report_version: reportVersion,
       rubric_version: RUBRIC_VERSION,
       architecture: architectureMetadata,
       overall_grade: deckScoreResult.overallGrade,
