@@ -537,7 +537,7 @@ export default function App() {
 
     // Trigger background regeneration (fire and forget)
     // Background function returns 202 immediately, runs in background
-    fetch('/.netlify/functions/regenerate-report-background', {
+    fetch('/.netlify/functions/generate-report-background', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

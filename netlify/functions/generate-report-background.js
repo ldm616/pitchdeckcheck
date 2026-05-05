@@ -1,12 +1,11 @@
 /**
- * Regenerate report for an existing deck.
+ * Generate (or regenerate) report for an existing analyzed deck.
  *
  * This is a background function (15-minute timeout) that:
  * 1. Verifies admin password
  * 2. Validates deck exists and is analyzed
- * 3. Sets status to generating
- * 4. Generates full report
- * 5. Sets final status
+ * 3. Generates full report (deletes existing, creates new)
+ * 4. Sets final status
  *
  * Returns 202 immediately (background function behavior).
  * Frontend should poll get-deck-status with admin_password to track progress.
