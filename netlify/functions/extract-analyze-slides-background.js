@@ -1,7 +1,7 @@
 const { getSupabaseClient, verifyDeckAccess, setDeckStatus } = require('./lib/supabase')
 const { extractSlides } = require('./lib/extractSlides')
 const { analyzeSlides } = require('./lib/analyzeSlides')
-const { generateFullReport } = require('./lib/generateFreeReport')
+const { generateFullReport } = require('./lib/reportGenerator')
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {

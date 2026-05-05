@@ -55,34 +55,36 @@ See `/docs/EVALS.md` for full details.
 
 | File | Purpose |
 |------|---------|
-| `netlify/functions/lib/rubrics.js` | Rubric questions, weights, scoring (source of truth) |
-| `netlify/functions/lib/generateFreeReport.js` | Report generation (`generateFullReport` + `deriveFreeReport`) |
-| `netlify/functions/lib/canonicalPatterns.js` | Investor reasoning patterns (source of truth) |
+| `netlify/functions/lib/reportGenerator.js` | Full report generation (`generateFullReport`) |
+| `netlify/functions/lib/rubrics.js` | Rubric questions, weights, scoring |
+| `netlify/functions/lib/canonicalPatterns.js` | Investor reasoning patterns |
 | `scripts/seed-rubrics.js` | Seed rubric questions to database |
 | `scripts/seed-patterns.js` | Seed investor patterns to database |
 | `docs/EVALS.md` | Evaluation framework |
 
 ## Report Generation Architecture
 
-Runtime generates a **full structured report** first, then derives the free report.
+**Concept:** Generate a comprehensive full report now. Derive filtered subsets (free report) later.
 
 ```
 generateFullReport(supabase, deckId)
-    ├── Evaluates slides with investor questions
-    ├── Uses pattern context for gap/fix quality
+    ├── Evaluates slides with investor questions + pattern context
     ├── Computes deterministic scores
     ├── Evaluates investment thesis
     ├── Builds full_report (source of truth)
-    └── Derives free_report (limited subset)
+    ├── Derives free_report (limited subset, for now)
+    └── Stores both in reports.content
 ```
 
-**Current optimization focus:** full_report quality
+**Current focus:** full_report quality
 
-The full report should provide detailed, insightful, actionable investor-grade feedback:
+The full report provides detailed, actionable investor-grade feedback:
 - What is missing vs investor expectations
-- Why each gap matters
-- How to close each gap
+- Why each gap matters (investor impact)
+- How to close each gap (conditional fixes)
 - Investor reasoning patterns where relevant
+
+**Future:** Free report will use configurable filters to include/exclude content from full_report for product packaging.
 
 ## Rubric Management
 

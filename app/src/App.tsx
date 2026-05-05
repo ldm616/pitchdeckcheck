@@ -552,7 +552,7 @@ export default function App() {
       startRegenPolling(deckId, data.access_token)
 
       // Fire and forget - trigger background report generation
-      fetch('/.netlify/functions/generate-free-report-background', {
+      fetch('/.netlify/functions/generate-report-background', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1042,21 +1042,13 @@ async function generateFullReport(supabase, deckId) {
 }
 
 module.exports = {
-  // Main generator - creates full report and derives free report
+  // Main generator - creates full report, derives free report, stores both
   generateFullReport,
-  // Derivation helper - creates free report subset from full report
-  deriveFreeReport,
-  // Internal helpers (exported for testing)
-  evaluateSlide,
-  evaluateInvestmentThesis,
-  generateDeterministicSummary,
-  buildDeckOutline,
-  getPatternsForQuestion,
-  getPatternsForQuestions,
-  // Constants
+
+  // Version for tracking report structure changes
   REPORT_VERSION,
-  RUBRIC_EVAL_PROMPT,
-  THESIS_EVAL_PROMPT,
-  THESIS_QUESTIONS,
-  HIGH_IMPACT_TYPES,
+
+  // Future: deriveFreeReport will use configurable filters to create
+  // limited subsets from full_report for product packaging.
+  // For now, it's called internally by generateFullReport.
 }

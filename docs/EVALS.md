@@ -484,18 +484,19 @@ When changing patterns:
 
 ## Report Generation Architecture
 
-The report generator source of truth is:
+The report generator is:
 
 ```
-/netlify/functions/lib/generateFreeReport.js
+/netlify/functions/lib/reportGenerator.js
 ```
 
-**Key functions:**
+**Concept:** Generate full report now, derive filtered subsets later.
+
+**Main export:**
 
 | Function | Purpose |
 |----------|---------|
-| `generateFullReport(supabase, deckId)` | Main generator - creates full report and derives free report |
-| `deriveFreeReport(fullReport)` | Derives limited free report from full report |
+| `generateFullReport(supabase, deckId)` | Creates full report, derives free report, stores both |
 
 **Flow:**
 
@@ -506,22 +507,23 @@ generateFullReport()
     ├── Compute deterministic scores
     ├── Evaluate deck-level investment thesis
     ├── Build full_report (source of truth)
-    ├── Derive free_report (limited subset)
+    ├── Derive free_report (limited subset, internal for now)
     └── Store both in reports.content
 ```
 
-**Architecture principle:**
+**Architecture principles:**
 
 - `full_report` is the source of truth for all analysis
-- `free_report` is a derived subset for product packaging/monetization
+- `free_report` is a derived subset (currently internal)
+- Future: configurable filters to include/exclude full_report content
 - Current optimization focus: `full_report` quality
 
 **Full report quality goals:**
 
 - Detailed, insightful, actionable investor-grade feedback
 - What is missing vs investor expectations
-- Why each gap matters to investors
-- How to close each gap
+- Why each gap matters to investors (investor_impact)
+- How to close each gap (conditional fixes)
 - Investor reasoning patterns where relevant
 
 ---
@@ -534,3 +536,4 @@ generateFullReport()
 | v1.1 | 2026-05-04 | Add expected findings, regression checks, golden checks |
 | v1.2 | 2026-05-04 | Add canonical investor patterns documentation |
 | v1.3 | 2026-05-05 | Add report generation architecture, clarify full/free report separation |
+| v1.4 | 2026-05-05 | Rename to reportGenerator.js, clean up exports |
