@@ -2061,8 +2061,8 @@ export default function App() {
                               if (actionDeckId !== item.deck_id) {
                                 const svg = e.currentTarget.querySelector('svg')
                                 const label = e.currentTarget.querySelector('span')
-                                if (svg) svg.style.color = '#22c55e'
-                                if (label) label.style.color = '#22c55e'
+                                if (svg) svg.style.color = '#2563eb'
+                                if (label) label.style.color = '#2563eb'
                               }
                             }}
                             onMouseLeave={(e) => {
@@ -2091,7 +2091,7 @@ export default function App() {
                                   : '#9ca3af',
                                 transition: 'color 0.15s',
                                 animation: actionDeckId === item.deck_id && actionType === 'regenerate'
-                                  ? 'pulse-slow 2s ease-in-out infinite'
+                                  ? 'pulse-slow 1s ease-in-out infinite'
                                   : 'none',
                               }}
                             >
