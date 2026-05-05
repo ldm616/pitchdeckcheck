@@ -30,7 +30,7 @@ const {
 } = require('./rubrics')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
-const REPORT_VERSION = 'report_v2.2'
+const REPORT_VERSION = 'report_v2.3'
 
 // High-impact slide types for summary generation (ignore cover/contact)
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
@@ -184,10 +184,10 @@ SCORING SCALE (0-5):
 
 GRADING CALIBRATION:
 - E grade = essentially missing, unusable, or not visible (rare)
-- D grade = weak but present
-- C grade = partially answers with meaningful gaps
-- B grade = strong but incomplete
-- A grade = rare, clearly answers investor expectations with strong evidence
+- D grade = weak but present (40-55% of criteria met)
+- C grade = partially answers with meaningful gaps (55-70% met)
+- B grade = strong but incomplete (70-85% met)
+- A grade = rare, clearly answers investor expectations with strong evidence (85%+)
 
 Do NOT assign E to a slide that contains relevant content unless the core investor question is essentially unanswered.
 
@@ -204,8 +204,29 @@ ASSESSMENT RULES:
 - If nothing relevant is present, say "Not addressed in slide"
 - Keep to 1-2 sentences
 
+DECK-LEVEL CONTEXT AWARENESS (CRITICAL):
+You have a deck outline showing ALL slides. Use it to:
+1. UNDERSTAND what information exists across the entire deck
+2. AVOID claiming something is missing from the deck when another slide contains it
+3. FOCUS gaps on what's missing from THIS SPECIFIC SLIDE vs what's missing from the whole deck
+
+Gap categories to distinguish:
+- "This slide doesn't show X" = missing from this specific slide
+- "X appears on slide N but isn't connected here" = exists elsewhere, not integrated
+- "X is not visible anywhere in the deck" = truly missing (verify against outline first!)
+
+NEVER make global claims about what the deck lacks based on one slide alone.
+ALWAYS check the outline before saying "no X is provided" or "the deck lacks Y".
+
 INVESTOR REASONING CONTEXT:
 You may receive investor reasoning patterns derived from real investment memos. These represent how experienced investors actually evaluate companies.
+
+PATTERN APPLICATION RULES (CRITICAL):
+- ONLY apply a pattern if THIS SLIDE contains content directly related to that pattern
+- Do NOT apply "growth curve" patterns to a problem slide (wrong context)
+- Do NOT apply "unit economics" patterns to a team slide (wrong context)
+- If patterns are provided but don't match the slide content, ignore them
+- Patterns should enhance your reasoning about gaps that ALREADY exist, not create new ones
 
 Use patterns to:
 - Explain why a gap matters to an investor (credibility, risk, growth potential, defensibility, scalability)
@@ -215,10 +236,11 @@ Use patterns to:
 Do NOT:
 - Mention patterns or pattern names in your output
 - Reference that you received reasoning guidance
+- Apply patterns to unrelated slide types or content
 - Add generic advice not tied to the specific gap
 
 GAP RULES (CRITICAL):
-- Describe what an investor would expect to see but doesn't
+- Describe what an investor would expect to see ON THIS SLIDE but doesn't
 - Explain WHY the missing information matters to investors
 - Connect to specific investor concerns:
   - Credibility: Can investors trust claims without supporting evidence?
@@ -229,6 +251,11 @@ GAP RULES (CRITICAL):
 - Be specific about what's missing and the investor concern it creates
 - If score is 5, gap should be "None - fully addressed"
 - Keep to 1-2 sentences
+
+GAP QUALITY RULES:
+- Every gap must explain WHY it matters, not just WHAT is missing
+- Bad: "No CAC data shown"
+- Good: "Without CAC data, investors cannot assess whether growth is capital-efficient"
 
 Avoid generic gap statements like:
 - "investors want more detail"
@@ -258,11 +285,29 @@ Score 3: Strengthen the partial answer with specific added evidence/detail
 Score 2: Explain what core content is missing and how to address it
 Score 1-0: Explain what answer needs to be introduced from scratch
 
+FIX QUALITY RULES (CRITICAL):
+Every fix MUST:
+1. Be CONDITIONAL - use "If X exists..." or "If available..."
+2. Be SPECIFIC - name the exact data/evidence needed
+3. Explain the INVESTOR BENEFIT - why adding this helps
+4. NEVER write copy or invent facts
+
+Bad fixes (reject these patterns):
+- "Add more detail about X" (too vague)
+- "Make this clearer" (not actionable)
+- "Include X, Y, and Z metrics" (assumes data exists)
+- "Say that you have X" (writing copy)
+
+Good fixes (follow these patterns):
+- "If CAC data exists, showing payback period would help investors assess capital efficiency"
+- "If team members have relevant exits or domain experience, highlighting these specifically would increase credibility"
+- "Investors typically look for month-over-month growth rates - if available, this would strengthen the traction story"
+
 Fix phrasing MUST be:
 - Conditional and non-prescriptive
 - Specific enough to act on
 - Tied directly to the stated gap
-- Grounded in how investors actually evaluate (use reasoning patterns if provided)
+- Grounded in how investors actually evaluate
 - NOT generic phrases like "provide more detail" or "add more information"
 
 Use phrases like:
@@ -620,6 +665,85 @@ For each thesis question, evaluate how well the COMPLETE DECK answers it. Look a
 }
 
 /**
+ * Generate recommended investment highlights based on deck strengths.
+ * Returns 4-6 bullet points highlighting the strongest signals from the deck.
+ *
+ * Focus on high-impact slides (traction, market, team, problem, solution) where
+ * the deck shows genuine strength (score >= 4 on important questions).
+ */
+function generateRecommendedInvestmentHighlights(slideEvaluations, investmentThesis) {
+  const highlights = []
+
+  // Priority order for investment highlights
+  const priorityOrder = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'product', 'competition']
+
+  // Collect strong signals from slides
+  for (const slideType of priorityOrder) {
+    const slide = slideEvaluations.find((s) => s.type === slideType)
+    if (!slide) continue
+
+    // Find high-scoring questions (score >= 4) for this slide
+    const strongQuestions = slide.questions.filter((q) => q.score >= 4 && q.confidence !== 'low')
+
+    for (const q of strongQuestions) {
+      // Extract key insight from assessment
+      if (q.assessment && q.assessment !== 'Not addressed in slide') {
+        highlights.push({
+          category: slideType,
+          signal: q.assessment,
+          score: q.score,
+          source: 'slide',
+        })
+      }
+    }
+  }
+
+  // Add strong thesis elements (score >= 4)
+  if (investmentThesis) {
+    for (const [key, thesis] of Object.entries(investmentThesis)) {
+      if (thesis.score >= 4) {
+        highlights.push({
+          category: key.replace('why_', '').replace('_', ' '),
+          signal: thesis.verdict,
+          score: thesis.score,
+          source: 'thesis',
+        })
+      }
+    }
+  }
+
+  // Sort by score descending, then by priority order
+  highlights.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score
+    const aPriority = priorityOrder.indexOf(a.category)
+    const bPriority = priorityOrder.indexOf(b.category)
+    return (aPriority === -1 ? 99 : aPriority) - (bPriority === -1 ? 99 : bPriority)
+  })
+
+  // Take top 4-6 highlights
+  const topHighlights = highlights.slice(0, 6)
+
+  // If we have fewer than 4 highlights, we don't have enough strong signals
+  if (topHighlights.length < 4) {
+    return {
+      bullets: [],
+      note: 'The deck does not have enough strong signals to generate recommended investment highlights. Focus on strengthening traction, market, team, and problem/solution slides first.',
+    }
+  }
+
+  // Format as bullets with category labels
+  const bullets = topHighlights.map((h) => ({
+    category: h.category,
+    text: h.signal,
+  }))
+
+  return {
+    bullets,
+    note: 'These highlights are based on the strongest signals found in the deck. Use them as a starting point for your investment highlights slide.',
+  }
+}
+
+/**
  * Generate deterministic summary based on weighted slide scores.
  * Ignores cover/contact slides. Identifies strongest signal and main friction
  * from high-impact slides only.
@@ -921,7 +1045,25 @@ async function generateFullReport(supabase, deckId) {
 
       console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-      const { answers } = await evaluateSlide(openai, supabase, slide, rubric, deckOutline)
+      let answers
+
+      // Skip detailed evaluation for investment_highlights - it's a summary slide
+      // that shouldn't be scored against rubric questions
+      if (slideType === 'investment_highlights') {
+        console.log(`  Skipping detailed evaluation for investment_highlights slide`)
+        answers = rubric.map((q) => ({
+          question_id: q.id,
+          score: 0,
+          assessment: 'Investment highlights slides are not evaluated against individual rubric questions.',
+          gap: 'N/A - see recommended_investment_highlights in report for guidance.',
+          investor_impact: 'N/A - investment highlights are a summary, not a primary evaluation target.',
+          fix: 'N/A - this slide type is excluded from scoring.',
+          confidence: 'high',
+        }))
+      } else {
+        const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline)
+        answers = result.answers
+      }
 
       // Compute deterministic slide score (0-5 scale)
       const slideScoreResult = computeSlideScore(answers, rubric)
@@ -978,6 +1120,13 @@ async function generateFullReport(supabase, deckId) {
       deckScoreResult.deckScore
     )
 
+    // Generate recommended investment highlights based on deck strengths
+    const recommendedHighlights = generateRecommendedInvestmentHighlights(
+      slideEvaluations,
+      investmentThesis
+    )
+    console.log(`Generated ${recommendedHighlights.bullets?.length || 0} recommended investment highlights`)
+
     // Build full report
     const fullReport = {
       report_version: REPORT_VERSION,
@@ -988,6 +1137,7 @@ async function generateFullReport(supabase, deckId) {
       slide_count_used: deckScoreResult.slideCountUsed,
       summary,
       investment_thesis: investmentThesis,
+      recommended_investment_highlights: recommendedHighlights,
       slides: slideEvaluations,
     }
 

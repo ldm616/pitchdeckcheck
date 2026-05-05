@@ -117,6 +117,7 @@ const RUBRICS = {
 }
 
 // Slide weights for deck-level scoring
+// investment_highlights is 0 - excluded from deck scoring (it's a summary, not evaluated)
 const SLIDE_WEIGHTS = {
   problem: 1.3,
   solution: 1.3,
@@ -130,18 +131,24 @@ const SLIDE_WEIGHTS = {
   competition: 1.0,
   go_to_market: 1.0,
   roadmap: 0.8,
-  investment_highlights: 0.6,
+  investment_highlights: 0.0,
   cover: 0.0,
   contact: 0.0,
   other: 0.5,
 }
 
 // Grade thresholds for slide scoring (normalized 0-1)
+// Calibrated for better B-D distribution:
+// - A: exceptional, rare (85%+)
+// - B: strong but incomplete (70%+)
+// - C: partial with meaningful gaps (55%+)
+// - D: weak but present (40%+)
+// - E: essentially missing
 const SLIDE_GRADE_THRESHOLDS = {
-  A: 0.9,
-  B: 0.75,
-  C: 0.6,
-  D: 0.45,
+  A: 0.85,
+  B: 0.70,
+  C: 0.55,
+  D: 0.40,
 }
 
 // Grade to numeric score for deck-level

@@ -537,3 +537,4 @@ generateFullReport()
 | v1.2 | 2026-05-04 | Add canonical investor patterns documentation |
 | v1.3 | 2026-05-05 | Add report generation architecture, clarify full/free report separation |
 | v1.4 | 2026-05-05 | Rename to reportGenerator.js, clean up exports |
+| v1.5 | 2026-05-05 | Evaluation system improvements: grade calibration, deck context awareness, pattern misapplication prevention, fix quality, investment_highlights exclusion, recommended_investment_highlights |
