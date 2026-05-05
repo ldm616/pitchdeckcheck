@@ -30,7 +30,7 @@ const {
 } = require('./rubrics')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
-const REPORT_VERSION = 'report_v2.4'
+const REPORT_VERSION = 'report_v2.5'
 
 // High-impact slide types for summary generation (ignore cover/contact)
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
@@ -1104,29 +1104,20 @@ async function generateFullReport(supabase, deckId) {
 
     for (const slide of slides) {
       const slideType = slide.inferred_type || 'other'
+
+      // Completely exclude investment_highlights from analysis and report
+      // It's a summary slide that should not be evaluated or scored
+      if (slideType === 'investment_highlights') {
+        console.log(`Skipping slide ${slide.slide_number} (investment_highlights) - excluded from analysis`)
+        continue
+      }
+
       const rubric = RUBRICS[slideType] || RUBRICS.other
 
       console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-      let answers
-
-      // Skip detailed evaluation for investment_highlights - it's a summary slide
-      // that shouldn't be scored against rubric questions
-      if (slideType === 'investment_highlights') {
-        console.log(`  Skipping detailed evaluation for investment_highlights slide`)
-        answers = rubric.map((q) => ({
-          question_id: q.id,
-          score: 0,
-          assessment: 'Investment highlights slides are not evaluated against individual rubric questions.',
-          gap: 'N/A - see recommended_investment_highlights in report for guidance.',
-          investor_impact: 'N/A - investment highlights are a summary, not a primary evaluation target.',
-          fix: 'N/A - this slide type is excluded from scoring.',
-          confidence: 'high',
-        }))
-      } else {
-        const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline)
-        answers = result.answers
-      }
+      const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline)
+      const answers = result.answers
 
       // Compute deterministic slide score (0-5 scale)
       const slideScoreResult = computeSlideScore(answers, rubric)
