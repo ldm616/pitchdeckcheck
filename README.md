@@ -7,6 +7,7 @@ Investor-readiness scoring for pitch decks.
 ```
 app/              # React frontend
 netlify/functions # Serverless backend
+scripts/          # Admin scripts (seeding, etc.)
 docs/             # Documentation
 supabase/         # Database schema
 ```
@@ -54,9 +55,40 @@ See `/docs/EVALS.md` for full details.
 
 | File | Purpose |
 |------|---------|
-| `netlify/functions/lib/rubrics.js` | Rubric questions, weights, scoring |
+| `netlify/functions/lib/rubrics.js` | Rubric questions, weights, scoring (source of truth) |
 | `netlify/functions/lib/generateFreeReport.js` | Report generation logic |
+| `scripts/seed-rubrics.js` | Seed rubric questions to database |
 | `docs/EVALS.md` | Evaluation framework |
+
+## Rubric Management
+
+### Source of Truth
+
+The rubric source of truth for **runtime** is `netlify/functions/lib/rubrics.js`.
+
+A database copy exists in `rubric_versions` and `rubric_questions` tables for:
+- Traceability and version history
+- Pattern mapping (pattern_rubric_map references question_key)
+- Future admin editing
+- Future DB-driven rubrics
+
+### Seeding Rubrics to Database
+
+To sync the rubric from code to database:
+
+```bash
+cd scripts
+npm install
+SUPABASE_URL=your_url SUPABASE_SERVICE_ROLE_KEY=your_key npm run seed:rubrics
+```
+
+The script will:
+1. Upsert the current RUBRIC_VERSION as active
+2. Deactivate all other versions
+3. Upsert all questions with deterministic keys
+4. Print verification output
+
+Safe to rerun - uses upsert based on `(version_key, question_key)`.
 
 ## Report Versions
 

@@ -1,0 +1,12 @@
+{
+  "name": "pitchdeckcheck-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scripts for PitchDeckCheck administration",
+  "scripts": {
+    "seed:rubrics": "node seed-rubrics.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}

@@ -427,6 +427,27 @@ To run a report for evaluation:
 
 ---
 
+## Rubric Source of Truth
+
+The rubric source of truth for **runtime report generation** is:
+
+```
+/netlify/functions/lib/rubrics.js
+```
+
+A database copy exists in `rubric_versions` and `rubric_questions` tables for:
+- Traceability and version history
+- Pattern mapping (`pattern_rubric_map` references `question_key`)
+- Future admin editing capabilities
+- Future DB-driven rubrics
+
+When changing rubric questions:
+1. Edit `rubrics.js` first
+2. Run `npm run seed:rubrics` in `/scripts` to sync to database
+3. Update `RUBRIC_VERSION` if scoring logic changes
+
+---
+
 ## Version History
 
 | Version | Date | Description |
