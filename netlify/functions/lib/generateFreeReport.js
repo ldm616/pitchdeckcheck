@@ -11,6 +11,9 @@ const {
   sortAnswersByImportance,
 } = require('./rubrics')
 
+// Report version for evaluation tracking (update when report structure/logic changes)
+const REPORT_VERSION = 'report_v2.1'
+
 // High-impact slide types for summary generation (ignore cover/contact)
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
 
@@ -791,6 +794,7 @@ async function generateFreeReport(supabase, deckId) {
 
     // Build full report
     const fullReport = {
+      report_version: REPORT_VERSION,
       rubric_version: RUBRIC_VERSION,
       overall_grade: deckScoreResult.overallGrade,
       deck_score: deckScoreResult.deckScore,
@@ -858,6 +862,7 @@ module.exports = {
   generateDeterministicSummary,
   buildFreeReport,
   buildDeckOutline,
+  REPORT_VERSION,
   RUBRIC_EVAL_PROMPT,
   THESIS_EVAL_PROMPT,
   THESIS_QUESTIONS,

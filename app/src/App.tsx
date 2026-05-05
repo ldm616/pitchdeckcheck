@@ -88,6 +88,7 @@ interface ReportContent {
   overall_grade: string
   summary: string
   deck_score?: number
+  report_version?: string
   rubric_version?: string
 
   // Investment thesis (deck-level)
@@ -1106,8 +1107,8 @@ export default function App() {
                 </p>
                 <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
                   {slideCount || report.slides?.length || 0} slides analyzed
-                  {report.rubric_version && (
-                    <span style={{ marginLeft: '8px' }}>• {report.rubric_version}</span>
+                  {report.report_version && (
+                    <span style={{ marginLeft: '8px' }}>• {report.report_version}</span>
                   )}
                 </p>
               </div>
