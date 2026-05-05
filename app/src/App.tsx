@@ -796,7 +796,14 @@ export default function App() {
               }}
             >
               <button
-                onClick={() => setAdminView('upload')}
+                onClick={() => {
+                  setAdminView('upload')
+                  // Reset report state to show the upload form
+                  setReport(null)
+                  setStatus('idle')
+                  setSlides([])
+                  setSlideCount(null)
+                }}
                 style={{
                   background: 'none',
                   border: 'none',
