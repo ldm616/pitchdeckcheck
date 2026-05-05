@@ -6,9 +6,17 @@
  *
  * This is READ-ONLY and does not modify any evaluation behavior yet.
  * It provides the foundation for context-aware evaluation in v3.
+ *
+ * Schema (actual Supabase tables):
+ * - evaluation_rule_packs: version_key, name, description, status, is_active, architecture_version, report_version
+ * - evaluation_rules: rule_pack_id, rule_key, rule_type, slide_type, question_key, title, instruction, weight, priority, is_required, is_active
+ * - evaluation_prompt_versions: rule_pack_id, prompt_key, prompt_type, version_key, title, prompt_text, status, is_active
  */
 
 const { EVALUATION_RULE_PACKS, RULE_PACK_VERSION } = require('./evaluationRulePacks')
+
+// Default v3 rule pack version to load
+const DEFAULT_V3_VERSION_KEY = 'v3.0.0-draft'
 
 /**
  * Get the current evaluation architecture from environment.
@@ -28,24 +36,24 @@ function isV3Enabled() {
 }
 
 /**
- * Fetch the active rule pack from Supabase.
+ * Fetch a rule pack from Supabase by version_key.
  *
  * @param {Object} supabase - Supabase client
- * @param {string} packKey - Rule pack key (e.g., 'modern_seed_deck', 'marketplace')
+ * @param {string} versionKey - Rule pack version key (e.g., 'v3.0.0-draft')
  * @returns {Promise<Object|null>} - Rule pack with metadata and rules, or null on error
  */
-async function fetchRulePack(supabase, packKey) {
+async function fetchRulePack(supabase, versionKey = DEFAULT_V3_VERSION_KEY) {
   try {
-    // Fetch the rule pack metadata
+    // Fetch the rule pack metadata by version_key
     const { data: pack, error: packError } = await supabase
       .from('evaluation_rule_packs')
       .select('*')
-      .eq('pack_key', packKey)
-      .eq('status', 'active')
+      .eq('version_key', versionKey)
+      .eq('is_active', true)
       .single()
 
     if (packError || !pack) {
-      console.log(`[v3] Rule pack '${packKey}' not found or not active`)
+      console.log(`[v3] Rule pack '${versionKey}' not found or not active`)
       return null
     }
 
@@ -58,23 +66,26 @@ async function fetchRulePack(supabase, packKey) {
       .order('priority', { ascending: true })
 
     if (rulesError) {
-      console.error(`[v3] Error fetching rules for pack '${packKey}':`, rulesError.message)
+      console.error(`[v3] Error fetching rules for pack '${versionKey}':`, rulesError.message)
       return null
     }
 
     return {
       id: pack.id,
-      packKey: pack.pack_key,
+      versionKey: pack.version_key,
       name: pack.name,
       description: pack.description,
-      version: pack.version,
       status: pack.status,
+      isActive: pack.is_active,
+      architectureVersion: pack.architecture_version,
+      reportVersion: pack.report_version,
+      metadata: pack.metadata,
       rules: rules || [],
       ruleCount: rules?.length || 0,
       source: 'supabase',
     }
   } catch (err) {
-    console.error(`[v3] Exception fetching rule pack '${packKey}':`, err.message)
+    console.error(`[v3] Exception fetching rule pack '${versionKey}':`, err.message)
     return null
   }
 }
@@ -90,8 +101,8 @@ async function fetchAllRulePacks(supabase) {
     const { data: packs, error: packsError } = await supabase
       .from('evaluation_rule_packs')
       .select('*')
-      .eq('status', 'active')
-      .order('pack_key', { ascending: true })
+      .eq('is_active', true)
+      .order('version_key', { ascending: true })
 
     if (packsError || !packs) {
       console.error('[v3] Error fetching rule packs:', packsError?.message)
@@ -122,11 +133,14 @@ async function fetchAllRulePacks(supabase) {
 
     return packs.map((pack) => ({
       id: pack.id,
-      packKey: pack.pack_key,
+      versionKey: pack.version_key,
       name: pack.name,
       description: pack.description,
-      version: pack.version,
       status: pack.status,
+      isActive: pack.is_active,
+      architectureVersion: pack.architecture_version,
+      reportVersion: pack.report_version,
+      metadata: pack.metadata,
       rules: rulesByPack[pack.id] || [],
       ruleCount: rulesByPack[pack.id]?.length || 0,
       source: 'supabase',
@@ -138,46 +152,56 @@ async function fetchAllRulePacks(supabase) {
 }
 
 /**
- * Fetch the active prompt version from Supabase.
+ * Fetch prompt versions for a rule pack from Supabase.
  *
  * @param {Object} supabase - Supabase client
- * @param {string} promptType - Prompt type (e.g., 'rubric_eval', 'thesis_eval')
- * @returns {Promise<Object|null>} - Prompt version data, or null on error
+ * @param {string} rulePackId - Rule pack ID
+ * @param {string} promptType - Optional prompt type filter (e.g., 'rubric_eval', 'thesis_eval')
+ * @returns {Promise<Object[]>} - Array of prompt versions, or empty array on error
  */
-async function fetchPromptVersion(supabase, promptType = 'rubric_eval') {
+async function fetchPromptVersions(supabase, rulePackId, promptType = null) {
   try {
-    const { data: prompt, error } = await supabase
+    let query = supabase
       .from('evaluation_prompt_versions')
       .select('*')
-      .eq('prompt_type', promptType)
-      .eq('status', 'active')
+      .eq('rule_pack_id', rulePackId)
+      .eq('is_active', true)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
 
-    if (error || !prompt) {
-      console.log(`[v3] Prompt version '${promptType}' not found or not active`)
-      return null
+    if (promptType) {
+      query = query.eq('prompt_type', promptType)
     }
 
-    return {
+    const { data: prompts, error } = await query
+
+    if (error || !prompts) {
+      console.log(`[v3] No prompt versions found for rule pack ${rulePackId}`)
+      return []
+    }
+
+    return prompts.map((prompt) => ({
       id: prompt.id,
+      rulePackId: prompt.rule_pack_id,
+      promptKey: prompt.prompt_key,
       promptType: prompt.prompt_type,
-      version: prompt.version,
-      content: prompt.content,
+      versionKey: prompt.version_key,
+      title: prompt.title,
+      promptText: prompt.prompt_text,
       status: prompt.status,
+      isActive: prompt.is_active,
+      metadata: prompt.metadata,
       source: 'supabase',
-    }
+    }))
   } catch (err) {
-    console.error(`[v3] Exception fetching prompt version '${promptType}':`, err.message)
-    return null
+    console.error(`[v3] Exception fetching prompt versions:`, err.message)
+    return []
   }
 }
 
 /**
  * Get fallback rule pack from hardcoded definitions.
  *
- * @param {string} packKey - Rule pack key
+ * @param {string} packKey - Rule pack key (from hardcoded EVALUATION_RULE_PACKS)
  * @returns {Object|null} - Hardcoded rule pack or null if not found
  */
 function getFallbackRulePack(packKey) {
@@ -187,13 +211,20 @@ function getFallbackRulePack(packKey) {
   }
 
   return {
-    packKey,
+    versionKey: RULE_PACK_VERSION,
     name: pack.name,
     description: pack.description,
-    version: RULE_PACK_VERSION,
+    status: 'fallback',
+    isActive: true,
+    architectureVersion: 'v2',
+    reportVersion: null,
     rules: pack.rules.map((rule, idx) => ({
-      rule_text: rule,
+      rule_key: `fallback_rule_${idx + 1}`,
+      rule_type: 'general',
+      title: `Rule ${idx + 1}`,
+      instruction: rule,
       priority: idx + 1,
+      is_active: true,
     })),
     ruleCount: pack.rules.length,
     source: 'hardcoded_fallback',
@@ -204,23 +235,29 @@ function getFallbackRulePack(packKey) {
  * Load evaluation context for a deck.
  *
  * This is the main entry point for v3 rule loading.
- * Returns the appropriate rule pack and prompt version based on context.
+ * Returns the appropriate rule pack and prompt versions based on context.
  *
  * @param {Object} supabase - Supabase client
  * @param {Object} options - Loading options
- * @param {string} options.packKey - Rule pack key to load
- * @param {boolean} options.loadPrompt - Whether to load prompt version
- * @returns {Promise<Object>} - Evaluation context with rulePack, promptVersion, and metadata
+ * @param {string} options.versionKey - Rule pack version key to load (default: v3.0.0-draft)
+ * @param {string} options.fallbackPackKey - Hardcoded pack key to use as fallback
+ * @param {boolean} options.loadPrompts - Whether to load prompt versions
+ * @returns {Promise<Object>} - Evaluation context with rulePack, promptVersions, and metadata
  */
 async function loadEvaluationContext(supabase, options = {}) {
   const architecture = getEvaluationArchitecture()
-  const { packKey = 'modern_seed_deck', loadPrompt = false } = options
+  const {
+    versionKey = DEFAULT_V3_VERSION_KEY,
+    fallbackPackKey = 'modern_seed_deck',
+    loadPrompts = false,
+  } = options
 
   const result = {
     architecture,
-    packKey,
+    versionKey,
     rulePack: null,
-    promptVersion: null,
+    promptVersions: [],
+    promptVersionCount: 0,
     fallbackUsed: false,
     fallbackReason: null,
   }
@@ -231,37 +268,54 @@ async function loadEvaluationContext(supabase, options = {}) {
     return result
   }
 
-  console.log(`[eval] Architecture: v3 - loading rule pack '${packKey}'`)
+  console.log(`[eval] Architecture: v3 - loading rule pack '${versionKey}'`)
 
   // Try to load from Supabase
-  const rulePack = await fetchRulePack(supabase, packKey)
+  const rulePack = await fetchRulePack(supabase, versionKey)
 
   if (rulePack) {
     result.rulePack = rulePack
-    console.log(`[v3] Loaded rule pack '${packKey}' from Supabase (${rulePack.ruleCount} rules, version: ${rulePack.version})`)
+
+    // Load prompt versions if requested
+    if (loadPrompts) {
+      const promptVersions = await fetchPromptVersions(supabase, rulePack.id)
+      result.promptVersions = promptVersions
+      result.promptVersionCount = promptVersions.length
+    }
+
+    // Diagnostic log
+    console.log(`[v3] ┌─────────────────────────────────────────`)
+    console.log(`[v3] │ Evaluation Context Loaded`)
+    console.log(`[v3] │ Architecture: ${architecture}`)
+    console.log(`[v3] │ Rule Pack: ${rulePack.versionKey}`)
+    console.log(`[v3] │ Name: ${rulePack.name}`)
+    console.log(`[v3] │ Rules: ${rulePack.ruleCount}`)
+    console.log(`[v3] │ Prompts: ${result.promptVersionCount}`)
+    console.log(`[v3] │ Source: ${rulePack.source}`)
+    console.log(`[v3] └─────────────────────────────────────────`)
   } else {
     // Fall back to hardcoded rules
-    const fallback = getFallbackRulePack(packKey)
+    const fallback = getFallbackRulePack(fallbackPackKey)
     if (fallback) {
       result.rulePack = fallback
       result.fallbackUsed = true
       result.fallbackReason = 'supabase_load_failed'
-      console.log(`[v3] Using fallback rule pack '${packKey}' (hardcoded, ${fallback.ruleCount} rules)`)
+
+      // Diagnostic log for fallback
+      console.log(`[v3] ┌─────────────────────────────────────────`)
+      console.log(`[v3] │ Evaluation Context (FALLBACK)`)
+      console.log(`[v3] │ Architecture: ${architecture}`)
+      console.log(`[v3] │ Rule Pack: ${fallback.versionKey}`)
+      console.log(`[v3] │ Name: ${fallback.name}`)
+      console.log(`[v3] │ Rules: ${fallback.ruleCount}`)
+      console.log(`[v3] │ Prompts: 0 (hardcoded prompt used)`)
+      console.log(`[v3] │ Source: ${fallback.source}`)
+      console.log(`[v3] │ Fallback Reason: ${result.fallbackReason}`)
+      console.log(`[v3] └─────────────────────────────────────────`)
     } else {
       result.fallbackUsed = true
       result.fallbackReason = 'pack_not_found'
-      console.log(`[v3] Rule pack '${packKey}' not found in Supabase or fallback`)
-    }
-  }
-
-  // Optionally load prompt version
-  if (loadPrompt) {
-    const promptVersion = await fetchPromptVersion(supabase, 'rubric_eval')
-    if (promptVersion) {
-      result.promptVersion = promptVersion
-      console.log(`[v3] Loaded prompt version '${promptVersion.version}' from Supabase`)
-    } else {
-      console.log(`[v3] Using hardcoded prompt (no Supabase version found)`)
+      console.log(`[v3] Rule pack '${versionKey}' not found in Supabase, fallback '${fallbackPackKey}' also not found`)
     }
   }
 
@@ -272,15 +326,15 @@ async function loadEvaluationContext(supabase, options = {}) {
  * Detect the appropriate rule pack based on deck characteristics.
  *
  * This is a placeholder for future context detection logic.
- * Currently returns 'modern_seed_deck' as default.
+ * Currently returns the default v3 version key.
  *
  * @param {Object} deckContext - Deck context (slides, types, etc.)
- * @returns {string} - Recommended rule pack key
+ * @returns {string} - Recommended rule pack version key
  */
 function detectRulePack(deckContext = {}) {
   // Future: analyze deck to detect business model, stage, etc.
-  // For now, return default
-  return 'modern_seed_deck'
+  // For now, return default v3 version
+  return DEFAULT_V3_VERSION_KEY
 }
 
 /**
@@ -295,8 +349,10 @@ function formatRulesForPrompt(rulePack) {
   }
 
   const ruleLines = rulePack.rules.map((r) => {
-    const text = r.rule_text || r
-    return `- ${text}`
+    // Use instruction field (actual schema) or fallback to rule_text or string
+    const text = r.instruction || r.rule_text || r
+    const title = r.title ? `${r.title}: ` : ''
+    return `- ${title}${text}`
   })
 
   return `
@@ -306,6 +362,9 @@ ${ruleLines.join('\n')}
 }
 
 module.exports = {
+  // Constants
+  DEFAULT_V3_VERSION_KEY,
+
   // Architecture detection
   getEvaluationArchitecture,
   isV3Enabled,
@@ -316,7 +375,7 @@ module.exports = {
   getFallbackRulePack,
 
   // Prompt version loading
-  fetchPromptVersion,
+  fetchPromptVersions,
 
   // Main entry point
   loadEvaluationContext,

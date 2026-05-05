@@ -1364,22 +1364,18 @@ async function generateFullReport(supabase, deckId) {
 
     let evalContext = null
     if (evalArchitecture === 'v3') {
-      // Detect appropriate rule pack based on deck characteristics
-      const detectedPackKey = detectRulePack({ slides, deckOutline })
+      // Detect appropriate rule pack version based on deck characteristics
+      const detectedVersionKey = detectRulePack({ slides, deckOutline })
 
-      // Load evaluation context (rule pack + optional prompt version)
+      // Load evaluation context (rule pack + optional prompt versions)
       evalContext = await loadEvaluationContext(supabase, {
-        packKey: detectedPackKey,
-        loadPrompt: false, // Not using DB prompts yet
+        versionKey: detectedVersionKey,
+        fallbackPackKey: 'modern_seed_deck',
+        loadPrompts: false, // Not using DB prompts yet
       })
 
-      // Log v3 context for debugging (no behavior change)
-      if (evalContext.rulePack) {
-        console.log(`[v3] Rule pack loaded: ${evalContext.rulePack.name} (${evalContext.rulePack.ruleCount} rules)`)
-        if (evalContext.fallbackUsed) {
-          console.log(`[v3] Fallback used: ${evalContext.fallbackReason}`)
-        }
-      }
+      // Diagnostic logging is handled inside loadEvaluationContext
+      // No additional logging needed here - context box is printed by loader
     }
     // ===== End V3 Architecture block =====
 
