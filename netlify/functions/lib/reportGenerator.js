@@ -572,37 +572,62 @@ function buildDeckOutline(slides) {
 
 /**
  * Enforce phrase rules on investor_impact field.
- * Replaces forbidden vague phrasing with direct "Investors cannot..." language.
+ * Replaces awkward phrasing with clearer investor-centric language.
  *
- * Forbidden phrases per v2.7:
- * - may, might, potentially, could
- * - raises questions, leaves questions
- * - this creates uncertainty
+ * Banned phrases (v3):
+ * - "Investors cannot question" (nonsensical)
+ * - "Investors cannot not" (double negative)
+ * - "Investors cannot find it challenging" (awkward)
+ * - "Investors cannot be concerned" (awkward)
+ * - "Investors cannot doubt" (awkward)
+ * - "Investors cannot overlook" (awkward)
+ * - "Investors cannot receive" (nonsensical)
+ *
+ * Preferred alternatives:
+ * - "Investors may question..."
+ * - "Investors may not be able to..."
+ * - "This may make it harder for investors to..."
+ * - "This creates investor uncertainty around..."
  */
 function enforcePhrasingRules(text) {
   if (!text) return text
 
   const forbiddenPatterns = [
-    // Direct investor + vague verb patterns
-    { pattern: /investors may\b/gi, replacement: 'Investors cannot' },
-    { pattern: /investors might\b/gi, replacement: 'Investors cannot' },
-    { pattern: /investors could\b/gi, replacement: 'Investors cannot' },
-    { pattern: /investors potentially\b/gi, replacement: 'Investors cannot' },
-    // Generic vague patterns
-    { pattern: /this may\b/gi, replacement: 'This blocks investors from' },
-    { pattern: /this might\b/gi, replacement: 'This blocks investors from' },
-    { pattern: /this could\b/gi, replacement: 'This blocks investors from' },
-    { pattern: /this potentially\b/gi, replacement: 'This blocks investors from' },
-    { pattern: /may be unclear/gi, replacement: 'is unclear to investors' },
-    { pattern: /might be unclear/gi, replacement: 'is unclear to investors' },
-    { pattern: /could be unclear/gi, replacement: 'is unclear to investors' },
-    // Question-raising patterns
-    { pattern: /this creates uncertainty/gi, replacement: 'Investors cannot assess this' },
-    { pattern: /potentially prompting investor questions/gi, replacement: 'blocking investor assessment' },
-    { pattern: /raises questions/gi, replacement: 'prevents investors from assessing' },
-    { pattern: /leaves questions/gi, replacement: 'prevents investors from determining' },
-    { pattern: /raises concerns/gi, replacement: 'prevents investors from determining' },
-    { pattern: /leaves uncertainty/gi, replacement: 'blocks investor assessment of' },
+    // Fix awkward "Investors cannot X" patterns
+    { pattern: /investors cannot question/gi, replacement: 'Investors may question' },
+    { pattern: /investors cannot not\b/gi, replacement: 'Investors may not be able to' },
+    { pattern: /investors cannot find it challenging/gi, replacement: 'Investors may find it challenging' },
+    { pattern: /investors cannot be concerned/gi, replacement: 'Investors may be concerned' },
+    { pattern: /investors cannot doubt/gi, replacement: 'Investors may question' },
+    { pattern: /investors cannot overlook/gi, replacement: 'Investors may overlook' },
+    { pattern: /investors cannot receive/gi, replacement: 'Investors may not receive' },
+    { pattern: /investors cannot see/gi, replacement: 'Investors may not see' },
+    { pattern: /investors cannot understand/gi, replacement: 'Investors may struggle to understand' },
+    { pattern: /investors cannot determine/gi, replacement: 'Investors may not be able to determine' },
+    { pattern: /investors cannot assess/gi, replacement: 'Investors may not be able to assess' },
+    { pattern: /investors cannot evaluate/gi, replacement: 'Investors may struggle to evaluate' },
+    { pattern: /investors cannot judge/gi, replacement: 'Investors may struggle to judge' },
+    { pattern: /investors cannot verify/gi, replacement: 'Investors may not be able to verify' },
+    { pattern: /investors cannot confirm/gi, replacement: 'Investors may not be able to confirm' },
+
+    // Fix vague patterns - now use clearer language
+    { pattern: /this may\b/gi, replacement: 'This makes it harder for investors to' },
+    { pattern: /this might\b/gi, replacement: 'This makes it harder for investors to' },
+    { pattern: /this could\b/gi, replacement: 'This may make it harder for investors to' },
+    { pattern: /this potentially\b/gi, replacement: 'This may make it harder for investors to' },
+
+    // Fix "creates uncertainty" patterns
+    { pattern: /this creates uncertainty/gi, replacement: 'This creates investor uncertainty around' },
+    { pattern: /this creates investor uncertainty around around/gi, replacement: 'This creates investor uncertainty around' },
+
+    // Fix question-raising patterns
+    { pattern: /raises questions/gi, replacement: 'may cause investors to question' },
+    { pattern: /leaves questions/gi, replacement: 'leaves investors uncertain about' },
+    { pattern: /raises concerns/gi, replacement: 'may concern investors regarding' },
+    { pattern: /leaves uncertainty/gi, replacement: 'creates investor uncertainty about' },
+
+    // Clean up any double spaces created by replacements
+    { pattern: /  +/g, replacement: ' ' },
   ]
 
   let result = text

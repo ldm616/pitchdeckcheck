@@ -18,6 +18,11 @@ const { EVALUATION_RULE_PACKS, RULE_PACK_VERSION } = require('./evaluationRulePa
 // Default v3 rule pack version to load
 const DEFAULT_V3_VERSION_KEY = 'v3.0.0-draft'
 
+// V3 rule injection mode: 'minimal' or 'full'
+// - minimal: inject only core calibration + inferred context categories (reduces prompt conflict)
+// - full: inject all universal + inferred categories (for debugging)
+const DEFAULT_V3_RULE_MODE = 'minimal'
+
 /**
  * Get the current evaluation architecture from environment.
  * @returns {'v2' | 'v3'} - Current architecture version
@@ -25,6 +30,15 @@ const DEFAULT_V3_VERSION_KEY = 'v3.0.0-draft'
 function getEvaluationArchitecture() {
   const arch = process.env.EVALUATION_ARCHITECTURE || 'v2'
   return arch === 'v3' ? 'v3' : 'v2'
+}
+
+/**
+ * Get the v3 rule injection mode.
+ * @returns {'minimal' | 'full'} - Rule injection mode
+ */
+function getV3RuleMode() {
+  const mode = process.env.V3_RULE_MODE || DEFAULT_V3_RULE_MODE
+  return mode === 'full' ? 'full' : 'minimal'
 }
 
 /**
@@ -431,9 +445,9 @@ ${ruleLines.join('\n')}
 // ============================================================
 
 /**
- * Universal rule categories that always apply to v3 evaluations.
+ * Universal rule categories for FULL mode (all rules).
  */
-const UNIVERSAL_CATEGORIES = [
+const FULL_MODE_CATEGORIES = [
   'core_calibration',
   'core',
   'language_rules',
@@ -443,6 +457,34 @@ const UNIVERSAL_CATEGORIES = [
   'suggestions',
   'general_evidence',
   'modern_seed_deck',
+]
+
+/**
+ * Minimal mode categories - reduced set to avoid prompt conflict.
+ * Only includes essential calibration rules.
+ */
+const MINIMAL_MODE_CATEGORIES = [
+  'core_calibration',
+  'core',
+  // Note: language_rules moved to base prompt, not injected
+  // Note: modern_seed_deck excluded to reduce conflict
+]
+
+/**
+ * Additional categories to include in minimal mode only if inferred from deck content.
+ */
+const MINIMAL_MODE_CONDITIONAL = [
+  'sparse_high_signal_deck',
+  'consumer_network',
+  // These are specific rule keys, not categories - handled separately
+]
+
+/**
+ * Specific rule keys to always include in minimal mode (cross-category).
+ */
+const MINIMAL_MODE_RULE_KEYS = [
+  'evidence_require_specificity',
+  'suggestions_rank_by_impact',
 ]
 
 /**
@@ -509,18 +551,39 @@ const CONDITIONAL_CATEGORIES = {
  *
  * @param {Object[]} slides - Array of slide objects with extracted_text and inferred_type
  * @param {Object} options - Additional options
+ * @param {string} options.ruleMode - Rule injection mode ('minimal' or 'full')
  * @returns {Object} - Deck context classification with categories and reasons
  */
 function inferDeckContext(slides, options = {}) {
+  const ruleMode = options.ruleMode || getV3RuleMode()
+
+  // Start with base categories based on rule mode
+  const baseCategories = ruleMode === 'minimal'
+    ? [...MINIMAL_MODE_CATEGORIES]
+    : [...FULL_MODE_CATEGORIES]
+
   const result = {
-    included_categories: [...UNIVERSAL_CATEGORIES],
+    rule_mode: ruleMode,
+    included_categories: baseCategories,
     excluded_categories: [],
+    excluded_due_to_rule_mode: [],
     category_reasons: {},
     deck_signals: {
       is_sparse: false,
       detected_models: [],
       keyword_matches: {},
     },
+  }
+
+  // In minimal mode, track what full mode would have included
+  if (ruleMode === 'minimal') {
+    const excludedByMode = FULL_MODE_CATEGORIES.filter(
+      (c) => !MINIMAL_MODE_CATEGORIES.includes(c)
+    )
+    result.excluded_due_to_rule_mode = excludedByMode
+    for (const cat of excludedByMode) {
+      result.category_reasons[cat] = `Excluded by minimal rule mode`
+    }
   }
 
   // Combine all slide text for analysis
@@ -592,6 +655,7 @@ function inferDeckContext(slides, options = {}) {
 /**
  * Filter rules based on inferred deck context.
  * Only includes rules whose category matches the inferred context.
+ * In minimal mode, also includes specific rule keys from MINIMAL_MODE_RULE_KEYS.
  *
  * @param {Object[]} rules - Array of rule objects with metadata.category
  * @param {Object} deckContext - Deck context from inferDeckContext()
@@ -605,13 +669,20 @@ function filterRulesByContext(rules, deckContext) {
       injected_rules_count: 0,
       filtered_out_count: 0,
       rules_by_category: {},
+      rule_mode: deckContext.rule_mode || 'full',
     }
   }
 
+  const ruleMode = deckContext.rule_mode || 'full'
   const includedCategories = new Set(deckContext.included_categories.map((c) => c.toLowerCase()))
+  const includedRuleKeys = ruleMode === 'minimal'
+    ? new Set(MINIMAL_MODE_RULE_KEYS.map((k) => k.toLowerCase()))
+    : new Set()
+
   const rulesByCategory = {}
   const filteredRules = []
   const filteredOutRules = []
+  const includedByRuleKey = []
 
   for (const rule of rules) {
     // Get rule category from metadata or rule_key prefix
@@ -622,19 +693,28 @@ function filterRulesByContext(rules, deckContext) {
       'general'
     ).toLowerCase()
 
+    const ruleKey = (rule.rule_key || '').toLowerCase()
+
     // Track rules by category for debug
     if (!rulesByCategory[category]) {
       rulesByCategory[category] = { included: 0, excluded: 0 }
     }
 
-    // Check if this rule's category is included
+    // Check if this rule should be included
+    // 1. Category match
     const categoryIncluded = includedCategories.has(category) ||
-      // Also check if any included category is a prefix/suffix match
       [...includedCategories].some((inc) => category.includes(inc) || inc.includes(category))
 
-    if (categoryIncluded) {
+    // 2. Specific rule key match (minimal mode only)
+    const ruleKeyIncluded = includedRuleKeys.has(ruleKey) ||
+      [...includedRuleKeys].some((k) => ruleKey.includes(k))
+
+    if (categoryIncluded || ruleKeyIncluded) {
       filteredRules.push(rule)
       rulesByCategory[category].included++
+      if (ruleKeyIncluded && !categoryIncluded) {
+        includedByRuleKey.push(ruleKey)
+      }
     } else {
       filteredOutRules.push(rule)
       rulesByCategory[category].excluded++
@@ -647,6 +727,8 @@ function filterRulesByContext(rules, deckContext) {
     injected_rules_count: filteredRules.length,
     filtered_out_count: filteredOutRules.length,
     rules_by_category: rulesByCategory,
+    rule_mode: ruleMode,
+    included_by_rule_key: includedByRuleKey,
   }
 }
 
@@ -697,21 +779,28 @@ function applyDeckContextFiltering(evalContext, slides) {
 
   // Build context debug info
   const contextDebug = {
+    rule_mode: deckContext.rule_mode,
     deck_context_classification: {
       is_sparse: deckContext.deck_signals.is_sparse,
       detected_models: deckContext.deck_signals.detected_models,
     },
     included_rule_categories: deckContext.included_categories,
     excluded_rule_categories: deckContext.excluded_categories,
+    excluded_due_to_rule_mode: deckContext.excluded_due_to_rule_mode || [],
     category_reasons: deckContext.category_reasons,
     all_rules_loaded_count: filterResult.all_rules_count,
     injected_rules_count: filterResult.injected_rules_count,
     filtered_out_count: filterResult.filtered_out_count,
     rules_by_category: filterResult.rules_by_category,
+    included_by_rule_key: filterResult.included_by_rule_key || [],
   }
 
+  console.log(`[v3] Rule mode: ${deckContext.rule_mode}`)
   console.log(`[v3] Context filtering: ${filterResult.injected_rules_count}/${filterResult.all_rules_count} rules injected`)
   console.log(`[v3] Included categories: ${deckContext.included_categories.join(', ')}`)
+  if (deckContext.excluded_due_to_rule_mode && deckContext.excluded_due_to_rule_mode.length > 0) {
+    console.log(`[v3] Excluded by minimal mode: ${deckContext.excluded_due_to_rule_mode.join(', ')}`)
+  }
   if (deckContext.deck_signals.detected_models.length > 0) {
     console.log(`[v3] Detected models: ${deckContext.deck_signals.detected_models.join(', ')}`)
   }
@@ -727,10 +816,12 @@ function applyDeckContextFiltering(evalContext, slides) {
 module.exports = {
   // Constants
   DEFAULT_V3_VERSION_KEY,
+  DEFAULT_V3_RULE_MODE,
 
   // Architecture detection
   getEvaluationArchitecture,
   isV3Enabled,
+  getV3RuleMode,
 
   // Rule pack loading
   fetchRulePack,
