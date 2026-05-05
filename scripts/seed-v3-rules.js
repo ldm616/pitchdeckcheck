@@ -10,6 +10,18 @@
  *
  * Idempotent: Uses upsert to avoid duplicates.
  *
+ * Valid rule_type values:
+ * - slide_classification
+ * - atomic_question
+ * - scoring
+ * - evidence
+ * - strength
+ * - gap
+ * - suggestion
+ * - report_summary
+ * - guardrail
+ * - calibration
+ *
  * Usage:
  *   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed-v3-rules.js
  *
@@ -39,6 +51,55 @@ const V3_RULE_PACK = {
     seeded_at: new Date().toISOString(),
     rule_pack_version: RULE_PACK_VERSION,
   },
+}
+
+/**
+ * Map rules to valid rule_type values based on their content.
+ *
+ * Valid types: scoring, evidence, guardrail, suggestion, calibration
+ *
+ * Mapping logic:
+ * - "Reward", "Evaluate", scoring guidance → scoring
+ * - "Look for", "Assess", "Check", evidence requirements → evidence
+ * - "Do not", "avoid", anti-patterns → guardrail
+ * - Connection/linking guidance → suggestion
+ */
+const RULE_DEFINITIONS = {
+  modern_seed_deck: [
+    { instruction: 'Reward credible investor signal, not completeness alone.', rule_type: 'scoring' },
+    { instruction: 'Missing CAC or retention matters when growth depends on scaling efficiency.', rule_type: 'evidence' },
+    { instruction: 'Financials should connect to traction and GTM.', rule_type: 'evidence' },
+  ],
+  sparse_high_signal_deck: [
+    { instruction: 'Evaluate signal over completeness.', rule_type: 'scoring' },
+    { instruction: 'Do not penalize missing CAC/LTV/financial detail if core idea is strong.', rule_type: 'guardrail' },
+    { instruction: 'Reward clarity, timing, insight, simplicity.', rule_type: 'scoring' },
+  ],
+  marketplace: [
+    { instruction: 'Evaluate supply and demand strength.', rule_type: 'evidence' },
+    { instruction: 'Assess liquidity and trust.', rule_type: 'evidence' },
+    { instruction: 'Check if advantages are durable.', rule_type: 'evidence' },
+  ],
+  local_services_marketplace: [
+    { instruction: 'Assess trust and repeat usage.', rule_type: 'evidence' },
+    { instruction: 'Do not apply SaaS or API logic unless present.', rule_type: 'guardrail' },
+    { instruction: 'Coverage only matters if it compounds.', rule_type: 'scoring' },
+  ],
+  consumer_network: [
+    { instruction: 'Look for network effects or user pull.', rule_type: 'evidence' },
+    { instruction: 'Why-now can come from infrastructure shifts.', rule_type: 'evidence' },
+    { instruction: 'Sparse traction can still be high-signal.', rule_type: 'scoring' },
+  ],
+  saas: [
+    { instruction: 'Evaluate retention, CAC, expansion.', rule_type: 'evidence' },
+    { instruction: 'Missing unit economics is meaningful.', rule_type: 'evidence' },
+    { instruction: 'Link product value to revenue durability.', rule_type: 'suggestion' },
+  ],
+  infrastructure_developer: [
+    { instruction: 'Evaluate complexity reduction.', rule_type: 'evidence' },
+    { instruction: 'Check developer adoption.', rule_type: 'evidence' },
+    { instruction: 'Assess commoditization risk.', rule_type: 'evidence' },
+  ],
 }
 
 // Real prompt content from reportGenerator.js (v2.7)
@@ -486,35 +547,36 @@ async function main() {
   console.log()
   console.log('Step 2: Seeding evaluation rules')
 
-  const rulePackKeys = Object.keys(EVALUATION_RULE_PACKS)
+  const contextKeys = Object.keys(RULE_DEFINITIONS)
   let totalRules = 0
   let upsertedRules = 0
 
-  for (const packKey of rulePackKeys) {
-    const pack = EVALUATION_RULE_PACKS[packKey]
-    console.log(`  Processing rule type: ${packKey} (${pack.rules.length} rules)`)
+  for (const contextKey of contextKeys) {
+    const rules = RULE_DEFINITIONS[contextKey]
+    const packInfo = EVALUATION_RULE_PACKS[contextKey]
+    console.log(`  Processing context: ${contextKey} (${rules.length} rules)`)
 
-    for (let i = 0; i < pack.rules.length; i++) {
-      const rule = pack.rules[i]
+    for (let i = 0; i < rules.length; i++) {
+      const rule = rules[i]
       totalRules++
 
-      const ruleKey = `${packKey}_rule_${i + 1}`
+      const ruleKey = `${contextKey}_rule_${i + 1}`
       const ruleData = {
         rule_pack_id: rulePackId,
         rule_key: ruleKey,
-        rule_type: packKey,
-        slide_type: null, // These are general rules, not slide-specific
+        rule_type: rule.rule_type, // Valid type: scoring, evidence, guardrail, suggestion
+        slide_type: null, // These are context rules, not slide-specific
         question_key: null,
-        title: `${pack.name} Rule ${i + 1}`,
-        instruction: rule,
+        title: `${packInfo.name} Rule ${i + 1}`,
+        instruction: rule.instruction,
         weight: 1.0,
         priority: i + 1,
         is_required: false,
         is_active: true,
         metadata: {
-          source_pack: packKey,
-          source_name: pack.name,
-          source_description: pack.description,
+          category: contextKey, // Business model/deck type context
+          category_name: packInfo.name,
+          category_description: packInfo.description,
         },
         updated_at: new Date().toISOString(),
       }
@@ -643,26 +705,42 @@ async function main() {
   console.log('Verification')
   console.log('='.repeat(60))
 
-  // Count rules
-  const { data: ruleCount, error: ruleCountError } = await supabase
+  // Count rules by rule_type
+  const { data: rulesByType, error: ruleTypeError } = await supabase
     .from('evaluation_rules')
     .select('rule_type')
     .eq('rule_pack_id', rulePackId)
 
-  if (!ruleCountError && ruleCount) {
+  if (!ruleTypeError && rulesByType) {
     const countsByType = {}
-    for (const r of ruleCount) {
+    for (const r of rulesByType) {
       countsByType[r.rule_type] = (countsByType[r.rule_type] || 0) + 1
     }
 
     console.log()
-    console.log('Rules in database:')
-    console.log(`  Total: ${ruleCount.length}`)
-    console.log(`  Rule types: ${Object.keys(countsByType).length}`)
-    console.log()
-    console.log('By rule type:')
+    console.log('Rules by rule_type:')
     for (const [type, count] of Object.entries(countsByType).sort()) {
       console.log(`  ${type}: ${count}`)
+    }
+  }
+
+  // Count rules by category (from metadata)
+  const { data: rulesWithMeta, error: metaError } = await supabase
+    .from('evaluation_rules')
+    .select('metadata')
+    .eq('rule_pack_id', rulePackId)
+
+  if (!metaError && rulesWithMeta) {
+    const countsByCategory = {}
+    for (const r of rulesWithMeta) {
+      const category = r.metadata?.category || 'unknown'
+      countsByCategory[category] = (countsByCategory[category] || 0) + 1
+    }
+
+    console.log()
+    console.log('Rules by category (metadata.category):')
+    for (const [cat, count] of Object.entries(countsByCategory).sort()) {
+      console.log(`  ${cat}: ${count}`)
     }
   }
 
@@ -693,7 +771,7 @@ async function main() {
   console.log(`Rule pack is_active: false (intentionally not activated)`)
   console.log()
   console.log(`Rules seeded: ${upsertedRules}`)
-  console.log(`Rule types: ${rulePackKeys.length}`)
+  console.log(`Context categories: ${contextKeys.length}`)
   console.log(`Prompts seeded: ${upsertedPrompts}`)
   console.log()
 
