@@ -16,6 +16,34 @@ Random changes degrade quality. This framework ensures intentional iteration.
 
 ---
 
+## Golden Checks (Run Every Iteration)
+
+These are invariant checks that must pass before any deeper evaluation. If any fail, the iteration is not acceptable.
+
+### Quick Validation Checklist
+
+- [ ] Summary correctly identifies a top weighted strength (not cover/contact)
+- [ ] Summary correctly identifies a real high-impact weakness
+- [ ] No hallucinated missing items (claims something is missing when it's present)
+- [ ] Fixes are specific and conditional (no generic advice like "add more detail")
+- [ ] No contradiction across slides (e.g., "no traction shown" when traction slide exists)
+- [ ] Thesis verdicts align with slide-level evidence
+- [ ] Scores are consistent with assessment text (low score = clear gap stated)
+
+### Failure Modes to Watch
+
+| Failure | Example | Action |
+|---------|---------|--------|
+| Hallucination | "No market size provided" when TAM is stated | Reject, fix prompt |
+| Generic fix | "Consider adding more information" | Reject, tighten fix rules |
+| Contradiction | Thesis says weak traction, slide shows strong traction | Reject, check cross-slide context |
+| Score mismatch | Score 4 with "major gaps remain" in assessment | Reject, recalibrate |
+| Wrong priority | Cover slide flagged as top weakness | Reject, check weighting |
+
+**Rule: If Golden Checks fail, do not proceed. Fix the issue first.**
+
+---
+
 ## Evaluation Criteria
 
 ### Accuracy
@@ -74,16 +102,70 @@ Does output reflect our rubric and logic vs generic AI?
 
 We evaluate changes against a fixed set of decks to ensure consistent comparison.
 
-| Deck | Description | Primary Use |
-|------|-------------|-------------|
-| Gleamr | Current primary test deck | All evaluations |
-| TBD | Add 2-4 more decks with different characteristics | |
+| Deck | Description | Quality Level | Primary Use |
+|------|-------------|---------------|-------------|
+| Gleamr | Primary test deck | Mixed (strong traction, weak GTM) | All evaluations |
+| TBD | Add deck with weak fundamentals | Weak | Edge case testing |
+| TBD | Add deck with strong fundamentals | Strong | Ceiling testing |
+| TBD | Add non-standard structure deck | Varies | Structure robustness |
 
 When adding benchmark decks, include variety:
 - Different industries
 - Different stages (pre-seed, seed)
 - Different quality levels (strong, weak, mixed)
 - Different structures (standard, non-standard)
+
+---
+
+## Gleamr — Expected Findings
+
+This section defines "correct output" for the Gleamr benchmark deck. Use this to detect regressions or incorrect improvements.
+
+### Expected Top Strengths
+
+| Area | Expected Signal | Notes |
+|------|-----------------|-------|
+| Traction | Should be one of the strongest signals | Growth metrics are visible |
+| Problem | Should score reasonably well | Pain point is articulated |
+
+### Expected Top Weaknesses
+
+| Area | Expected Signal | Notes |
+|------|-----------------|-------|
+| Go-to-market | Should be weak or partial | Channel strategy unclear |
+| Financial assumptions | Should be weak | Projections lack visible assumptions |
+| Product differentiation | Should be partial | Claims lack specificity |
+| Why now | Should be weak or missing | Timing justification unclear |
+
+### Expected Common Gaps
+
+- Market assumptions not fully explicit
+- Limited proof of product-market fit beyond growth numbers
+- Limited specificity of team achievements
+- Competitive moat is claimed but not defended
+- Unit economics not visible
+
+### Expected Thesis Scores (approximate)
+
+| Thesis | Expected Range | Notes |
+|--------|----------------|-------|
+| Why This Market? | 2-3 | Size claimed, assumptions weak |
+| Why This Product? | 2-3 | Value prop present, differentiation weak |
+| Why This Team? | 2-3 | Team shown, achievements vague |
+| Why Now? | 1-2 | Timing not well justified |
+
+### Using Expected Findings
+
+When evaluating a change:
+
+1. Compare output to expected findings above
+2. If output matches expectations → system is working correctly
+3. If output diverges from expectations → investigate:
+   - Is the divergence an improvement? (we were wrong before)
+   - Is the divergence a regression? (we broke something)
+4. Document which expected findings were confirmed or contradicted
+
+**A change that causes Gleamr's traction to score poorly is almost certainly a regression.**
 
 ---
 
@@ -101,6 +183,24 @@ Use this template for every meaningful change:
 **Deck:** [name]
 **Previous Commit:** [hash for comparison]
 
+---
+
+### Golden Checks
+
+- [ ] Summary identifies weighted strength (not cover/contact)
+- [ ] Summary identifies real high-impact weakness
+- [ ] No hallucinated missing items
+- [ ] Fixes are specific and conditional
+- [ ] No cross-slide contradictions
+- [ ] Thesis aligns with slide evidence
+- [ ] Scores match assessment text
+
+**Golden Check Result:** PASS / FAIL
+
+If FAIL, stop here. Do not proceed until fixed.
+
+---
+
 ### Results
 
 **Overall Grade:** [A-E]
@@ -112,6 +212,23 @@ Use this template for every meaningful change:
 **Top Weakness (from report):**
 [quote or paraphrase]
 
+---
+
+### Comparison to Expected Findings
+
+| Expected | Actual | Match? |
+|----------|--------|--------|
+| Traction strong | | |
+| GTM weak | | |
+| Financials weak | | |
+| Differentiation partial | | |
+| Why now weak | | |
+
+**Divergences:**
+[List any unexpected results and whether they are improvements or regressions]
+
+---
+
 ### Criteria Assessment
 
 | Criterion | Rating | Notes |
@@ -122,29 +239,57 @@ Use this template for every meaningful change:
 | Traceability | Good/Mixed/Poor | |
 | Differentiation | Good/Mixed/Poor | |
 
+---
+
+### Regression Check
+
+Did we lose anything that was previously correct?
+
+- [ ] No loss of previously correct strengths
+- [ ] No loss of previously correct weaknesses
+- [ ] No increase in hallucinations
+- [ ] No major scoring inconsistencies
+- [ ] No new contradictions introduced
+
+**Specific regressions found:**
+[List any, or "None"]
+
+---
+
 ### Changes Observed
 
 **What improved:**
-- [specific improvement]
+- [specific improvement with evidence]
 
 **What regressed:**
-- [specific regression, or "None observed"]
+- [specific regression with evidence, or "None observed"]
 
-**False positives:**
+**Tradeoffs:**
+- [any intentional tradeoffs accepted]
+
+**False positives (new):**
 - [issues flagged that aren't real problems]
 
-**False negatives:**
+**False negatives (new):**
 - [real issues that were missed]
+
+---
 
 ### Decision
 
-[ ] Proceed - improvement is clear
-[ ] Proceed with caveat - tradeoff is intentional
+[ ] Proceed - improvement is clear, no regressions
+[ ] Proceed with caveat - tradeoff is intentional and acceptable
 [ ] Revert - regression outweighs improvement
-[ ] Needs more testing
+[ ] Needs more testing - unclear impact
 
-**Notes:**
-[any additional context]
+**Rationale:**
+[Why this decision was made]
+
+**Does this move us closer to investor-grade output?**
+[ ] Yes - clear improvement
+[ ] Neutral - no net change
+[ ] No - regression
+
 ```
 
 ---
@@ -153,32 +298,49 @@ Use this template for every meaningful change:
 
 ### Before Making Changes
 
-1. Identify what you're trying to improve
+1. Identify what you're trying to improve (be specific)
 2. Predict how the change will affect output
-3. Note current benchmark output for comparison
+3. Run report on benchmark deck and save output for comparison
+4. Review Expected Findings for the benchmark deck
 
 ### When Making Changes
 
 1. Make ONE meaningful change at a time
-2. Run report on at least one benchmark deck
-3. Fill out evaluation template
-4. Compare against previous run (not just inspect current)
+2. Run report on the same benchmark deck
+3. Run Golden Checks first — if any fail, stop
+4. Fill out full evaluation template
+5. Compare against Expected Findings
+6. Compare against previous run output
 
 ### After Making Changes
 
-1. Document at least one improvement OR one regression
-2. Do not rely on "feels better" - cite specific differences
-3. If regression is found, decide: revert or accept tradeoff
-4. Update RUBRIC_VERSION if scoring logic changes
-5. Commit with clear description of what changed and why
+1. Complete Regression Check
+2. Document at least ONE improvement with evidence
+3. Document at least ONE risk or tradeoff (even if minor)
+4. Do not rely on "feels better" — cite specific differences
+5. If regression found, decide: revert or accept with documented rationale
+6. Update REPORT_VERSION if report structure changes
+7. Update RUBRIC_VERSION if scoring logic changes
+8. Commit with evaluation summary
+
+### Mandatory Documentation
+
+Every evaluation must answer:
+
+- What specifically improved vs last run?
+- What specifically regressed (even slightly)?
+- Was the tradeoff acceptable? Why?
+- Does this move us closer to investor-grade output?
 
 ### What Counts as "Meaningful Change"
 
+Requires full evaluation:
 - Prompt wording changes
 - Scoring scale or threshold changes
 - New fields or sections added
 - Evaluation logic changes
 - Summary generation changes
+- Thesis evaluation changes
 
 Does NOT require full eval:
 - Typo fixes
@@ -189,33 +351,49 @@ Does NOT require full eval:
 
 ## Evaluation Log
 
-Record completed evaluations here for reference.
+Record completed evaluations here. Each entry must answer the core questions.
 
-### Template Entry
+### Entry Format
 
 ```
 ### [Date] - [Brief description]
 
 Commit: [hash]
 Deck: [name]
+Report Version: [version]
 Grade: [X] -> [Y] (or unchanged)
-Key finding: [one sentence]
-Decision: [proceed/revert/caveat]
+
+Golden Checks: PASS/FAIL
+Expected Findings Match: [X of Y matched]
+
+What improved: [one sentence]
+What regressed: [one sentence, or "None"]
+Tradeoff: [one sentence, or "None"]
+
+Decision: [proceed/proceed with caveat/revert]
+Investor-grade progress: [yes/neutral/no]
 ```
+
+### Evaluation History
 
 ---
 
-### [Example Entry - Delete after first real eval]
+#### 2026-05-04 - Initial framework creation
 
-```
-### 2026-05-04 - Initial framework creation
-
-Commit: (pending)
+Commit: 40b6c2c
 Deck: N/A
+Report Version: N/A
 Grade: N/A
-Key finding: Framework established, no evaluation run yet
+
+Golden Checks: N/A (no report generated)
+Expected Findings Match: N/A
+
+What improved: Framework established
+What regressed: None
+Tradeoff: None
+
 Decision: Proceed
-```
+Investor-grade progress: Neutral (process improvement, not output improvement)
 
 ---
 
@@ -224,20 +402,28 @@ Decision: Proceed
 When making changes to report generation:
 
 ```
-1. Run report on Gleamr deck (or other benchmark)
-2. Save output for comparison
-3. Make your change
-4. Run report again on same deck
-5. Fill out evaluation template above
-6. Compare outputs side-by-side
-7. Only commit if improvement is clear or tradeoff is intentional
-8. Include evaluation summary in commit message
+1. Run report on Gleamr deck
+2. Save output (copy to temp file or screenshot)
+3. Run Golden Checks on current output
+4. Make your change
+5. Run report again on Gleamr
+6. Run Golden Checks on new output — STOP if any fail
+7. Compare to Expected Findings
+8. Compare to previous output
+9. Complete Regression Check
+10. Fill out full evaluation template
+11. Only commit if:
+    - Golden Checks pass
+    - No unacceptable regressions
+    - At least one clear improvement documented
+12. Include evaluation summary in commit message
 ```
 
 To run a report for evaluation:
 1. Upload benchmark deck through admin UI
 2. Or use existing deck and regenerate report
 3. View full report in admin Reports view
+4. Compare against Expected Findings
 
 ---
 
@@ -246,3 +432,4 @@ To run a report for evaluation:
 | Version | Date | Description |
 |---------|------|-------------|
 | v1.0 | 2026-05-04 | Initial evaluation framework |
+| v1.1 | 2026-05-04 | Add expected findings, regression checks, golden checks |
