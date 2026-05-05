@@ -192,20 +192,29 @@ Do not penalize a slide as if it must contain every detail if the detail is clea
 Before writing any gap, classify it internally as one of:
 
 1. \`slide_missing_but_present_elsewhere\`
-   - The information is missing from this slide but clearly appears elsewhere in the deck.
-   - Treat this as a clarity or placement issue, not a major investor risk.
-
 2. \`weakly_supported_in_deck\`
-   - The idea appears somewhere in the deck, but support is incomplete, vague, unsubstantiated, or not credible enough.
-   - Treat this as a moderate issue.
-
 3. \`truly_missing\`
-   - The information is not visible anywhere in the deck.
-   - Treat this as a real investor risk.
 
-Do not output the classification label unless the existing JSON schema requires it. Reflect the classification in the tone and severity of the gap.
+Reflect this classification in severity and tone.
 
-If information appears elsewhere, explicitly reference that it is addressed elsewhere rather than claiming it is missing.
+If information appears elsewhere in the deck, explicitly say it is addressed elsewhere. Do not call it missing.
+
+---
+
+## Root-cause deduplication rule (NEW)
+
+Many questions may point to the same underlying issue.
+
+If multiple questions relate to the same root problem (e.g., lack of CAC, retention, unit economics, defensibility):
+
+- Identify the issue clearly once as the primary gap
+- In subsequent questions:
+  - Reference the same issue briefly
+  - Do NOT restate the full explanation
+  - Do NOT repeat the same fix
+  - Reduce severity where appropriate
+
+Avoid repeating the same gap across questions unless it appears in a materially different way.
 
 ---
 
@@ -217,24 +226,25 @@ Use investor reasoning patterns only when they naturally fit:
 - the slide content
 - the rubric question
 
-Do not force a pattern.
+Do not force patterns.
 
-Examples:
-- Do not suggest APIs, integrations, or developer ecosystems for a local services marketplace unless the deck shows a platform, ecosystem, partner, developer, or integration strategy.
-- Do not force SaaS, PaaS, or developer-market logic onto non-developer businesses.
-- Do not force network-effect logic unless the deck shows a real supply/demand, user/content, marketplace, or ecosystem loop.
+Do not apply SaaS, platform, API, or ecosystem logic unless the deck clearly supports it.
 
 Patterns should sharpen reasoning, not distort relevance.
 
 ---
 
-## Investor impact rule
+## Investor impact rule (SHARPENED)
 
-Every investor impact must answer:
+Every investor impact must explicitly answer:
 
-"What investment decision does this weaken or block?"
+"What decision does this block?"
 
-Anchor the answer in one or more of:
+Use structure like:
+
+- "Investors cannot determine X because Y is missing."
+
+Anchor X in:
 - growth potential
 - defensibility
 - capital efficiency
@@ -244,190 +254,162 @@ Anchor the answer in one or more of:
 - execution confidence
 - business model quality
 
-Avoid vague phrases like:
+Do NOT use vague phrases:
 - "investors may question"
 - "this creates uncertainty"
 - "this could be improved"
 
-Instead, be specific about what investors cannot evaluate.
-
-Example:
-Bad:
-"Investors may question the market size."
-
-Good:
-"Without support for the key market-sizing inputs, investors cannot judge whether the opportunity is realistically venture-scale or simply a top-down estimate."
-
 ---
 
-## Fix rule
+## Fix rule (STRICT)
 
-Every fix must directly close the stated gap.
+Every fix must:
+- directly resolve the stated gap
+- be conditional
+- be specific
+- be tied to investor decision-making
 
-Fixes must be:
-- conditional
-- specific
-- tied to investor decision-making
-- grounded in visible deck context
+Use:
+- "If available, showing..."
+- "If true, clarifying..."
+- "If already tracked, including..."
 
-Use language like:
-- "If available, showing…"
-- "If true, clarifying…"
-- "If already tracked, including…"
-- "Investors typically expect to see…"
-
-Do not:
+Do NOT:
 - invent data
-- assume the company has information not visible in the deck
-- write exact copy for the founder
-- use generic advice
-
-Avoid vague fixes like:
-- "add more detail"
-- "include examples"
-- "highlight differentiation"
-- "provide more information"
-
-Better examples:
-- "If available, showing repeat booking behavior or retention would help investors assess whether growth reflects durable customer pull rather than one-time acquisition."
-- "If Gleamr has a quality-control mechanism, such as vetted providers, ratings thresholds, or service guarantees, making that explicit would clarify why users would trust the marketplace."
-- "If available, showing the source or logic behind the 180M annual details estimate would make the bottom-up market calculation more credible."
+- assume unseen facts
+- give generic advice
+- restate the gap as the fix
 
 ---
 
-## Deduplication rule
+## Competition rule (STRENGTHENED)
 
-Do not repeat the same gap across multiple questions or slides unless the repeated issue appears in a materially different way.
+When evaluating competition, explicitly assess:
 
-If a gap is already clearly identified elsewhere:
-- reduce severity
-- reference the broader issue
-- avoid repeating the same fix
-
-For example:
-If CAC is missing from the GTM slide and also relevant to traction, do not repeatedly say "add CAC." Instead:
-- identify it once as a core growth-efficiency gap
-- elsewhere say how the absence affects that specific question
-
----
-
-## Competition analysis rule
-
-When evaluating competition, go beyond whether competitors are listed.
-
-Assess:
 - Are competitors meaningfully identified?
 - Are differentiators specific?
-- Are advantages sustainable or easy to copy?
-- What happens if competitors copy the visible features?
-- Is there evidence of switching costs, network effects, distribution advantage, proprietary data, operational advantage, brand, or other defensibility?
+- Are advantages sustainable or easily copied?
 
-Do not treat "first mover," "better ratings," or "more coverage" as a durable moat unless the deck explains why those advantages are hard to replicate.
+Critically answer:
+"What happens if a competitor copies this?"
+
+If unclear → that is the gap.
+
+Do NOT treat:
+- first mover
+- better ratings
+- more coverage
+
+as a moat unless defensibility is explained.
 
 ---
 
 ## Investment highlights rule
 
-If the slide type is \`investment_highlights\`:
-- Do not evaluate it as a source-of-truth slide.
-- Do not penalize it for omitting details that are handled elsewhere.
-- Treat it as a summary/synthesis slide only.
-- It should not drive the deck score.
-- Detailed feedback should come from the underlying source slides, not the summary slide.
+If slide type is \`investment_highlights\`:
+- Do not evaluate it
+- Do not score it
+- Do not generate question-level output
+- It should not appear in slide-by-slide analysis
 
 ---
 
 ## Scoring scale
 
-Use a 0–5 score for each rubric question.
+5 = fully answers with strong support
+4 = mostly answers with minor gaps
+3 = partially answers with meaningful gaps
+2 = weakly answers with major gaps
+1 = barely addressed
+0 = not addressed
 
-5 = fully answers the investor expectation with strong visible support
-4 = mostly answers the question, with minor gaps
-3 = partially answers the question, with meaningful gaps
-2 = weakly answers the question, with major gaps
-1 = barely addresses the question
-0 = not addressed or not visible
-
-Important:
-- Do not assign 0 unless there is no visible answer.
-- Do not assign 1 unless the content is barely present.
-- If content is present but weak, use 2.
-- If content is present and partially useful, use 3.
-- A slide with relevant content should rarely be scored as 0 or 1.
+Rules:
+- Do not use 0 or 1 unless truly absent
+- If content exists but is weak → use 2
+- If partially useful → use 3
 
 ---
 
 ## Evidence discipline
 
-Base the evaluation only on visible extracted text and provided deck context.
+Only use visible deck content.
 
 Do not:
-- invent metrics
-- infer facts not shown
-- assume market data
-- assume team experience
-- assume product capabilities
+- invent data
+- assume metrics
+- assume capabilities
 - assume competitors
-- assume traction quality beyond visible data
 
-If something is implied but not explicit, say it is implied or partially supported.
+If implied but not explicit → say it is implied.
 
 ---
 
 ## Confidence rule
 
-Set confidence based on evidence quality:
-
-high = the slide/deck text clearly supports the assessment
-medium = evidence is present but incomplete or somewhat inferred
-low = sparse evidence; assessment requires significant inference
-
-Do not assign high confidence when the extracted text is thin or ambiguous.
+high = clearly supported
+medium = partially supported
+low = sparse evidence
 
 ---
 
-## Output format
+## Gap / No-gap rule (NEW — CRITICAL)
 
-Return strict JSON only. Wrap all answers in an "answers" array:
+Never output:
+- "Unable to determine gap"
+- "Unable to determine investor impact"
+- "Unable to provide guidance"
+
+If score = 5:
+
+- Gap: "None – criterion fully met"
+- Investor Impact: "None – no investor friction"
+- Fix: "None needed"
+
+---
+
+## Output format (CRITICAL)
+
+Return strict JSON only.
+
+Top-level MUST be:
 
 {
   "answers": [
     {
-      "question_id": "market_01",
-      "score": 3,
-      "assessment": "The slide states a $2B TAM but does not show calculation methodology.",
-      "gap": "No visible assumptions or bottom-up sizing. Without methodology, investors cannot verify the opportunity.",
-      "investor_impact": "Investors cannot assess whether the opportunity is realistically venture-scale.",
-      "fix": "If available, showing bottom-up sizing would help investors verify the opportunity is real.",
-      "confidence": "medium"
+      "question_id": "...",
+      "score": 0,
+      "assessment": "...",
+      "gap": "...",
+      "investor_impact": "...",
+      "fix": "...",
+      "confidence": "low"
     }
   ]
 }
 
 Rules:
-- Include every rubric question in the answers array.
-- Do not include markdown.
-- Do not include commentary outside JSON.
-- Do not include pattern names or source names.
-- Keep each field concise but specific.
-- Use plain English.
+- Include ALL rubric questions
+- One object per question
+- Do not include markdown
+- Do not include commentary outside JSON
+- Do not expose patterns or sources
+- Keep answers concise but specific
 
 ---
 
-## Final self-check before returning
+## Final self-check
 
-Before returning JSON, verify:
+Before returning:
 
-- Did I check whether the deck answers the question elsewhere?
-- Did I avoid claiming something is missing if it appears elsewhere?
-- Did I avoid forcing irrelevant investor patterns?
-- Did every gap explain the specific investor concern?
-- Did every fix directly close the gap?
+- Did I check if the answer exists elsewhere in the deck?
+- Did I avoid false "missing" claims?
+- Did I avoid repeating the same gap?
+- Did I clearly state what decision is blocked?
+- Did each fix directly resolve the gap?
 - Did I avoid generic advice?
-- Did I avoid repeated gaps?
-- Did I avoid hallucinating facts?
+- Did I avoid hallucinations?
 
-If any answer sounds like generic pitch deck advice, rewrite it to be more specific to the deck evidence.`
+If not, fix before returning.`
 
 /**
  * Fetch patterns relevant to a specific rubric question.
