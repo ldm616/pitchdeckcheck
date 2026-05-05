@@ -11,18 +11,27 @@ const {
   sortAnswersByImportance,
 } = require('./rubrics')
 
+// High-impact slide types for summary generation (ignore cover/contact)
+const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
+
 /**
  * Prompt for investor question evaluation with 0-5 scoring.
- * Each question gets: score, assessment, gap, fix, confidence.
+ * Each question gets: score, assessment, gap, investor_impact, fix, confidence.
  */
 const RUBRIC_EVAL_PROMPT = `You are an experienced early-stage startup investor evaluating a pitch deck slide for investor-readiness. You are skeptical by default and evaluate strictly.
 
-You will receive a slide's extracted text and a set of investor questions to evaluate. For each question, you must provide:
-- A score from 0-5
-- An assessment (what IS present)
-- A gap (what is MISSING)
-- A fix (conditional guidance on how to address the gap)
-- A confidence level (how reliable is this evaluation)
+You will receive:
+1. The current slide's extracted text and type
+2. A compact deck outline showing all slides (for cross-slide context)
+3. Investor questions to evaluate
+
+For each question, you must provide:
+- score (0-5)
+- assessment (what IS present)
+- gap (what is MISSING)
+- investor_impact (why the gap matters to investors)
+- fix (conditional guidance)
+- confidence (evaluation reliability)
 
 SCORING SCALE (0-5):
 5 = Fully answers investor expectation with strong, specific evidence
@@ -31,6 +40,15 @@ SCORING SCALE (0-5):
 2 = Weak answer, major gaps
 1 = Barely addressed
 0 = Not addressed / not visible in slide
+
+GRADING CALIBRATION:
+- E grade = essentially missing, unusable, or not visible (rare)
+- D grade = weak but present
+- C grade = partially answers with meaningful gaps
+- B grade = strong but incomplete
+- A grade = rare, clearly answers investor expectations with strong evidence
+
+Do NOT assign E to a slide that contains relevant content unless the core investor question is essentially unanswered.
 
 SCORING RULES:
 - Score based ONLY on visible evidence in the extracted text
@@ -48,39 +66,58 @@ ASSESSMENT RULES:
 GAP RULES:
 - Describe what an investor would expect to see but doesn't
 - Be specific about what's missing
-- Connect to investor decision-making: "Investors need X to assess Y"
-- If score is 5, gap can be "None - fully addressed"
+- If score is 5, gap should be "None - fully addressed"
 - Keep to 1-2 sentences
 
-FIX RULES (CRITICAL - tone matters):
-- Fixes are GUIDANCE, not instructions
-- Use CONDITIONAL, NON-PRESCRIPTIVE phrasing:
-  - "If this data exists, showing it would strengthen credibility"
-  - "Investors typically expect to see X here"
-  - "It would help to include Y if available"
-- NEVER assume the founder has data they haven't shown
-- NEVER write exact copy for the founder
-- NEVER fabricate specific numbers or claims
-- Connect to investor credibility or decision-making
-- If score is 5, fix can be "None needed"
-- Keep to 1-2 sentences
+INVESTOR IMPACT RULES (CRITICAL):
+- Explain WHY the gap matters to an investor's decision
+- Connect to: credibility, market opportunity, risk assessment, differentiation, fundability, execution confidence, or business model clarity
+- Keep to one sentence
+- If score is 5, investor_impact should be "None - criterion fully met"
 
-CONFIDENCE RULES (IMPORTANT):
-Confidence indicates how reliable this evaluation is based on available slide content.
+Examples:
+- "Without visible assumptions, investors cannot assess whether the market opportunity is realistically venture-scale."
+- "Missing growth data makes it difficult for investors to evaluate product-market fit."
+- "Without unit economics, investors cannot model path to profitability."
 
-- "high": Clear, specific, sufficient content directly answers or addresses the question. You can evaluate with certainty.
-- "medium": Partial evidence exists but is incomplete, somewhat vague, or requires minor interpretation.
-- "low": Very little or no visible content related to the question. Assessment required significant inference or assumption.
+FIX RULES (CRITICAL - tied to score):
+Score 5: "None needed" or a light optional enhancement
+Score 4: Address the minor missing evidence or clarity gap
+Score 3: Strengthen the partial answer with specific added evidence/detail
+Score 2: Explain what core content is missing and how to address it
+Score 1-0: Explain what answer needs to be introduced from scratch
 
-Additional confidence rules:
-- If extracted_text is sparse, unclear, or mostly empty, default to "low" confidence
-- If you had to infer or assume information not explicitly stated, use "medium" or "low"
-- Do NOT claim "high" confidence when evidence is weak or absent
-- A score of 0 should typically have "low" confidence (nothing to evaluate)
-- A score of 5 should typically have "high" confidence (strong evidence present)
+Fix phrasing MUST be:
+- Conditional and non-prescriptive
+- Specific enough to act on
+- Tied directly to the stated gap
+- NOT generic phrases like "provide more detail" or "add more information"
+
+Use phrases like:
+- "If this data exists, it would help to show..."
+- "Investors would expect to see..."
+- "Consider including X if available..."
+- "If true, adding Y would strengthen..."
+
+NEVER:
+- Write exact copy for the founder
+- Assume facts not visible in the deck
+- Use vague phrases like "make this clearer" or "strengthen the slide"
+
+CROSS-SLIDE CONSISTENCY (CRITICAL):
+- Check the deck outline before making claims about what's missing from the whole deck
+- Do NOT say "no traction is provided" if another slide clearly contains traction
+- Instead say "this slide does not connect to the traction shown elsewhere" if applicable
+- Do NOT make global claims from one slide unless supported by the full deck context
+- Be specific to THIS slide's content and gaps
+
+CONFIDENCE RULES:
+- "high": Clear, specific, sufficient content directly addresses the question
+- "medium": Partial evidence exists but is incomplete or requires interpretation
+- "low": Very little or no visible content related to the question
 
 OUTPUT FORMAT:
-Return ONLY valid JSON matching this structure:
+Return ONLY valid JSON:
 
 {
   "answers": [
@@ -88,7 +125,8 @@ Return ONLY valid JSON matching this structure:
       "question_id": "market_01",
       "score": 3,
       "assessment": "The slide states a $2B TAM but does not show calculation methodology.",
-      "gap": "No visible assumptions or bottom-up sizing. Investors need to see how this number was derived.",
+      "gap": "No visible assumptions or bottom-up sizing.",
+      "investor_impact": "Without the assumptions, investors cannot judge whether the opportunity is realistically venture-scale or just a top-down estimate.",
       "fix": "If available, showing bottom-up sizing (e.g. customer count × average spend) would strengthen credibility.",
       "confidence": "medium"
     }
@@ -97,33 +135,33 @@ Return ONLY valid JSON matching this structure:
 
 REQUIREMENTS:
 - Answer EVERY question provided
-- Each answer must have question_id, score, assessment, gap, fix, and confidence
+- Each answer must have: question_id, score, assessment, gap, investor_impact, fix, confidence
 - Score must be an integer from 0 to 5
 - Confidence must be "high", "medium", or "low"
 - All text fields must be 1-2 sentences, clear and specific`
 
 /**
- * Prompt for generating the deck summary after all slides are evaluated.
+ * Build compact deck outline for cross-slide context.
+ * Keeps token usage low while providing enough context to avoid contradictions.
  */
-const SUMMARY_PROMPT = `You are an experienced early-stage startup investor. You have just evaluated a pitch deck slide-by-slide. Now summarize the overall findings.
-
-RULES:
-- Be balanced and honest. Include both strengths and weaknesses.
-- The summary should be 2-4 sentences covering: the strongest positive signal, the main investor friction, and overall investor-readiness.
-- Do NOT invent facts not in the evaluation data.
-- Sound like an experienced investor coach, not generic AI.
-
-OUTPUT FORMAT:
-Return ONLY valid JSON:
-
-{
-  "summary": "2-4 sentence summary of the deck's investor-readiness."
-}`
+function buildDeckOutline(slides) {
+  return slides.map((s) => {
+    // Truncate text to first 150 chars for context
+    const textPreview = s.extracted_text
+      ? s.extracted_text.slice(0, 150).replace(/\n/g, ' ').trim() + (s.extracted_text.length > 150 ? '...' : '')
+      : '(empty)'
+    return {
+      slide: s.slide_number,
+      type: s.inferred_type || 'other',
+      preview: textPreview,
+    }
+  })
+}
 
 /**
- * Evaluate a single slide against its investor questions.
+ * Evaluate a single slide against its investor questions with deck context.
  */
-async function evaluateSlide(openai, slide, rubric) {
+async function evaluateSlide(openai, slide, rubric, deckOutline) {
   // Sort questions by importance for display
   const sortedRubric = sortByImportance(rubric)
 
@@ -132,16 +170,20 @@ async function evaluateSlide(openai, slide, rubric) {
     question: q.question,
   }))
 
-  const userMessage = `SLIDE TYPE: ${slide.inferred_type}
-SLIDE NUMBER: ${slide.slide_number}
+  const userMessage = `CURRENT SLIDE:
+Type: ${slide.inferred_type}
+Number: ${slide.slide_number}
 
 EXTRACTED TEXT:
 ${slide.extracted_text || '(No text extracted)'}
 
+DECK OUTLINE (for cross-slide context):
+${JSON.stringify(deckOutline, null, 2)}
+
 INVESTOR QUESTIONS TO EVALUATE:
 ${JSON.stringify(questions, null, 2)}
 
-Evaluate each question using the 0-5 scale. Provide assessment, gap, and fix for each.`
+Evaluate each question. Include assessment, gap, investor_impact, fix, and confidence for each.`
 
   try {
     const response = await openai.chat.completions.create({
@@ -150,7 +192,7 @@ Evaluate each question using the 0-5 scale. Provide assessment, gap, and fix for
         { role: 'system', content: RUBRIC_EVAL_PROMPT },
         { role: 'user', content: userMessage },
       ],
-      max_tokens: 2500,
+      max_tokens: 3000,
       response_format: { type: 'json_object' },
     })
 
@@ -171,7 +213,6 @@ Evaluate each question using the 0-5 scale. Provide assessment, gap, and fix for
       // Validate confidence - default based on score if invalid
       let confidence = a.confidence
       if (!['high', 'medium', 'low'].includes(confidence)) {
-        // Default: score 0 = low, score 4-5 = high, else medium
         confidence = score === 0 ? 'low' : score >= 4 ? 'high' : 'medium'
       }
       return {
@@ -179,6 +220,7 @@ Evaluate each question using the 0-5 scale. Provide assessment, gap, and fix for
         score,
         assessment: a.assessment || 'Unable to assess.',
         gap: a.gap || 'Unable to determine gap.',
+        investor_impact: a.investor_impact || 'Unable to determine investor impact.',
         fix: a.fix || 'Unable to provide guidance.',
         confidence,
       }
@@ -195,52 +237,80 @@ Evaluate each question using the 0-5 scale. Provide assessment, gap, and fix for
 }
 
 /**
- * Generate deck summary from slide evaluations.
+ * Generate deterministic summary based on weighted slide scores.
+ * Ignores cover/contact slides. Identifies strongest signal and main friction
+ * from high-impact slides only.
  */
-async function generateDeckSummary(openai, slideEvaluations, overallGrade, deckScore) {
-  const slideOverview = slideEvaluations.map((s) => ({
-    slide_number: s.slide_number,
-    type: s.type,
-    grade: s.grade,
-    normalized_score: s.normalized_score,
-  }))
+function generateDeterministicSummary(slideEvaluations, overallGrade, deckScore) {
+  // Filter to high-impact slides only
+  const impactSlides = slideEvaluations.filter(
+    (s) => HIGH_IMPACT_TYPES.includes(s.type) && SLIDE_WEIGHTS[s.type] > 0
+  )
 
-  const userMessage = `DECK EVALUATION RESULTS:
-Overall Grade: ${overallGrade}
-Deck Score: ${deckScore.toFixed(2)} / 5.0
-
-SLIDE GRADES:
-${JSON.stringify(slideOverview, null, 2)}
-
-Generate a summary of this deck's investor-readiness.`
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: SUMMARY_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
-    })
-
-    const content = response.choices[0]?.message?.content
-    if (!content) {
-      throw new Error('Empty response from OpenAI')
-    }
-
-    const result = JSON.parse(content)
-    return result.summary || 'Unable to generate summary.'
-  } catch (err) {
-    console.error('Summary generation error:', err.message)
-    return `This deck received an overall grade of ${overallGrade}. Review the slide-by-slide feedback for details.`
+  if (impactSlides.length === 0) {
+    return `This deck received an overall grade of ${overallGrade}. The deck lacks standard investor slides (problem, solution, market, traction, team, etc.), making it difficult to assess investor-readiness.`
   }
+
+  // Find strongest slide (highest normalized score among high-weight slides)
+  const sortedByStrength = [...impactSlides].sort((a, b) => {
+    const weightA = SLIDE_WEIGHTS[a.type] ?? 0.5
+    const weightB = SLIDE_WEIGHTS[b.type] ?? 0.5
+    // Sort by normalized score first, then by weight
+    if (b.normalized_score !== a.normalized_score) {
+      return b.normalized_score - a.normalized_score
+    }
+    return weightB - weightA
+  })
+
+  // Find weakest slide (lowest normalized score among high-weight slides)
+  const sortedByWeakness = [...impactSlides].sort((a, b) => {
+    const weightA = SLIDE_WEIGHTS[a.type] ?? 0.5
+    const weightB = SLIDE_WEIGHTS[b.type] ?? 0.5
+    // Sort by normalized score first (ascending), then by weight (descending for higher impact)
+    if (a.normalized_score !== b.normalized_score) {
+      return a.normalized_score - b.normalized_score
+    }
+    return weightB - weightA
+  })
+
+  const strongestSlide = sortedByStrength[0]
+  const weakestSlide = sortedByWeakness[0]
+
+  // Get the top-scoring question from strongest slide
+  const strongQuestions = strongestSlide.questions.filter((q) => q.score >= 4)
+  const strongSignal = strongQuestions.length > 0
+    ? strongQuestions[0].assessment
+    : `The ${strongestSlide.type} slide is relatively well-presented`
+
+  // Get the lowest-scoring question from weakest slide
+  const weakQuestions = weakestSlide.questions.filter((q) => q.score <= 2)
+  const weakSignal = weakQuestions.length > 0
+    ? weakQuestions[0].gap
+    : `The ${weakestSlide.type} slide has gaps that need addressing`
+
+  // Grade interpretation
+  let gradeInterpretation
+  if (overallGrade === 'A') {
+    gradeInterpretation = 'investor-ready with strong fundamentals'
+  } else if (overallGrade === 'B') {
+    gradeInterpretation = 'solid but has specific gaps to address'
+  } else if (overallGrade === 'C') {
+    gradeInterpretation = 'partially developed with meaningful gaps'
+  } else if (overallGrade === 'D') {
+    gradeInterpretation = 'weak and needs significant work'
+  } else {
+    gradeInterpretation = 'incomplete and not ready for investor review'
+  }
+
+  // Build summary following the required format
+  const summary = `The strongest positive signal is the ${strongestSlide.type} content: ${strongSignal}. The biggest investor friction is in the ${weakestSlide.type} slide: ${weakSignal}. Overall, the deck is ${gradeInterpretation} (${overallGrade}, ${deckScore.toFixed(2)}/5.0).`
+
+  return summary
 }
 
 /**
  * Build free report subset from full report.
- * Shows: question, score, assessment
+ * Shows: question, score, assessment, gap, investor_impact
  * Hides: fix
  */
 function buildFreeReport(fullReport) {
@@ -257,6 +327,7 @@ function buildFreeReport(fullReport) {
           score: q.score,
           assessment: q.assessment,
           gap: q.gap,
+          investor_impact: q.investor_impact,
           slide_type: slide.type,
           slide_number: slide.slide_number,
           slide_weight: weight,
@@ -277,6 +348,7 @@ function buildFreeReport(fullReport) {
     score: issue.score,
     assessment: issue.assessment,
     gap: issue.gap,
+    investor_impact: issue.investor_impact,
     slide_type: issue.slide_type,
     priority: issue.slide_weight >= 1.2 ? 'high' : issue.slide_weight >= 0.8 ? 'medium' : 'low',
   }))
@@ -312,11 +384,10 @@ function buildFreeReport(fullReport) {
     slide_type: s.slide_type,
   }))
 
-  // Slide notes: question/score/assessment only (no fix)
+  // Slide notes: show investor_impact for low-scoring slides
   const slideNotes = fullReport.slides.map((slide) => {
-    // Get the most important low-scoring question for the note
     const lowScoring = slide.questions.filter((q) => q.score <= 2)
-    const topGap = lowScoring[0] // Already sorted by importance
+    const topGap = lowScoring[0]
 
     let note
     if (slide.grade === 'A') {
@@ -324,7 +395,8 @@ function buildFreeReport(fullReport) {
     } else if (slide.grade === 'B') {
       note = 'Good foundation. Minor gaps remain.'
     } else if (topGap) {
-      note = topGap.gap
+      // Include investor impact in the note for context
+      note = topGap.investor_impact || topGap.gap
     } else {
       note = 'Needs improvement to meet investor expectations.'
     }
@@ -444,6 +516,9 @@ async function generateFreeReport(supabase, deckId) {
   try {
     const openai = new OpenAI.default({ apiKey: openaiKey })
 
+    // Build deck outline for cross-slide context
+    const deckOutline = buildDeckOutline(slides)
+
     // Evaluate each slide
     const slideEvaluations = []
 
@@ -453,7 +528,7 @@ async function generateFreeReport(supabase, deckId) {
 
       console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-      const { answers } = await evaluateSlide(openai, slide, rubric)
+      const { answers } = await evaluateSlide(openai, slide, rubric, deckOutline)
 
       // Compute deterministic slide score (0-5 scale)
       const slideScoreResult = computeSlideScore(answers, rubric)
@@ -469,6 +544,7 @@ async function generateFreeReport(supabase, deckId) {
         score: a.score,
         assessment: a.assessment,
         gap: a.gap,
+        investor_impact: a.investor_impact,
         fix: a.fix,
         confidence: a.confidence,
       }))
@@ -492,9 +568,8 @@ async function generateFreeReport(supabase, deckId) {
         `score=${deckScoreResult.deckScore}, slides_used=${deckScoreResult.slideCountUsed}`
     )
 
-    // Generate summary
-    const summary = await generateDeckSummary(
-      openai,
+    // Generate deterministic summary (no model call)
+    const summary = generateDeterministicSummary(
       slideEvaluations,
       deckScoreResult.overallGrade,
       deckScoreResult.deckScore
@@ -564,8 +639,9 @@ async function generateFreeReport(supabase, deckId) {
 module.exports = {
   generateFreeReport,
   evaluateSlide,
-  generateDeckSummary,
+  generateDeterministicSummary,
   buildFreeReport,
+  buildDeckOutline,
   RUBRIC_EVAL_PROMPT,
-  SUMMARY_PROMPT,
+  HIGH_IMPACT_TYPES,
 }

@@ -258,6 +258,7 @@ function generateFallbackAnswers(rubric) {
     score: 0,
     assessment: 'Unable to evaluate slide content.',
     gap: 'Evaluation failed due to processing error.',
+    investor_impact: 'Cannot assess investor impact without successful evaluation.',
     fix: 'Ensure slide has clear, readable content.',
     confidence: 'low',
   }))

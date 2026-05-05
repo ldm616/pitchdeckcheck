@@ -53,6 +53,7 @@ interface SlideQuestion {
   score: number
   assessment: string
   gap: string
+  investor_impact: string
   fix: string
   confidence: 'high' | 'medium' | 'low'
 }
@@ -1286,6 +1287,18 @@ export default function App() {
                                 </p>
                                 <p style={{ margin: 0, fontSize: '13px', color: '#991b1b', lineHeight: 1.5 }}>
                                   {q.gap}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Investor Impact */}
+                            {q.investor_impact && q.investor_impact !== 'None - this area is well-addressed' && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 500, color: '#7c3aed', textTransform: 'uppercase' }}>
+                                  Investor Impact
+                                </p>
+                                <p style={{ margin: 0, fontSize: '13px', color: '#6d28d9', lineHeight: 1.5 }}>
+                                  {q.investor_impact}
                                 </p>
                               </div>
                             )}
