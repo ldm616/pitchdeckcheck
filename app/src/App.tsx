@@ -1898,11 +1898,11 @@ export default function App() {
                               strokeLinejoin="round"
                               style={{
                                 color: actionDeckId === item.deck_id && actionType === 'regenerate'
-                                  ? '#22c55e'
+                                  ? '#2563eb'
                                   : '#9ca3af',
                                 transition: 'color 0.15s',
                                 animation: actionDeckId === item.deck_id && actionType === 'regenerate'
-                                  ? 'spin 1s linear infinite'
+                                  ? 'spin 2.5s linear infinite'
                                   : 'none',
                               }}
                             >
@@ -1912,7 +1912,9 @@ export default function App() {
                             <span
                               style={{
                                 fontSize: '10px',
-                                color: '#9ca3af',
+                                color: actionDeckId === item.deck_id && actionType === 'regenerate'
+                                  ? '#2563eb'
+                                  : '#9ca3af',
                                 transition: 'color 0.15s',
                               }}
                             >
