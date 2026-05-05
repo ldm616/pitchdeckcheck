@@ -30,7 +30,7 @@ const {
 } = require('./rubrics')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
-const REPORT_VERSION = 'report_v2.5'
+const REPORT_VERSION = 'report_v2.6.1'
 
 // High-impact slide types for summary generation (ignore cover/contact)
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
@@ -191,187 +191,189 @@ Do not penalize a slide as if it must contain every detail if the detail is clea
 
 Before writing any gap, classify it internally as one of:
 
-1. \`slide_missing_but_present_elsewhere\`
-2. \`weakly_supported_in_deck\`
-3. \`truly_missing\`
+1. slide_missing_but_present_elsewhere
+2. weakly_supported_in_deck
+3. truly_missing
 
-Reflect this classification in severity and tone.
+Do not output these labels.
 
-If information appears elsewhere in the deck, explicitly say it is addressed elsewhere. Do not call it missing.
+Instead:
+- If present elsewhere → treat as clarity/placement issue (low severity)
+- If weak → moderate severity
+- If missing → real investor risk
 
----
-
-## Root-cause deduplication rule (NEW)
-
-Many questions may point to the same underlying issue.
-
-If multiple questions relate to the same root problem (e.g., lack of CAC, retention, unit economics, defensibility):
-
-- Identify the issue clearly once as the primary gap
-- In subsequent questions:
-  - Reference the same issue briefly
-  - Do NOT restate the full explanation
-  - Do NOT repeat the same fix
-  - Reduce severity where appropriate
-
-Avoid repeating the same gap across questions unless it appears in a materially different way.
+If information appears elsewhere, explicitly say so.
 
 ---
 
 ## Pattern usage rule
 
 Use investor reasoning patterns only when they naturally fit:
-- the company type
-- the business model
-- the slide content
-- the rubric question
+- company type
+- business model
+- slide content
+- rubric question
 
 Do not force patterns.
 
-Do not apply SaaS, platform, API, or ecosystem logic unless the deck clearly supports it.
+Do not introduce:
+- APIs / developer ecosystems unless clearly relevant
+- SaaS logic into non-SaaS businesses
+- network effects unless clearly present
 
-Patterns should sharpen reasoning, not distort relevance.
+Patterns should sharpen reasoning, not distort it.
 
 ---
 
-## Investor impact rule (SHARPENED)
+## Investor impact rule (STRICT)
 
-Every investor impact must explicitly answer:
+Every investor impact MUST answer:
 
-"What decision does this block?"
+"What specific investment judgment is blocked?"
 
-Use structure like:
-
-- "Investors cannot determine X because Y is missing."
-
-Anchor X in:
+Anchor ONLY in:
 - growth potential
 - defensibility
 - capital efficiency
-- retention or engagement
+- retention / engagement
 - scalability
 - market credibility
 - execution confidence
 - business model quality
 
-Do NOT use vague phrases:
-- "investors may question"
+DO NOT USE:
+- "investors may…"
+- "investors might…"
 - "this creates uncertainty"
-- "this could be improved"
+- "potentially prompting investor questions"
+- "raises questions"
+- "leaves questions"
+
+Instead use direct language:
+
+Examples:
+- "Investors cannot assess whether growth is capital-efficient without CAC data."
+- "Investors cannot determine whether this advantage is defensible or easily replicated."
+- "Investors cannot judge whether the market is venture-scale or overstated."
 
 ---
 
-## Fix rule (STRICT)
+## Fix rule (UPGRADED)
 
 Every fix must:
-- directly resolve the stated gap
+
+- directly close the gap
 - be conditional
-- be specific
-- be tied to investor decision-making
+- specify the exact missing input or proof
+- explain why that input matters for the decision
 
-Use:
-- "If available, showing..."
-- "If true, clarifying..."
-- "If already tracked, including..."
+Avoid generic fixes.
 
-Do NOT:
-- invent data
-- assume unseen facts
-- give generic advice
-- restate the gap as the fix
+BAD:
+- "add more detail"
+- "include metrics"
+- "expand on this"
+
+GOOD:
+- "If available, showing CAC payback period would allow investors to assess whether growth can scale without excessive capital."
+- "If tracked, showing repeat booking rate would clarify whether demand is durable or one-time."
+- "If patents cover matching logic or pricing algorithms, specifying that would clarify whether the core advantage is defensible."
+
+Always tie fix → investor decision.
 
 ---
 
-## Competition rule (STRENGTHENED)
+## Deduplication rule
 
-When evaluating competition, explicitly assess:
+Do not repeat the same gap across questions.
 
-- Are competitors meaningfully identified?
-- Are differentiators specific?
-- Are advantages sustainable or easily copied?
+If already identified elsewhere:
+- reference it indirectly
+- reduce severity
+- do not restate full gap
 
-Critically answer:
-"What happens if a competitor copies this?"
+---
 
-If unclear → that is the gap.
+## Competition analysis rule (STRICT)
+
+When evaluating competition:
+
+Always answer:
+- Are advantages specific?
+- Are they durable?
+- Can competitors copy them?
+
+Explicitly evaluate:
+- replicability
+- switching costs
+- network effects
+- data advantage
+- operational advantage
+- distribution advantage
 
 Do NOT treat:
-- first mover
-- better ratings
-- more coverage
+- "first mover"
+- "better ratings"
+- "more coverage"
 
-as a moat unless defensibility is explained.
+as defensible unless explained WHY they persist.
 
 ---
 
 ## Investment highlights rule
 
-If slide type is \`investment_highlights\`:
-- Do not evaluate it
-- Do not score it
-- Do not generate question-level output
-- It should not appear in slide-by-slide analysis
+If slide type = investment_highlights:
+
+- Do not evaluate normally
+- Do not penalize
+- Do not generate gaps
+- Return neutral minimal output
 
 ---
 
-## Scoring scale
+## Scoring scale (RECALIBRATED)
 
-5 = fully answers with strong support
-4 = mostly answers with minor gaps
-3 = partially answers with meaningful gaps
-2 = weakly answers with major gaps
-1 = barely addressed
-0 = not addressed
+5 = fully answers with strong evidence
+4 = strong but slightly incomplete
+3 = partial, meaningful gaps
+2 = weak, major gaps
+1 = barely present
+0 = not present
 
-Rules:
-- Do not use 0 or 1 unless truly absent
-- If content exists but is weak → use 2
-- If partially useful → use 3
+Important:
+- Do NOT use 0 or 1 if content exists
+- Default weak-but-present → 2
+- Default partial → 3
 
 ---
 
 ## Evidence discipline
 
-Only use visible deck content.
+Only use visible data.
 
-Do not:
-- invent data
-- assume metrics
-- assume capabilities
-- assume competitors
+Do NOT:
+- infer missing metrics
+- assume traction quality
+- assume product capabilities
+- assume team strength beyond text
 
-If implied but not explicit → say it is implied.
+If implied, say "implied but not explicit."
 
 ---
 
 ## Confidence rule
 
-high = clearly supported
-medium = partially supported
-low = sparse evidence
+high = clear evidence
+medium = partial evidence
+low = weak evidence
+
+Do not overrate confidence.
 
 ---
 
-## Gap / No-gap rule (NEW — CRITICAL)
+## Output format
 
-Never output:
-- "Unable to determine gap"
-- "Unable to determine investor impact"
-- "Unable to provide guidance"
-
-If score = 5:
-
-- Gap: "None – criterion fully met"
-- Investor Impact: "None – no investor friction"
-- Fix: "None needed"
-
----
-
-## Output format (CRITICAL)
-
-Return strict JSON only.
-
-Top-level MUST be:
+Return strict JSON only:
 
 {
   "answers": [
@@ -388,28 +390,29 @@ Top-level MUST be:
 }
 
 Rules:
-- Include ALL rubric questions
-- One object per question
-- Do not include markdown
-- Do not include commentary outside JSON
-- Do not expose patterns or sources
-- Keep answers concise but specific
+- MUST include "answers" array
+- Include all rubric questions
+- No markdown
+- No commentary outside JSON
+- No pattern mentions
+- Plain English
+- Be concise but specific
 
 ---
 
-## Final self-check
+## Final self-check (STRICT)
 
 Before returning:
 
-- Did I check if the answer exists elsewhere in the deck?
-- Did I avoid false "missing" claims?
-- Did I avoid repeating the same gap?
-- Did I clearly state what decision is blocked?
-- Did each fix directly resolve the gap?
-- Did I avoid generic advice?
-- Did I avoid hallucinations?
+- Did I avoid forbidden phrasing?
+- Did every investor impact state a blocked decision?
+- Did every fix specify exact missing proof/data?
+- Did I avoid repeating gaps?
+- Did I avoid hallucinating?
+- Did I check if content exists elsewhere in the deck?
 
-If not, fix before returning.`
+If not, rewrite.`
+
 
 /**
  * Fetch patterns relevant to a specific rubric question.
@@ -512,6 +515,94 @@ function buildDeckOutline(slides) {
       preview: textPreview,
     }
   })
+}
+
+/**
+ * Enforce phrase rules on investor_impact field.
+ * Replaces forbidden vague phrasing with direct "Investors cannot..." language.
+ */
+function enforcePhrasingRules(text) {
+  if (!text) return text
+
+  const forbiddenPatterns = [
+    { pattern: /investors may\b/gi, replacement: 'Investors cannot' },
+    { pattern: /investors might\b/gi, replacement: 'Investors cannot' },
+    { pattern: /this creates uncertainty/gi, replacement: 'Investors cannot assess this' },
+    { pattern: /potentially prompting investor questions/gi, replacement: 'blocking investor assessment' },
+    { pattern: /raises questions/gi, replacement: 'prevents investors from assessing' },
+    { pattern: /leaves questions/gi, replacement: 'prevents investors from determining' },
+  ]
+
+  let result = text
+  for (const { pattern, replacement } of forbiddenPatterns) {
+    result = result.replace(pattern, replacement)
+  }
+  return result
+}
+
+/**
+ * Apply phrase enforcement to all answers.
+ */
+function enforceAnswerPhrasing(answers) {
+  return answers.map((a) => ({
+    ...a,
+    investor_impact: enforcePhrasingRules(a.investor_impact),
+  }))
+}
+
+/**
+ * Apply grade calibration cap.
+ *
+ * If BOTH conditions are true:
+ * - 3 or more core slides have average score < 3.0
+ * - AND no slide (except traction or market) has score >= 4.5
+ *
+ * Then cap overall grade at B- (max 3.4/5 equivalent)
+ */
+function applyGradeCalibrationCap(deckScoreResult, slideEvaluations) {
+  const CORE_SLIDE_TYPES = ['problem', 'solution', 'product', 'competition', 'business_model', 'go_to_market', 'financials']
+  const EXEMPT_FROM_HIGH_SCORE_CHECK = ['traction', 'market']
+  const GRADE_CAP_SCORE = 3.4
+  const GRADE_CAP = 'B'
+
+  // Count core slides with average score < 3.0
+  let weakCoreSlideCount = 0
+  for (const slide of slideEvaluations) {
+    if (CORE_SLIDE_TYPES.includes(slide.type)) {
+      // Calculate average score from questions
+      const scores = slide.questions.map((q) => q.score)
+      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+      if (avgScore < 3.0) {
+        weakCoreSlideCount++
+      }
+    }
+  }
+
+  // Check if any non-exempt slide has score >= 4.5
+  let hasHighScoringSlide = false
+  for (const slide of slideEvaluations) {
+    if (!EXEMPT_FROM_HIGH_SCORE_CHECK.includes(slide.type)) {
+      const scores = slide.questions.map((q) => q.score)
+      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+      if (avgScore >= 4.5) {
+        hasHighScoringSlide = true
+        break
+      }
+    }
+  }
+
+  // Apply cap if conditions met
+  if (weakCoreSlideCount >= 3 && !hasHighScoringSlide) {
+    console.log(`Grade cap applied: ${weakCoreSlideCount} weak core slides, no high-scoring non-exempt slides`)
+    return {
+      ...deckScoreResult,
+      deckScore: Math.min(deckScoreResult.deckScore, GRADE_CAP_SCORE),
+      overallGrade: deckScoreResult.deckScore > GRADE_CAP_SCORE ? GRADE_CAP : deckScoreResult.overallGrade,
+      gradeCapped: true,
+    }
+  }
+
+  return { ...deckScoreResult, gradeCapped: false }
 }
 
 /**
@@ -619,7 +710,10 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
     // Sort by importance
     const sortedAnswers = sortAnswersByImportance(validatedAnswers, rubric)
 
-    return { success: true, answers: sortedAnswers }
+    // Apply phrase enforcement to investor_impact fields
+    const enforcedAnswers = enforceAnswerPhrasing(sortedAnswers)
+
+    return { success: true, answers: enforcedAnswers }
   } catch (err) {
     console.error(`Slide ${slide.slide_number} evaluation error:`, err.message)
     return { success: false, answers: generateFallbackAnswers(rubric) }
@@ -1134,11 +1228,15 @@ async function generateFullReport(supabase, deckId) {
     }
 
     // Compute deck-level score
-    const deckScoreResult = computeDeckScore(slideEvaluations)
+    const rawDeckScoreResult = computeDeckScore(slideEvaluations)
+
+    // Apply grade calibration cap if conditions met
+    const deckScoreResult = applyGradeCalibrationCap(rawDeckScoreResult, slideEvaluations)
 
     console.log(
       `Deck scoring: grade=${deckScoreResult.overallGrade}, ` +
-        `score=${deckScoreResult.deckScore}, slides_used=${deckScoreResult.slideCountUsed}`
+        `score=${deckScoreResult.deckScore}, slides_used=${deckScoreResult.slideCountUsed}` +
+        (deckScoreResult.gradeCapped ? ' (CAPPED)' : '')
     )
 
     // Evaluate deck-level investment thesis
