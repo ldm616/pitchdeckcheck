@@ -140,6 +140,11 @@ exports.handler = async (event) => {
   // Falls back to free_report or raw content for legacy reports
   const reportContent = report.content?.full_report || report.content?.free_report || report.content
 
+  // Include v3 debug data if present (for admin viewing)
+  if (report.content?.debug) {
+    reportContent.debug = report.content.debug
+  }
+
   // Return full report content with slides
   return {
     statusCode: 200,
