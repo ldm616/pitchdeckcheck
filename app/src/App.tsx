@@ -83,6 +83,16 @@ interface InvestmentThesis {
   why_now: ThesisElement
 }
 
+// V3 Debug output structure
+interface V3DebugOutput {
+  generated_at?: string
+  architecture?: Record<string, unknown>
+  rule_injection?: Record<string, unknown>
+  prompts?: Record<string, unknown>
+  slide_evaluations?: Array<Record<string, unknown>>
+  thesis_evaluation?: Record<string, unknown>
+}
+
 interface ReportContent {
   // Common fields
   overall_grade: string
@@ -105,6 +115,9 @@ interface ReportContent {
     title: string
     bullets: string[]
   }
+
+  // V3 debug output (admin only)
+  debug?: V3DebugOutput
 }
 
 interface SlideData {
@@ -203,6 +216,7 @@ export default function App() {
   const [reportCreatedAt, setReportCreatedAt] = useState<string | null>(null)
   const [slides, setSlides] = useState<SlideData[]>([])
   const [hoveredSlideNumber, setHoveredSlideNumber] = useState<number | null>(null)
+  const [debugExpanded, setDebugExpanded] = useState(false)
 
   // Store credentials for fetching report
   const deckCredentialsRef = useRef<{ deckId: string; accessToken: string } | null>(null)
@@ -1663,6 +1677,154 @@ export default function App() {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {/* V3 Debug Output (admin only) */}
+            {isAdmin && report.debug && (
+              <div style={{ marginTop: '32px', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setDebugExpanded(!debugExpanded)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    backgroundColor: '#f3f4f6',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#374151',
+                  }}
+                >
+                  <span>V3 Debug Output</span>
+                  <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                    {debugExpanded ? '▼' : '▶'}
+                  </span>
+                </button>
+
+                {debugExpanded && (
+                  <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+                    {/* Architecture */}
+                    {report.debug.architecture && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase' }}>
+                          Architecture
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '200px',
+                        }}>
+                          {JSON.stringify(report.debug.architecture, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Rule Injection */}
+                    {report.debug.rule_injection && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase' }}>
+                          Rule Injection
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '300px',
+                        }}>
+                          {JSON.stringify(report.debug.rule_injection, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Prompts */}
+                    {report.debug.prompts && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase' }}>
+                          Prompts
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '400px',
+                        }}>
+                          {JSON.stringify(report.debug.prompts, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Slide Evaluations */}
+                    {report.debug.slide_evaluations && report.debug.slide_evaluations.length > 0 && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase' }}>
+                          Slide Evaluations ({report.debug.slide_evaluations.length} slides)
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '400px',
+                        }}>
+                          {JSON.stringify(report.debug.slide_evaluations, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Thesis Evaluation */}
+                    {report.debug.thesis_evaluation && (
+                      <div>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase' }}>
+                          Thesis Evaluation
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '300px',
+                        }}>
+                          {JSON.stringify(report.debug.thesis_evaluation, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Generated timestamp */}
+                    {report.debug.generated_at && (
+                      <p style={{ margin: '16px 0 0 0', fontSize: '11px', color: '#6b7280' }}>
+                        Debug generated: {new Date(report.debug.generated_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
