@@ -30,7 +30,7 @@ const {
 } = require('./rubrics')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
-const REPORT_VERSION = 'report_v2.6.1'
+const REPORT_VERSION = 'report_v2.7'
 
 // High-impact slide types for summary generation (ignore cover/contact)
 const HIGH_IMPACT_TYPES = ['traction', 'market', 'team', 'problem', 'solution', 'business_model', 'financials', 'ask', 'go_to_market', 'product', 'competition']
@@ -178,12 +178,55 @@ Investor reasoning patterns are internal calibration context derived from real i
 
 ## Core evaluation principle
 
-Evaluate each rubric question in two layers:
+Evaluate investor signal quality, not just modern pitch-deck completeness.
 
-1. Does the deck answer the investor question anywhere?
+Do not treat missing modern metrics as automatically fatal if the deck clearly shows strong underlying investor signal.
+
+Strong investor signal includes:
+- clear problem
+- simple solution
+- strong why-now logic
+- obvious behavior or infrastructure shift
+- clear user pull or traction
+- strong team-market fit
+- clear competitive insight
+- clear product insight
+
+Penalize unclear thinking more than missing formatting.
+
+---
+
+## Sparse but high-signal deck rule
+
+Some strong early decks are sparse.
+
+If a deck is sparse but clearly communicates:
+- what the company does
+- why the problem matters
+- why now
+- why the solution is compelling
+- why the team can execute
+- evidence of early pull
+
+Then do not over-penalize for lack of modern polish, full financials, CAC/LTV, or detailed GTM.
+
+For sparse decks:
+- reward clarity, insight, timing, and sharpness
+- penalize only gaps that materially block investment judgment
+- avoid checklist-style criticism
+
+---
+
+## Deck-aware evaluation rule
+
+Evaluate each question in two layers:
+
+1. Does the deck answer this investor question anywhere?
 2. Does this specific slide appropriately contribute to answering it?
 
-Do not penalize a slide as if it must contain every detail if the detail is clearly handled elsewhere in the deck.
+Do not penalize a slide for omitting detail that appears elsewhere in the deck.
+
+If present elsewhere, say it is addressed elsewhere and reduce severity.
 
 ---
 
@@ -197,12 +240,7 @@ Before writing any gap, classify it internally as one of:
 
 Do not output these labels.
 
-Instead:
-- If present elsewhere → treat as clarity/placement issue (low severity)
-- If weak → moderate severity
-- If missing → real investor risk
-
-If information appears elsewhere, explicitly say so.
+Reflect the classification in severity and tone.
 
 ---
 
@@ -216,158 +254,150 @@ Use investor reasoning patterns only when they naturally fit:
 
 Do not force patterns.
 
-Do not introduce:
-- APIs / developer ecosystems unless clearly relevant
-- SaaS logic into non-SaaS businesses
-- network effects unless clearly present
-
 Patterns should sharpen reasoning, not distort it.
 
 ---
 
-## Investor impact rule (STRICT)
+## Why-now rule
 
-Every investor impact MUST answer:
+Treat the following as strong why-now evidence when visible:
+- infrastructure adoption
+- cost curves
+- technology readiness
+- platform shifts
+- consumer behavior shifts
+- regulatory or market structure changes
+- new distribution mechanisms
+
+If a slide shows a clear enabling change, score why-now/timing strongly even if it lacks numeric market sizing.
+
+---
+
+## Signal vs completeness rule
+
+Do not downgrade purely because a deck lacks:
+- CAC
+- LTV
+- detailed financials
+- modern GTM plan
+- polished design
+- detailed market sizing
+
+Downgrade only if the missing information blocks a real investor decision.
+
+Example:
+- Missing CAC in a modern paid-growth company is important.
+- Missing CAC in a very early organic-growth consumer network is less important if traction or pull is otherwise visible.
+
+---
+
+## Investor impact rule
+
+Every investor impact must answer:
 
 "What specific investment judgment is blocked?"
 
-Anchor ONLY in:
-- growth potential
-- defensibility
-- capital efficiency
-- retention / engagement
-- scalability
-- market credibility
-- execution confidence
-- business model quality
+Use direct language:
+- "Investors cannot assess…"
+- "Investors cannot determine…"
+- "Investors cannot judge…"
 
-DO NOT USE:
-- "investors may…"
-- "investors might…"
-- "this creates uncertainty"
-- "potentially prompting investor questions"
-- "raises questions"
-- "leaves questions"
-
-Instead use direct language:
-
-Examples:
-- "Investors cannot assess whether growth is capital-efficient without CAC data."
-- "Investors cannot determine whether this advantage is defensible or easily replicated."
-- "Investors cannot judge whether the market is venture-scale or overstated."
+Forbidden phrases:
+- may
+- might
+- potentially
+- could
+- raises questions
+- leaves questions
+- this creates uncertainty
 
 ---
 
-## Fix rule (UPGRADED)
+## Fix rule
 
 Every fix must:
-
 - directly close the gap
 - be conditional
-- specify the exact missing input or proof
-- explain why that input matters for the decision
+- specify the exact missing proof/input
+- explain why that proof matters
 
-Avoid generic fixes.
+Use:
+- "If available…"
+- "If true…"
+- "If already tracked…"
 
-BAD:
-- "add more detail"
-- "include metrics"
-- "expand on this"
-
-GOOD:
-- "If available, showing CAC payback period would allow investors to assess whether growth can scale without excessive capital."
-- "If tracked, showing repeat booking rate would clarify whether demand is durable or one-time."
-- "If patents cover matching logic or pricing algorithms, specifying that would clarify whether the core advantage is defensible."
-
-Always tie fix → investor decision.
+Do not invent data or provide generic advice.
 
 ---
 
-## Deduplication rule
+## Competition rule
 
-Do not repeat the same gap across questions.
+When evaluating competition, assess:
+- Are competitors identified?
+- Are alternatives segmented by user/job?
+- Are differentiators specific?
+- Are advantages durable or easy to copy?
 
-If already identified elsewhere:
-- reference it indirectly
-- reduce severity
-- do not restate full gap
+Do not treat first mover, ratings, or coverage as a moat unless persistence is explained.
 
 ---
 
-## Competition analysis rule (STRICT)
+## Cover/contact guardrail
 
-When evaluating competition:
+For cover slides:
+- If company name is visible, score company-name question 5.
+- If tagline is present, score tagline question 5.
+- Do not penalize cover slides for lacking detailed context.
 
-Always answer:
-- Are advantages specific?
-- Are they durable?
-- Can competitors copy them?
-
-Explicitly evaluate:
-- replicability
-- switching costs
-- network effects
-- data advantage
-- operational advantage
-- distribution advantage
-
-Do NOT treat:
-- "first mover"
-- "better ratings"
-- "more coverage"
-
-as defensible unless explained WHY they persist.
+For contact slides:
+- If contact information is present, score contact question 5.
 
 ---
 
 ## Investment highlights rule
 
 If slide type = investment_highlights:
-
 - Do not evaluate normally
-- Do not penalize
-- Do not generate gaps
-- Return neutral minimal output
+- Do not score
+- Do not include in slide-by-slide analysis
 
 ---
 
-## Scoring scale (RECALIBRATED)
+## Scoring scale
 
-5 = fully answers with strong evidence
-4 = strong but slightly incomplete
-3 = partial, meaningful gaps
-2 = weak, major gaps
+5 = fully answers with strong visible signal
+4 = strong answer, minor gaps
+3 = partial answer, meaningful gaps
+2 = weak answer, major gaps
 1 = barely present
-0 = not present
+0 = absent
 
-Important:
-- Do NOT use 0 or 1 if content exists
-- Default weak-but-present → 2
-- Default partial → 3
+Rules:
+- Do not use 0 or 1 if content exists.
+- Do not assign low scores just because a sparse deck lacks modern details.
+- Give credit for clear, concise, high-signal answers.
 
 ---
 
 ## Evidence discipline
 
-Only use visible data.
+Only use visible deck content and provided deck context.
 
-Do NOT:
-- infer missing metrics
-- assume traction quality
-- assume product capabilities
-- assume team strength beyond text
+Do not:
+- invent metrics
+- assume capabilities
+- assume competitors
+- assume traction quality beyond visible claims
 
-If implied, say "implied but not explicit."
+If implied but not explicit, say "implied but not explicit."
 
 ---
 
 ## Confidence rule
 
-high = clear evidence
-medium = partial evidence
-low = weak evidence
-
-Do not overrate confidence.
+high = clearly supported
+medium = partially supported
+low = sparse or ambiguous evidence
 
 ---
 
@@ -390,26 +420,40 @@ Return strict JSON only:
 }
 
 Rules:
-- MUST include "answers" array
+- MUST include answers array
 - Include all rubric questions
 - No markdown
 - No commentary outside JSON
-- No pattern mentions
+- No pattern names
 - Plain English
-- Be concise but specific
+- Concise but specific
 
 ---
 
-## Final self-check (STRICT)
+## No-gap rule
+
+If score = 5:
+- Gap: "None – criterion fully met"
+- Investor Impact: "None – no investor friction"
+- Fix: "None needed"
+
+Never output:
+- Unable to determine gap
+- Unable to determine investor impact
+- Unable to provide guidance
+
+---
+
+## Final self-check
 
 Before returning:
-
-- Did I avoid forbidden phrasing?
-- Did every investor impact state a blocked decision?
-- Did every fix specify exact missing proof/data?
-- Did I avoid repeating gaps?
+- Did I evaluate signal, not just completeness?
+- Did I avoid over-penalizing sparse but strong decks?
+- Did I avoid forbidden phrases?
+- Did every investor impact state a blocked judgment?
+- Did every fix directly close the gap?
 - Did I avoid hallucinating?
-- Did I check if content exists elsewhere in the deck?
+- Did I check if the deck answers this elsewhere?
 
 If not, rewrite.`
 
@@ -520,17 +564,36 @@ function buildDeckOutline(slides) {
 /**
  * Enforce phrase rules on investor_impact field.
  * Replaces forbidden vague phrasing with direct "Investors cannot..." language.
+ *
+ * Forbidden phrases per v2.7:
+ * - may, might, potentially, could
+ * - raises questions, leaves questions
+ * - this creates uncertainty
  */
 function enforcePhrasingRules(text) {
   if (!text) return text
 
   const forbiddenPatterns = [
+    // Direct investor + vague verb patterns
     { pattern: /investors may\b/gi, replacement: 'Investors cannot' },
     { pattern: /investors might\b/gi, replacement: 'Investors cannot' },
+    { pattern: /investors could\b/gi, replacement: 'Investors cannot' },
+    { pattern: /investors potentially\b/gi, replacement: 'Investors cannot' },
+    // Generic vague patterns
+    { pattern: /this may\b/gi, replacement: 'This blocks investors from' },
+    { pattern: /this might\b/gi, replacement: 'This blocks investors from' },
+    { pattern: /this could\b/gi, replacement: 'This blocks investors from' },
+    { pattern: /this potentially\b/gi, replacement: 'This blocks investors from' },
+    { pattern: /may be unclear/gi, replacement: 'is unclear to investors' },
+    { pattern: /might be unclear/gi, replacement: 'is unclear to investors' },
+    { pattern: /could be unclear/gi, replacement: 'is unclear to investors' },
+    // Question-raising patterns
     { pattern: /this creates uncertainty/gi, replacement: 'Investors cannot assess this' },
     { pattern: /potentially prompting investor questions/gi, replacement: 'blocking investor assessment' },
     { pattern: /raises questions/gi, replacement: 'prevents investors from assessing' },
     { pattern: /leaves questions/gi, replacement: 'prevents investors from determining' },
+    { pattern: /raises concerns/gi, replacement: 'prevents investors from determining' },
+    { pattern: /leaves uncertainty/gi, replacement: 'blocks investor assessment of' },
   ]
 
   let result = text
@@ -551,19 +614,108 @@ function enforceAnswerPhrasing(answers) {
 }
 
 /**
- * Apply grade calibration cap.
+ * Apply cover/contact scoring guardrails.
+ *
+ * For cover slides:
+ * - If company name is visible (text length > 0), score company-name questions as 5
+ * - If tagline is present, score tagline questions as 5
+ *
+ * For contact slides:
+ * - If contact info is present, score contact questions as 5
+ *
+ * This ensures these simple slides aren't penalized for lacking detailed context.
+ */
+function applyCoverContactGuardrails(answers, slideType, extractedText) {
+  if (!answers || answers.length === 0) return answers
+
+  const hasContent = extractedText && extractedText.trim().length > 0
+
+  if (slideType === 'cover' && hasContent) {
+    return answers.map((a) => {
+      const qLower = (a.question_id || '').toLowerCase()
+      // Company name and tagline questions should get 5 if content exists
+      if (qLower.includes('company') || qLower.includes('name') || qLower.includes('tagline') || qLower.includes('title')) {
+        return {
+          ...a,
+          score: 5,
+          assessment: 'Company name/tagline clearly visible on cover slide.',
+          gap: 'None – criterion fully met',
+          investor_impact: 'None – no investor friction',
+          fix: 'None needed',
+          confidence: 'high',
+        }
+      }
+      return a
+    })
+  }
+
+  if (slideType === 'contact' && hasContent) {
+    return answers.map((a) => {
+      const qLower = (a.question_id || '').toLowerCase()
+      // Contact information questions should get 5 if content exists
+      if (qLower.includes('contact') || qLower.includes('email') || qLower.includes('phone') || qLower.includes('info')) {
+        return {
+          ...a,
+          score: 5,
+          assessment: 'Contact information is present on contact slide.',
+          gap: 'None – criterion fully met',
+          investor_impact: 'None – no investor friction',
+          fix: 'None needed',
+          confidence: 'high',
+        }
+      }
+      return a
+    })
+  }
+
+  return answers
+}
+
+/**
+ * Check if deck has strong core investor signals.
+ *
+ * Strong signal slides: problem, solution, team, traction
+ * A slide has strong signal if average score >= 3.5
+ *
+ * Returns true if 3+ of these core signal slides are strong.
+ */
+function hasSparseHighSignal(slideEvaluations) {
+  const SIGNAL_SLIDE_TYPES = ['problem', 'solution', 'team', 'traction']
+  let strongSignalCount = 0
+
+  for (const slide of slideEvaluations) {
+    if (SIGNAL_SLIDE_TYPES.includes(slide.type)) {
+      const scores = slide.questions.map((q) => q.score)
+      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+      if (avgScore >= 3.5) {
+        strongSignalCount++
+      }
+    }
+  }
+
+  return strongSignalCount >= 3
+}
+
+/**
+ * Apply grade calibration cap with sparse-high-signal exception.
  *
  * If BOTH conditions are true:
  * - 3 or more core slides have average score < 3.0
  * - AND no slide (except traction or market) has score >= 4.5
  *
- * Then cap overall grade at B- (max 3.4/5 equivalent)
+ * Then cap overall grade at B- (max 3.4/5 equivalent).
+ *
+ * EXCEPTION (sparse-high-signal calibration):
+ * If deck has strong problem/solution/team/traction signals (3+ of these with avg >= 3.5),
+ * do not allow missing modern detail (GTM, financials) alone to push grade below C+.
  */
 function applyGradeCalibrationCap(deckScoreResult, slideEvaluations) {
   const CORE_SLIDE_TYPES = ['problem', 'solution', 'product', 'competition', 'business_model', 'go_to_market', 'financials']
   const EXEMPT_FROM_HIGH_SCORE_CHECK = ['traction', 'market']
   const GRADE_CAP_SCORE = 3.4
   const GRADE_CAP = 'B'
+  const SPARSE_HIGH_SIGNAL_FLOOR_SCORE = 2.75 // C+ equivalent
+  const SPARSE_HIGH_SIGNAL_FLOOR_GRADE = 'C'
 
   // Count core slides with average score < 3.0
   let weakCoreSlideCount = 0
@@ -591,8 +743,23 @@ function applyGradeCalibrationCap(deckScoreResult, slideEvaluations) {
     }
   }
 
-  // Apply cap if conditions met
-  if (weakCoreSlideCount >= 3 && !hasHighScoringSlide) {
+  // Check for sparse-high-signal deck
+  const isSparseHighSignal = hasSparseHighSignal(slideEvaluations)
+
+  // Sparse-high-signal calibration: ensure floor of C+ even with weak modern slides
+  if (isSparseHighSignal && deckScoreResult.deckScore < SPARSE_HIGH_SIGNAL_FLOOR_SCORE) {
+    console.log(`Sparse-high-signal floor applied: lifting grade to C+ minimum`)
+    return {
+      ...deckScoreResult,
+      deckScore: SPARSE_HIGH_SIGNAL_FLOOR_SCORE,
+      overallGrade: SPARSE_HIGH_SIGNAL_FLOOR_GRADE,
+      gradeCapped: false,
+      sparseHighSignalFloor: true,
+    }
+  }
+
+  // Apply cap if conditions met (but not for sparse-high-signal decks)
+  if (weakCoreSlideCount >= 3 && !hasHighScoringSlide && !isSparseHighSignal) {
     console.log(`Grade cap applied: ${weakCoreSlideCount} weak core slides, no high-scoring non-exempt slides`)
     return {
       ...deckScoreResult,
@@ -713,7 +880,14 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
     // Apply phrase enforcement to investor_impact fields
     const enforcedAnswers = enforceAnswerPhrasing(sortedAnswers)
 
-    return { success: true, answers: enforcedAnswers }
+    // Apply cover/contact scoring guardrails
+    const guardrailedAnswers = applyCoverContactGuardrails(
+      enforcedAnswers,
+      slide.inferred_type,
+      slide.extracted_text
+    )
+
+    return { success: true, answers: guardrailedAnswers }
   } catch (err) {
     console.error(`Slide ${slide.slide_number} evaluation error:`, err.message)
     return { success: false, answers: generateFallbackAnswers(rubric) }
