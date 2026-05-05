@@ -2068,7 +2068,7 @@ export default function App() {
                                   : '#9ca3af',
                                 transition: 'color 0.15s',
                                 animation: actionDeckId === item.deck_id && actionType === 'regenerate'
-                                  ? 'spin 2.5s linear infinite'
+                                  ? 'pulse-slow 2s ease-in-out infinite'
                                   : 'none',
                               }}
                             >
