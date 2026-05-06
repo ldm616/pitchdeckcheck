@@ -1,0 +1,590 @@
+{
+  "version": "1.0.0",
+  "description": "Canonical registry of evaluation benchmark decks for calibration",
+  "last_updated": "2024-01-01T00:00:00Z",
+  "decks": [
+    {
+      "id": "youtube_seed_consumer_network",
+      "company": "YouTube",
+      "archetype": "consumer_network",
+      "era": "sparse_classic",
+      "stage": "seed",
+      "year": 2005,
+      "deck_file": "youtube_2005.pdf",
+      "expected_grade_range": ["B-", "A-"],
+      "strengths": [
+        "why_now",
+        "behavior_shift",
+        "network_effect",
+        "simplicity",
+        "timing",
+        "founder_market_fit"
+      ],
+      "known_weaknesses": [
+        "missing_metrics",
+        "weak_financials",
+        "minimal_competition_analysis"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C",
+        "business_model_grade_A",
+        "competition_grade_A",
+        "generic_feedback_excessive"
+      ],
+      "notes": "Iconic sparse deck with strong investor signals. Should not be over-penalized for missing modern metrics.",
+      "active": true
+    },
+    {
+      "id": "linkedin_seed_consumer_network",
+      "company": "LinkedIn",
+      "archetype": "consumer_network",
+      "era": "sparse_classic",
+      "stage": "seed",
+      "year": 2004,
+      "deck_file": "linkedin_2004.pdf",
+      "expected_grade_range": ["B-", "A-"],
+      "strengths": [
+        "network_effect",
+        "founder_market_fit",
+        "clear_value_prop"
+      ],
+      "known_weaknesses": [
+        "missing_metrics",
+        "unclear_monetization"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C",
+        "business_model_grade_A"
+      ],
+      "notes": "Professional network with strong founder credibility signals.",
+      "active": true
+    },
+    {
+      "id": "twitch_seed_consumer_network",
+      "company": "Twitch",
+      "archetype": "consumer_network",
+      "era": "sparse_classic",
+      "stage": "seed",
+      "year": 2011,
+      "deck_file": "twitch_2011.pdf",
+      "expected_grade_range": ["B-", "B+"],
+      "strengths": [
+        "network_effect",
+        "timing",
+        "community"
+      ],
+      "known_weaknesses": [
+        "niche_market_perception"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C"
+      ],
+      "notes": "Gaming community platform with strong network dynamics.",
+      "active": true
+    },
+    {
+      "id": "airbnb_seed_marketplace",
+      "company": "Airbnb",
+      "archetype": "marketplace",
+      "era": "sparse_classic",
+      "stage": "seed",
+      "year": 2009,
+      "deck_file": "airbnb_2009.pdf",
+      "expected_grade_range": ["B", "A-"],
+      "strengths": [
+        "problem_clarity",
+        "product_simplicity",
+        "network_effect",
+        "timing"
+      ],
+      "known_weaknesses": [
+        "trust_concerns",
+        "regulatory_risk"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_B-"
+      ],
+      "notes": "Classic marketplace deck with strong problem-solution fit.",
+      "active": true
+    },
+    {
+      "id": "fiverr_seed_marketplace",
+      "company": "Fiverr",
+      "archetype": "marketplace",
+      "era": "sparse_classic",
+      "stage": "seed",
+      "year": 2010,
+      "deck_file": "fiverr_2010.pdf",
+      "expected_grade_range": ["B-", "B+"],
+      "strengths": [
+        "product_simplicity",
+        "clear_wedge",
+        "network_effect"
+      ],
+      "known_weaknesses": [
+        "low_value_perception"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C"
+      ],
+      "notes": "Services marketplace with clear price point wedge.",
+      "active": true
+    },
+    {
+      "id": "yelp_seed_local_marketplace",
+      "company": "Yelp",
+      "archetype": "local_marketplace",
+      "era": "sparse_classic",
+      "stage": "seed",
+      "year": 2005,
+      "deck_file": "yelp_2005.pdf",
+      "expected_grade_range": ["B-", "B+"],
+      "strengths": [
+        "community",
+        "user_generated_content",
+        "network_effect"
+      ],
+      "known_weaknesses": [
+        "local_scale_challenges"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C"
+      ],
+      "notes": "Local review platform with strong community dynamics.",
+      "active": true
+    },
+    {
+      "id": "twilio_seed_developer_tools",
+      "company": "Twilio",
+      "archetype": "developer_tools",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2009,
+      "deck_file": "twilio_2009.pdf",
+      "expected_grade_range": ["B", "A-"],
+      "strengths": [
+        "technical_moat",
+        "developer_experience",
+        "api_first"
+      ],
+      "known_weaknesses": [
+        "narrow_initial_market"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_B-"
+      ],
+      "notes": "API-first developer platform with strong technical positioning.",
+      "active": true
+    },
+    {
+      "id": "wix_seed_saas",
+      "company": "Wix",
+      "archetype": "saas",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2008,
+      "deck_file": "wix_2008.pdf",
+      "expected_grade_range": ["B-", "B+"],
+      "strengths": [
+        "product_simplicity",
+        "self_service",
+        "large_market"
+      ],
+      "known_weaknesses": [
+        "competitive_market"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C"
+      ],
+      "notes": "Website builder with strong self-service PLG motion.",
+      "active": true
+    },
+    {
+      "id": "toast_seed_vertical_saas",
+      "company": "Toast",
+      "archetype": "saas",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2013,
+      "deck_file": "toast_2013.pdf",
+      "expected_grade_range": ["B-", "B+"],
+      "strengths": [
+        "vertical_focus",
+        "integrated_solution",
+        "market_timing"
+      ],
+      "known_weaknesses": [
+        "capital_intensive"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C"
+      ],
+      "notes": "Restaurant vertical SaaS with integrated POS.",
+      "active": true
+    },
+    {
+      "id": "skype_seed_consumer_network",
+      "company": "Skype",
+      "archetype": "consumer_network",
+      "era": "sparse_classic",
+      "stage": "seed",
+      "year": 2003,
+      "deck_file": "skype_2003.pdf",
+      "expected_grade_range": ["B-", "A-"],
+      "strengths": [
+        "infrastructure_shift",
+        "timing",
+        "network_effect",
+        "simplicity"
+      ],
+      "known_weaknesses": [
+        "unclear_monetization"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C"
+      ],
+      "notes": "VoIP pioneer with strong infrastructure timing.",
+      "active": true
+    },
+    {
+      "id": "periscope_seed_consumer_network",
+      "company": "Periscope",
+      "archetype": "consumer_network",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2015,
+      "deck_file": "periscope_2015.pdf",
+      "expected_grade_range": ["B-", "B+"],
+      "strengths": [
+        "timing",
+        "mobile_first",
+        "live_streaming"
+      ],
+      "known_weaknesses": [
+        "defensibility"
+      ],
+      "must_not_happen": [
+        "overall_grade_below_C"
+      ],
+      "notes": "Mobile live streaming with strong timing insight.",
+      "active": true
+    },
+    {
+      "id": "ai_sales_assistant_placeholder",
+      "company": "AI Sales Assistant (Placeholder)",
+      "archetype": "ai_application",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2024,
+      "deck_file": null,
+      "expected_grade_range": ["C+", "B+"],
+      "strengths": [
+        "ai_capability",
+        "workflow_integration"
+      ],
+      "known_weaknesses": [
+        "differentiation",
+        "defensibility"
+      ],
+      "must_not_happen": [
+        "competition_grade_A_without_moat"
+      ],
+      "notes": "Placeholder for modern AI application deck. Requires strong differentiation evidence.",
+      "active": false
+    },
+    {
+      "id": "ai_healthcare_workflow_placeholder",
+      "company": "AI Healthcare Workflow (Placeholder)",
+      "archetype": "healthcare",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2024,
+      "deck_file": null,
+      "expected_grade_range": ["C+", "B"],
+      "strengths": [
+        "domain_expertise",
+        "regulatory_moat"
+      ],
+      "known_weaknesses": [
+        "sales_cycle",
+        "regulatory_risk"
+      ],
+      "must_not_happen": [],
+      "notes": "Placeholder for healthcare AI application.",
+      "active": false
+    },
+    {
+      "id": "ai_developer_tool_placeholder",
+      "company": "AI Developer Tool (Placeholder)",
+      "archetype": "developer_tools",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2024,
+      "deck_file": null,
+      "expected_grade_range": ["C+", "B+"],
+      "strengths": [
+        "developer_experience",
+        "technical_differentiation"
+      ],
+      "known_weaknesses": [
+        "commoditization_risk"
+      ],
+      "must_not_happen": [],
+      "notes": "Placeholder for AI-powered developer tool.",
+      "active": false
+    },
+    {
+      "id": "weak_deck_control",
+      "company": "Weak Deck (Control)",
+      "archetype": "saas",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2024,
+      "deck_file": null,
+      "expected_grade_range": ["D", "C"],
+      "strengths": [],
+      "known_weaknesses": [
+        "unclear_problem",
+        "no_differentiation",
+        "no_traction"
+      ],
+      "must_not_happen": [
+        "overall_grade_above_C+"
+      ],
+      "notes": "Intentionally weak control deck. Should NOT receive high grades.",
+      "active": false
+    },
+    {
+      "id": "average_yc_style_deck",
+      "company": "Average YC-Style Deck (Control)",
+      "archetype": "saas",
+      "era": "modern",
+      "stage": "seed",
+      "year": 2024,
+      "deck_file": null,
+      "expected_grade_range": ["C+", "B"],
+      "strengths": [
+        "clear_structure",
+        "reasonable_market"
+      ],
+      "known_weaknesses": [
+        "generic_solution",
+        "limited_traction"
+      ],
+      "must_not_happen": [
+        "overall_grade_A"
+      ],
+      "notes": "Average quality modern deck. Should score middle range.",
+      "active": false
+    },
+    {
+      "id": "strong_series_a_deck",
+      "company": "Strong Series A Deck (Control)",
+      "archetype": "saas",
+      "era": "modern",
+      "stage": "series_a",
+      "year": 2024,
+      "deck_file": null,
+      "expected_grade_range": ["B+", "A"],
+      "strengths": [
+        "strong_traction",
+        "clear_metrics",
+        "proven_team"
+      ],
+      "known_weaknesses": [],
+      "must_not_happen": [
+        "overall_grade_below_B"
+      ],
+      "notes": "Strong Series A control deck. Should receive high grades.",
+      "active": false
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "consumer_network",
+      "name": "Consumer Network",
+      "description": "Consumer-facing social or network products",
+      "metric_density_tolerance": "low",
+      "key_signals": ["network_effect", "behavior_shift", "timing", "simplicity"],
+      "common_weaknesses": ["monetization", "defensibility"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "qualitative_ok" },
+        "series_a": { "metric_expectation": "some_metrics_required" }
+      }
+    },
+    {
+      "id": "marketplace",
+      "name": "Marketplace",
+      "description": "Two-sided marketplace connecting buyers and sellers",
+      "metric_density_tolerance": "low",
+      "key_signals": ["network_effect", "supply_demand", "liquidity"],
+      "common_weaknesses": ["chicken_egg", "unit_economics"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "qualitative_ok" },
+        "series_a": { "metric_expectation": "gmv_or_take_rate" }
+      }
+    },
+    {
+      "id": "local_marketplace",
+      "name": "Local Marketplace",
+      "description": "Geographically constrained marketplace",
+      "metric_density_tolerance": "low",
+      "key_signals": ["network_effect", "local_density", "community"],
+      "common_weaknesses": ["scale_challenges", "local_competition"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "qualitative_ok" }
+      }
+    },
+    {
+      "id": "saas",
+      "name": "SaaS",
+      "description": "Software as a Service business",
+      "metric_density_tolerance": "medium",
+      "key_signals": ["product_simplicity", "retention", "expansion"],
+      "common_weaknesses": ["competition", "cac_payback"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "some_metrics_helpful" },
+        "series_a": { "metric_expectation": "arr_ndr_required" }
+      }
+    },
+    {
+      "id": "developer_tools",
+      "name": "Developer Tools",
+      "description": "Tools and infrastructure for developers",
+      "metric_density_tolerance": "medium",
+      "key_signals": ["technical_moat", "developer_experience", "api_first"],
+      "common_weaknesses": ["narrow_market", "commoditization"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "usage_metrics_helpful" }
+      }
+    },
+    {
+      "id": "infrastructure",
+      "name": "Infrastructure",
+      "description": "Backend infrastructure and platform services",
+      "metric_density_tolerance": "medium",
+      "key_signals": ["technical_moat", "timing", "scale_advantage"],
+      "common_weaknesses": ["capital_intensive", "long_sales_cycle"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "technical_validation_ok" }
+      }
+    },
+    {
+      "id": "ai_application",
+      "name": "AI Application",
+      "description": "Applications powered by AI/ML",
+      "metric_density_tolerance": "medium",
+      "key_signals": ["differentiation", "data_moat", "workflow_integration"],
+      "common_weaknesses": ["defensibility", "commoditization", "hallucination_risk"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "differentiation_evidence_required" }
+      }
+    },
+    {
+      "id": "fintech",
+      "name": "Fintech",
+      "description": "Financial technology services",
+      "metric_density_tolerance": "high",
+      "key_signals": ["regulatory_moat", "trust", "unit_economics"],
+      "common_weaknesses": ["regulatory_risk", "capital_requirements"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "regulatory_path_required" }
+      }
+    },
+    {
+      "id": "healthcare",
+      "name": "Healthcare",
+      "description": "Healthcare technology and services",
+      "metric_density_tolerance": "medium",
+      "key_signals": ["domain_expertise", "regulatory_path", "clinical_validation"],
+      "common_weaknesses": ["long_sales_cycle", "regulatory_risk"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "clinical_or_regulatory_progress" }
+      }
+    },
+    {
+      "id": "biotech",
+      "name": "Biotech",
+      "description": "Biotechnology and life sciences",
+      "metric_density_tolerance": "low",
+      "key_signals": ["scientific_breakthrough", "ip_moat", "team_credentials"],
+      "common_weaknesses": ["capital_intensive", "long_timeline"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "scientific_validation_focus" }
+      }
+    },
+    {
+      "id": "hardtech",
+      "name": "Hardtech",
+      "description": "Hardware and deep technology",
+      "metric_density_tolerance": "low",
+      "key_signals": ["technical_breakthrough", "ip_moat", "manufacturing_path"],
+      "common_weaknesses": ["capital_intensive", "long_development"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "technical_milestones_ok" }
+      }
+    },
+    {
+      "id": "enterprise_ai",
+      "name": "Enterprise AI",
+      "description": "AI solutions for enterprise customers",
+      "metric_density_tolerance": "high",
+      "key_signals": ["enterprise_validation", "integration_depth", "roi_proof"],
+      "common_weaknesses": ["long_sales_cycle", "implementation_complexity"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "pilot_evidence_helpful" }
+      }
+    },
+    {
+      "id": "consumer_ai",
+      "name": "Consumer AI",
+      "description": "AI-powered consumer applications",
+      "metric_density_tolerance": "low",
+      "key_signals": ["product_simplicity", "viral_potential", "retention"],
+      "common_weaknesses": ["defensibility", "monetization"],
+      "stage_adjustments": {
+        "seed": { "metric_expectation": "usage_evidence_helpful" }
+      }
+    }
+  ],
+  "stages": [
+    {
+      "id": "pre_seed",
+      "name": "Pre-Seed",
+      "metric_expectations": "minimal",
+      "grade_adjustment": 0
+    },
+    {
+      "id": "seed",
+      "name": "Seed",
+      "metric_expectations": "qualitative_acceptable",
+      "grade_adjustment": 0
+    },
+    {
+      "id": "series_a",
+      "name": "Series A",
+      "metric_expectations": "metrics_required",
+      "grade_adjustment": 0
+    },
+    {
+      "id": "series_b",
+      "name": "Series B",
+      "metric_expectations": "strong_metrics_required",
+      "grade_adjustment": 0
+    }
+  ],
+  "eras": [
+    {
+      "id": "sparse_classic",
+      "name": "Sparse Classic (pre-2015)",
+      "description": "Pre-modern deck conventions, typically sparse on metrics",
+      "metric_density_tolerance": "high"
+    },
+    {
+      "id": "modern",
+      "name": "Modern (2015+)",
+      "description": "Modern deck conventions with metric expectations",
+      "metric_density_tolerance": "normal"
+    }
+  ]
+}
