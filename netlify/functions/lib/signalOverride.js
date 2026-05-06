@@ -10,6 +10,11 @@
  * Evaluates investor signal quality, not compliance with modern deck conventions.
  */
 
+// Module load confirmation
+console.log('[signal-override] ****************************************************')
+console.log('[signal-override] SIGNAL OVERRIDE MODULE LOADED')
+console.log('[signal-override] ****************************************************')
+
 // Signal patterns to detect in slide text
 const SIGNAL_PATTERNS = {
   // Strong behavioral insight - understanding of user behavior/psychology
@@ -486,21 +491,51 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
   const { isSeedConsumerNetwork = false } = options
 
   console.log('[signal-override] ========================================')
-  console.log('[signal-override] applySignalOverride CALLED')
+  console.log('[signal-override] *** applySignalOverride ENTRY POINT ***')
+  console.log('[signal-override] ========================================')
+  console.log(`[signal-override] Timestamp: ${new Date().toISOString()}`)
   console.log(`[signal-override] isSeedConsumerNetwork: ${isSeedConsumerNetwork}`)
-  console.log(`[signal-override] Slides: ${slides.length}, Evaluations: ${slideEvaluations.length}`)
+  console.log(`[signal-override] Input slides count: ${slides.length}`)
+  console.log(`[signal-override] Input evaluations count: ${slideEvaluations.length}`)
+
+  // Log input slide types and grades
+  console.log('[signal-override] --- INPUT SLIDE GRADES (BEFORE OVERRIDE) ---')
+  for (const se of slideEvaluations) {
+    console.log(`[signal-override]   Slide ${se.slide_number} (${se.type}): grade=${se.grade}, normalized=${se.normalized_score?.toFixed(3) || 'N/A'}`)
+  }
 
   // Detect deck-wide signals
+  console.log('[signal-override] --- DETECTING DECK SIGNALS ---')
   const deckSignals = detectDeckSignals(slides)
   console.log(`[signal-override] Deck signal strength: ${deckSignals.deckSignalStrength}`)
   console.log(`[signal-override] Unique signal types: ${deckSignals.uniqueSignalTypes}`)
-  console.log(`[signal-override] Synergies: ${deckSignals.synergies.length}`)
+  console.log(`[signal-override] Signal types found: ${Object.keys(deckSignals.signalsByType).join(', ') || 'NONE'}`)
+  console.log(`[signal-override] Synergies detected: ${deckSignals.synergies.length}`)
+  if (deckSignals.synergies.length > 0) {
+    for (const syn of deckSignals.synergies) {
+      console.log(`[signal-override]   - ${syn.name}: ${syn.description} (+${syn.boost})`)
+    }
+  }
+
+  // Log signals per slide
+  console.log('[signal-override] --- SIGNALS PER SLIDE ---')
+  for (const slideNum of Object.keys(deckSignals.signalsBySlide)) {
+    const ss = deckSignals.signalsBySlide[slideNum]
+    console.log(`[signal-override]   Slide ${slideNum}: ${ss.signalCount} signals (strength: ${ss.signalStrength})`)
+    if (ss.signals.length > 0) {
+      for (const sig of ss.signals) {
+        console.log(`[signal-override]     - ${sig.type}: "${sig.match}"`)
+      }
+    }
+  }
 
   // Process each slide
+  console.log('[signal-override] --- PROCESSING SLIDES FOR OVERRIDE ---')
   const adjustedEvaluations = []
   const overrideResults = []
   let totalLifted = 0
   let totalSuppressedFixes = 0
+  const beforeAfterSummary = []
 
   for (const slideEval of slideEvaluations) {
     const slideData = slides.find(s => s.slide_number === slideEval.slide_number)
@@ -510,6 +545,10 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       signalStrength: 'none',
     }
 
+    // Check eligibility
+    const isEligible = SIGNAL_OVERRIDE_ELIGIBLE_SLIDES.includes(slideEval.type)
+    console.log(`[signal-override] Slide ${slideEval.slide_number} (${slideEval.type}): eligible=${isEligible}, signals=${slideSignals.signalCount}, strength=${slideSignals.signalStrength}`)
+
     // Apply signal override
     const overrideResult = applySlideSignalOverride(slideEval, slideSignals, deckSignals, options)
     overrideResults.push({
@@ -518,9 +557,23 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       ...overrideResult,
     })
 
+    // Track before/after
+    beforeAfterSummary.push({
+      slide: slideEval.slide_number,
+      type: slideEval.type,
+      eligible: isEligible,
+      signals: slideSignals.signalCount,
+      before_grade: overrideResult.originalGrade,
+      after_grade: overrideResult.adjustedGrade,
+      changed: overrideResult.adjusted,
+      reason: overrideResult.reason,
+    })
+
     if (overrideResult.adjusted) {
       totalLifted++
-      console.log(`[signal-override] Slide ${slideEval.slide_number} (${slideEval.type}): ${overrideResult.originalGrade} -> ${overrideResult.adjustedGrade} (lift: +${overrideResult.liftAmount.toFixed(2)})`)
+      console.log(`[signal-override]   >>> LIFTED: ${overrideResult.originalGrade} -> ${overrideResult.adjustedGrade} (lift: +${overrideResult.liftAmount.toFixed(2)})`)
+    } else {
+      console.log(`[signal-override]   No change: ${overrideResult.reason}`)
     }
 
     // Suppress inappropriate fixes
@@ -530,6 +583,13 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       options
     )
     totalSuppressedFixes += suppressedCount
+
+    if (suppressedCount > 0) {
+      console.log(`[signal-override]   Suppressed ${suppressedCount} fix(es):`)
+      for (const sf of suppressedFixes) {
+        console.log(`[signal-override]     - "${sf.originalFix.slice(0, 60)}..."`)
+      }
+    }
 
     // Build adjusted evaluation
     const adjusted = {
@@ -547,24 +607,77 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
     adjustedEvaluations.push(adjusted)
   }
 
-  console.log(`[signal-override] Total slides lifted: ${totalLifted}`)
-  console.log(`[signal-override] Total fixes suppressed: ${totalSuppressedFixes}`)
+  // Final summary
+  console.log('[signal-override] --- OVERRIDE SUMMARY ---')
+  console.log(`[signal-override] Total slides processed: ${slideEvaluations.length}`)
+  console.log(`[signal-override] Total slides LIFTED: ${totalLifted}`)
+  console.log(`[signal-override] Total fixes SUPPRESSED: ${totalSuppressedFixes}`)
+  console.log('[signal-override] Before/After:')
+  for (const ba of beforeAfterSummary) {
+    const marker = ba.changed ? '>>>' : '   '
+    console.log(`[signal-override] ${marker} Slide ${ba.slide} (${ba.type}): ${ba.before_grade} -> ${ba.after_grade} [${ba.reason}]`)
+  }
   console.log('[signal-override] ========================================')
+
+  // Build human-readable status message
+  const slidesChangedList = beforeAfterSummary
+    .filter(s => s.changed)
+    .map(s => `Slide ${s.slide} (${s.type}): ${s.before_grade} → ${s.after_grade}`)
+
+  const statusMessage = totalLifted > 0
+    ? `Signal override ACTIVE: lifted ${totalLifted} slide(s), suppressed ${totalSuppressedFixes} fix(es)`
+    : `Signal override ran but made NO changes (${slideEvaluations.length} slides processed, ${deckSignals.deckSignalStrength} deck signal strength)`
 
   // Build debug output
   const debug = {
-    override_applied: totalLifted > 0,
-    slides_lifted: totalLifted,
-    fixes_suppressed: totalSuppressedFixes,
-    deck_signals: {
-      strength: deckSignals.deckSignalStrength,
-      unique_signal_types: deckSignals.uniqueSignalTypes,
-      signal_types_detected: Object.keys(deckSignals.signalsByType),
-      synergies: deckSignals.synergies,
+    // ===== CONFIRMATION SECTION =====
+    // This confirms signal override ran and what it did
+    status: statusMessage,
+    signal_override_executed: true,
+    executed_at: new Date().toISOString(),
+
+    // Quick summary
+    summary: {
+      any_changes_made: totalLifted > 0 || totalSuppressedFixes > 0,
+      slides_processed: slideEvaluations.length,
+      slides_eligible_for_override: slideEvaluations.filter(s => SIGNAL_OVERRIDE_ELIGIBLE_SLIDES.includes(s.type)).length,
+      slides_grade_lifted: totalLifted,
+      fixes_suppressed: totalSuppressedFixes,
+      slides_changed: slidesChangedList,
     },
-    slide_overrides: overrideResults,
-    configuration: {
+
+    // Deck-level signal detection results
+    deck_signal_analysis: {
+      overall_strength: deckSignals.deckSignalStrength,
+      unique_signal_types_found: deckSignals.uniqueSignalTypes,
+      signal_types: Object.keys(deckSignals.signalsByType),
+      synergies_detected: deckSignals.synergies.map(s => s.name),
+      all_signals_found: deckSignals.allSignals.map(s => ({
+        slide: s.slide_number,
+        signal_type: s.type,
+        matched_text: s.match,
+      })),
+    },
+
+    // Before/After for every slide
+    slide_by_slide: beforeAfterSummary.map(s => ({
+      slide_number: s.slide,
+      slide_type: s.type,
+      eligible_for_override: s.eligible,
+      signals_detected: s.signals,
+      grade_before: s.before_grade,
+      grade_after: s.after_grade,
+      was_changed: s.changed,
+      reason: s.reason,
+    })),
+
+    // Detailed override results (for deep debugging)
+    detailed_overrides: overrideResults,
+
+    // Configuration that was used
+    config: {
       is_seed_consumer_network: isSeedConsumerNetwork,
+      eligible_slide_types: SIGNAL_OVERRIDE_ELIGIBLE_SLIDES,
       score_floors: SIGNAL_SCORE_FLOORS,
       grade_floors: SIGNAL_GRADE_FLOORS,
     },

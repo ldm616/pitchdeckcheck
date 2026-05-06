@@ -1549,26 +1549,52 @@ async function generateFullReport(supabase, deckId, options = {}) {
     let signalOverrideDebug = null
     let finalSlideEvaluations = slideEvaluations
 
+    console.log(`[v3-integration] evalArchitecture = "${evalArchitecture}"`)
+
     if (evalArchitecture === 'v3') {
+      console.log('[v3-integration] *** ENTERING SIGNAL OVERRIDE BLOCK ***')
+
       // Determine if deck is seed-stage consumer/network
       const isSeedConsumerNetwork = evalContext?.deckContext?.inferred_contexts?.includes('consumer_network') ||
                                      evalContext?.deckContext?.inferred_contexts?.includes('marketplace')
 
-      console.log('[v3] Applying signal override layer...')
+      console.log(`[v3-integration] isSeedConsumerNetwork = ${isSeedConsumerNetwork}`)
+      console.log(`[v3-integration] Calling applySignalOverride with ${slides.length} slides, ${slideEvaluations.length} evaluations`)
 
       const overrideResult = applySignalOverride(slides, slideEvaluations, {
         isSeedConsumerNetwork,
       })
 
+      console.log(`[v3-integration] applySignalOverride returned:`)
+      console.log(`[v3-integration]   - adjustedEvaluations count: ${overrideResult.adjustedEvaluations?.length || 0}`)
+      console.log(`[v3-integration]   - totalLifted: ${overrideResult.totalLifted}`)
+      console.log(`[v3-integration]   - totalSuppressedFixes: ${overrideResult.totalSuppressedFixes}`)
+      console.log(`[v3-integration]   - debug present: ${overrideResult.debug ? 'YES' : 'NO'}`)
+
       finalSlideEvaluations = overrideResult.adjustedEvaluations
       signalOverrideDebug = overrideResult.debug
 
+      // Log grade changes
+      console.log('[v3-integration] Grade comparison (original -> final):')
+      for (let i = 0; i < slideEvaluations.length; i++) {
+        const orig = slideEvaluations[i]
+        const final = finalSlideEvaluations[i]
+        const changed = orig.grade !== final.grade ? ' *** CHANGED ***' : ''
+        console.log(`[v3-integration]   Slide ${orig.slide_number} (${orig.type}): ${orig.grade} -> ${final.grade}${changed}`)
+      }
+
       if (overrideResult.totalLifted > 0) {
-        console.log(`[v3] Signal override lifted ${overrideResult.totalLifted} slides`)
+        console.log(`[v3-integration] >>> Signal override lifted ${overrideResult.totalLifted} slides`)
+      } else {
+        console.log(`[v3-integration] No slides were lifted by signal override`)
       }
       if (overrideResult.totalSuppressedFixes > 0) {
-        console.log(`[v3] Suppressed ${overrideResult.totalSuppressedFixes} inappropriate fixes`)
+        console.log(`[v3-integration] >>> Suppressed ${overrideResult.totalSuppressedFixes} inappropriate fixes`)
       }
+
+      console.log('[v3-integration] *** EXITING SIGNAL OVERRIDE BLOCK ***')
+    } else {
+      console.log('[v3-integration] Skipping signal override (not v3 architecture)')
     }
     // ===== End V3 Signal Override Layer =====
 
@@ -1718,7 +1744,15 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
       // Log signal override summary
       if (signalOverrideDebug) {
-        console.log(`[v3 debug] Signal override: ${signalOverrideDebug.slides_lifted} slides lifted, ${signalOverrideDebug.fixes_suppressed} fixes suppressed`)
+        console.log(`[v3 debug] Signal override debug attached:`)
+        console.log(`[v3 debug]   - module_executed: ${signalOverrideDebug.module_executed}`)
+        console.log(`[v3 debug]   - slides_processed: ${signalOverrideDebug.slides_processed}`)
+        console.log(`[v3 debug]   - slides_eligible: ${signalOverrideDebug.slides_eligible}`)
+        console.log(`[v3 debug]   - slides_lifted: ${signalOverrideDebug.slides_lifted}`)
+        console.log(`[v3 debug]   - fixes_suppressed: ${signalOverrideDebug.fixes_suppressed}`)
+        console.log(`[v3 debug]   - deck_signal_strength: ${signalOverrideDebug.deck_signals?.strength}`)
+      } else {
+        console.log(`[v3 debug] WARNING: signalOverrideDebug is null/undefined`)
       }
     }
 
