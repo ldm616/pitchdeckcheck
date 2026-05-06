@@ -186,7 +186,7 @@ export default function App() {
     return params.has('admin')
   }, [])
 
-  const [adminView, setAdminView] = useState<AdminView>('upload')
+  const [adminView, setAdminView] = useState<AdminView>('reports')
   const [reportsList, setReportsList] = useState<ReportListItem[]>([])
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsError, setReportsError] = useState('')
