@@ -160,6 +160,33 @@ const GRADE_TO_SCORE = {
   E: 1,
 }
 
+// V3 slide weights for seed-stage consumer/network decks
+// Reduces emphasis on business_model and competition for early-stage consumer products
+const V3_SEED_CONSUMER_WEIGHTS = {
+  problem: 1.4, // Higher - core thesis element
+  solution: 1.4, // Higher - core thesis element
+  market: 1.3,
+  traction: 1.6, // Highest - most important for consumer
+  team: 1.4, // Higher - founder-market fit crucial
+  business_model: 0.8, // Lower - seed stage doesn't need unit economics
+  financials: 0.8, // Lower - seed stage projections less meaningful
+  ask: 1.0,
+  product: 1.2, // Higher - product insight matters
+  competition: 0.7, // Lower - early moats often unclear
+  go_to_market: 0.9, // Slightly lower - distribution often emerging
+  roadmap: 0.6,
+  investment_highlights: 0.0,
+  cover: 0.0,
+  contact: 0.0,
+  other: 0.3,
+}
+
+// V3 scoring blend weights
+const V3_BLEND_WEIGHTS = {
+  slides: 0.6, // 60% from slide scores
+  thesis: 0.4, // 40% from thesis scores
+}
+
 /**
  * Convert normalized score (0-1) to letter grade.
  */
@@ -257,6 +284,145 @@ function computeDeckScore(slideEvaluations) {
 }
 
 /**
+ * V3 deck scoring that blends slide scores with thesis scores.
+ *
+ * For v3 only:
+ * - Uses adjusted slide weights for seed-stage consumer/network decks
+ * - Incorporates thesis scores (why_this_market, why_this_product, why_this_team, why_now)
+ * - Allows strong thesis to lift overall grade
+ *
+ * @param {Object[]} slideEvaluations - Array of evaluated slides with grade, type
+ * @param {Object} investmentThesis - Thesis evaluation with scores for each thesis question
+ * @param {Object} options - Configuration options
+ * @param {boolean} options.isSeedConsumerNetwork - Whether to use seed consumer/network weights
+ * @returns {Object} - deckScore, overallGrade, debug info
+ */
+function computeDeckScoreV3(slideEvaluations, investmentThesis, options = {}) {
+  const { isSeedConsumerNetwork = false } = options
+
+  // Select appropriate slide weights
+  const slideWeights = isSeedConsumerNetwork ? V3_SEED_CONSUMER_WEIGHTS : SLIDE_WEIGHTS
+
+  // ===== Calculate slide score component =====
+  let totalSlideWeightedScore = 0
+  let totalSlideWeight = 0
+  let slideCountUsed = 0
+  const slideBreakdown = []
+
+  for (const slide of slideEvaluations) {
+    const type = slide.type || 'other'
+    const weight = slideWeights[type] ?? 0.5
+
+    if (weight === 0) continue
+
+    const gradeScore = GRADE_TO_SCORE[slide.grade]
+    if (gradeScore === undefined) continue
+
+    totalSlideWeightedScore += gradeScore * weight
+    totalSlideWeight += weight
+    slideCountUsed++
+
+    slideBreakdown.push({
+      type,
+      grade: slide.grade,
+      grade_score: gradeScore,
+      weight,
+      weighted_contribution: gradeScore * weight,
+    })
+  }
+
+  const slideComponent = totalSlideWeight > 0
+    ? totalSlideWeightedScore / totalSlideWeight
+    : 3.0
+
+  // ===== Calculate thesis score component =====
+  const thesisKeys = ['why_this_market', 'why_this_product', 'why_this_team', 'why_now']
+  let totalThesisScore = 0
+  let thesisCount = 0
+  const thesisBreakdown = []
+
+  for (const key of thesisKeys) {
+    const thesis = investmentThesis[key]
+    if (thesis && typeof thesis.score === 'number') {
+      totalThesisScore += thesis.score
+      thesisCount++
+      thesisBreakdown.push({
+        key,
+        score: thesis.score,
+      })
+    }
+  }
+
+  // Thesis scores are 0-5, same scale as slide grades
+  const thesisComponent = thesisCount > 0
+    ? totalThesisScore / thesisCount
+    : 3.0
+
+  // ===== Blend slide and thesis components =====
+  const blendedScore = (slideComponent * V3_BLEND_WEIGHTS.slides) +
+                       (thesisComponent * V3_BLEND_WEIGHTS.thesis)
+
+  // ===== Apply thesis lift for strong thesis + weak slides =====
+  // If thesis average >= 4.0 but slide score < 3.5, apply modest lift
+  // This allows strong narrative to compensate for presentation gaps
+  let thesisLift = 0
+  let thesisLiftApplied = false
+  if (thesisComponent >= 4.0 && slideComponent < 3.5) {
+    // Lift capped at 0.3 points (prevents inflating truly weak decks)
+    thesisLift = Math.min(0.3, (thesisComponent - 4.0) * 0.15)
+    thesisLiftApplied = thesisLift > 0
+  }
+
+  const finalScore = Math.min(5.0, blendedScore + thesisLift)
+  const overallGrade = deckScoreToGrade(finalScore)
+
+  // Build debug output
+  const debug = {
+    scoring_mode: 'v3_blended',
+    weight_profile: isSeedConsumerNetwork ? 'seed_consumer_network' : 'standard',
+    blend_weights: V3_BLEND_WEIGHTS,
+    slide_score_component: {
+      raw_weighted_sum: Math.round(totalSlideWeightedScore * 100) / 100,
+      total_weight: Math.round(totalSlideWeight * 100) / 100,
+      slide_count_used: slideCountUsed,
+      component_score: Math.round(slideComponent * 100) / 100,
+      breakdown: slideBreakdown,
+    },
+    thesis_score_component: {
+      total_score: totalThesisScore,
+      thesis_count: thesisCount,
+      component_score: Math.round(thesisComponent * 100) / 100,
+      breakdown: thesisBreakdown,
+    },
+    blending: {
+      slide_contribution: Math.round(slideComponent * V3_BLEND_WEIGHTS.slides * 100) / 100,
+      thesis_contribution: Math.round(thesisComponent * V3_BLEND_WEIGHTS.thesis * 100) / 100,
+      blended_score: Math.round(blendedScore * 100) / 100,
+    },
+    thesis_lift: {
+      applied: thesisLiftApplied,
+      lift_amount: Math.round(thesisLift * 100) / 100,
+      reason: thesisLiftApplied
+        ? `Strong thesis (${thesisComponent.toFixed(1)}) lifted score for weaker slides (${slideComponent.toFixed(1)})`
+        : thesisComponent < 4.0
+          ? 'Thesis not strong enough to trigger lift (needs >= 4.0)'
+          : 'Slides already strong enough (>= 3.5)',
+    },
+    final_score: Math.round(finalScore * 100) / 100,
+    final_grade: overallGrade,
+    formula: `(slide_component × ${V3_BLEND_WEIGHTS.slides}) + (thesis_component × ${V3_BLEND_WEIGHTS.thesis}) + thesis_lift`,
+  }
+
+  return {
+    deckScore: Math.round(finalScore * 100) / 100,
+    totalWeight: Math.round(totalSlideWeight * 100) / 100,
+    slideCountUsed,
+    overallGrade,
+    debug,
+  }
+}
+
+/**
  * Generate fallback answers when model fails (0-5 scale).
  */
 function generateFallbackAnswers(rubric) {
@@ -295,12 +461,15 @@ module.exports = {
   RUBRIC_VERSION,
   RUBRICS,
   SLIDE_WEIGHTS,
+  V3_SEED_CONSUMER_WEIGHTS,
+  V3_BLEND_WEIGHTS,
   SLIDE_GRADE_THRESHOLDS,
   GRADE_TO_SCORE,
   normalizedScoreToGrade,
   deckScoreToGrade,
   computeSlideScore,
   computeDeckScore,
+  computeDeckScoreV3,
   generateFallbackAnswers,
   sortByImportance,
   sortAnswersByImportance,

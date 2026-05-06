@@ -24,6 +24,7 @@ const {
   SLIDE_WEIGHTS,
   computeSlideScore,
   computeDeckScore,
+  computeDeckScoreV3,
   generateFallbackAnswers,
   sortByImportance,
   sortAnswersByImportance,
@@ -1541,19 +1542,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
       })
     }
 
-    // Compute deck-level score
-    const rawDeckScoreResult = computeDeckScore(slideEvaluations)
-
-    // Apply grade calibration cap if conditions met
-    const deckScoreResult = applyGradeCalibrationCap(rawDeckScoreResult, slideEvaluations)
-
-    console.log(
-      `Deck scoring: grade=${deckScoreResult.overallGrade}, ` +
-        `score=${deckScoreResult.deckScore}, slides_used=${deckScoreResult.slideCountUsed}` +
-        (deckScoreResult.gradeCapped ? ' (CAPPED)' : '')
-    )
-
-    // Evaluate deck-level investment thesis
+    // Evaluate deck-level investment thesis first (needed for v3 scoring)
     console.log('Evaluating investment thesis...')
     const thesisResult = await evaluateInvestmentThesis(openai, slides, slideEvaluations, evalContext)
     const investmentThesis = thesisResult.thesis
@@ -1564,6 +1553,46 @@ async function generateFullReport(supabase, deckId, options = {}) {
       .map(([k, v]) => `${k}=${v.score}`)
       .join(', ')
     console.log(`Thesis scores: ${thesisScores}`)
+
+    // Compute deck-level score - use v3 scoring if in v3 architecture
+    let rawDeckScoreResult
+    let v3ScoringDebug = null
+
+    if (evalArchitecture === 'v3') {
+      // Determine if deck is seed-stage consumer/network based on inferred context
+      const isSeedConsumerNetwork = evalContext?.deckContext?.inferred_contexts?.includes('consumer_network') ||
+                                     evalContext?.deckContext?.inferred_contexts?.includes('marketplace')
+
+      console.log(`[v3] Using blended scoring (seed_consumer=${isSeedConsumerNetwork})`)
+
+      rawDeckScoreResult = computeDeckScoreV3(slideEvaluations, investmentThesis, {
+        isSeedConsumerNetwork,
+      })
+
+      // Capture v3 scoring debug info
+      v3ScoringDebug = rawDeckScoreResult.debug
+      delete rawDeckScoreResult.debug // Don't include in main result
+
+      console.log(`[v3] Slide component: ${v3ScoringDebug.slide_score_component.component_score}`)
+      console.log(`[v3] Thesis component: ${v3ScoringDebug.thesis_score_component.component_score}`)
+      console.log(`[v3] Blended score: ${v3ScoringDebug.blending.blended_score}`)
+      if (v3ScoringDebug.thesis_lift.applied) {
+        console.log(`[v3] Thesis lift applied: +${v3ScoringDebug.thesis_lift.lift_amount}`)
+      }
+    } else {
+      // Use standard v2 scoring
+      rawDeckScoreResult = computeDeckScore(slideEvaluations)
+    }
+
+    // Apply grade calibration cap if conditions met (applies to both v2 and v3)
+    const deckScoreResult = applyGradeCalibrationCap(rawDeckScoreResult, slideEvaluations)
+
+    console.log(
+      `Deck scoring: grade=${deckScoreResult.overallGrade}, ` +
+        `score=${deckScoreResult.deckScore}, slides_used=${deckScoreResult.slideCountUsed}` +
+        (deckScoreResult.gradeCapped ? ' (CAPPED)' : '') +
+        (deckScoreResult.sparseHighSignalFloor ? ' (FLOOR APPLIED)' : '')
+    )
 
     // Generate deterministic summary (no model call)
     const summary = generateDeterministicSummary(
@@ -1643,6 +1672,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
         deck_context: deckContextDebug,
         rule_injection: ruleInjectionSummary,
         prompts: promptInfo,
+        scoring: v3ScoringDebug,
         slide_evaluations: slideDebugInfo,
         thesis_evaluation: thesisDebugInfo,
       }
@@ -1705,8 +1735,11 @@ async function generateFullReport(supabase, deckId, options = {}) {
     console.log(`[eval] │ Prompt source: ${architectureMetadata.prompt_source}`)
     if (evalArchitecture === 'v3') {
       console.log(`[eval] │ Rule pack: ${architectureMetadata.rule_pack_version_key || 'none'}`)
-      console.log(`[eval] │ Rules loaded: ${architectureMetadata.rules_loaded_count}`)
+      console.log(`[eval] │ Rules injected: ${architectureMetadata.injected_rules_count}`)
       console.log(`[eval] │ Prompt versions: ${architectureMetadata.prompt_versions_loaded_count}`)
+      if (v3ScoringDebug) {
+        console.log(`[eval] │ Scoring: slide=${v3ScoringDebug.slide_score_component.component_score}, thesis=${v3ScoringDebug.thesis_score_component.component_score}`)
+      }
     }
     console.log(`[eval] └─────────────────────────────────────────`)
 
