@@ -150,31 +150,74 @@ const SIGNAL_GRADE_FLOORS = {
 }
 
 // Fixes to suppress for seed consumer/network decks
+// These patterns match recommendations that are inappropriate for early-stage consumer/network companies
 const SUPPRESSED_FIX_PATTERNS = [
-  // CAC/LTV metrics
-  /\b(CAC|LTV|customer acquisition cost|lifetime value|payback period)\b/i,
-  /\b(unit economics|contribution margin)\b/i,
+  // CAC/LTV/Unit economics - any mention
+  /\bCAC\b/i,
+  /\bLTV\b/i,
+  /\bcustomer acquisition cost/i,
+  /\blifetime value/i,
+  /\bpayback period/i,
+  /\bunit economics/i,
+  /\bcontribution margin/i,
+  /\bgross margin/i,
+  /\bprofit margin/i,
+  /\bmargin[s]?\b/i,
 
-  // Detailed pricing
-  /\b(pricing (model|strategy|detail|breakdown)|price point|monetization detail)\b/i,
-  /\b(revenue per user|ARPU|average revenue)\b/i,
+  // Retention metrics
+  /\bretention\b/i,
+  /\bchurn\b/i,
+  /\bcohort/i,
+  /\bDAU\b/i,
+  /\bMAU\b/i,
+  /\bDAU\/MAU/i,
+  /\bstickiness/i,
 
-  // Detailed moat articulation
-  /\b(defensib|moat|barrier to entry|competitive advantage) (detail|breakdown|articulation)\b/i,
-  /\b(patent|intellectual property|IP) (portfolio|strategy)\b/i,
+  // Pricing recommendations
+  /\bpricing\b/i,
+  /\bprice point/i,
+  /\bmonetization/i,
+  /\brevenue model/i,
+  /\bARPU\b/i,
+  /\brevenue per user/i,
 
-  // Advanced PMF analytics
-  /\b(product[- ]market fit (score|metric|measurement))\b/i,
-  /\b(NPS|net promoter|cohort analysis|retention curve)\b/i,
-  /\b(churn (rate|analysis)|DAU\/MAU)\b/i,
+  // Moat/defensibility
+  /\bmoat\b/i,
+  /\bdefensib/i,
+  /\bbarrier to entry/i,
+  /\bcompetitive advantage/i,
+  /\bsustainable advantage/i,
+  /\bnetwork effect/i,  // Don't recommend "add network effect" - they should show it, not claim it
+  /\bpatent/i,
+  /\bintellectual property\b/i,
+  /\bIP strategy/i,
+
+  // PMF analytics
+  /\bproduct[- ]?market fit/i,
+  /\bNPS\b/i,
+  /\bnet promoter/i,
 
   // Enterprise/SaaS specific
-  /\b(sales cycle|enterprise (sales|deal)|contract value|ACV)\b/i,
-  /\b(pipeline|quota|sales team)\b/i,
+  /\bsales cycle/i,
+  /\benterprise sales/i,
+  /\bcontract value/i,
+  /\bACV\b/i,
+  /\bARR\b/i,
+  /\bMRR\b/i,
+  /\bpipeline\b/i,
+  /\bquota\b/i,
 
-  // Detailed financial projections
-  /\b(detailed (financial|revenue) projection|5[- ]year (plan|projection))\b/i,
-  /\b(burn rate|runway calculation)\b/i,
+  // Detailed projections
+  /\bdetailed (financial|revenue)/i,
+  /\b5[- ]year/i,
+  /\bburn rate/i,
+  /\brunway/i,
+  /\bbreak[- ]?even/i,
+
+  // Specific metrics requests
+  /\bspecific metrics/i,
+  /\bquantif/i,
+  /\bmeasurable/i,
 ]
 
 /**
@@ -536,6 +579,7 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
   let totalLifted = 0
   let totalSuppressedFixes = 0
   const beforeAfterSummary = []
+  const allSuppressedFixes = [] // Collect all suppressed fixes for debug
 
   for (const slideEval of slideEvaluations) {
     const slideData = slides.find(s => s.slide_number === slideEval.slide_number)
@@ -557,18 +601,6 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       ...overrideResult,
     })
 
-    // Track before/after
-    beforeAfterSummary.push({
-      slide: slideEval.slide_number,
-      type: slideEval.type,
-      eligible: isEligible,
-      signals: slideSignals.signalCount,
-      before_grade: overrideResult.originalGrade,
-      after_grade: overrideResult.adjustedGrade,
-      changed: overrideResult.adjusted,
-      reason: overrideResult.reason,
-    })
-
     if (overrideResult.adjusted) {
       totalLifted++
       console.log(`[signal-override]   >>> LIFTED: ${overrideResult.originalGrade} -> ${overrideResult.adjustedGrade} (lift: +${overrideResult.liftAmount.toFixed(2)})`)
@@ -584,12 +616,33 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
     )
     totalSuppressedFixes += suppressedCount
 
+    // Track suppressed fixes for debug
     if (suppressedCount > 0) {
       console.log(`[signal-override]   Suppressed ${suppressedCount} fix(es):`)
       for (const sf of suppressedFixes) {
         console.log(`[signal-override]     - "${sf.originalFix.slice(0, 60)}..."`)
+        allSuppressedFixes.push({
+          slide_number: slideEval.slide_number,
+          slide_type: slideEval.type,
+          question: sf.question,
+          original_fix: sf.originalFix,
+          matched_pattern: sf.pattern,
+        })
       }
     }
+
+    // Track before/after including suppressed fixes
+    beforeAfterSummary.push({
+      slide: slideEval.slide_number,
+      type: slideEval.type,
+      eligible: isEligible,
+      signals: slideSignals.signalCount,
+      before_grade: overrideResult.originalGrade,
+      after_grade: overrideResult.adjustedGrade,
+      changed: overrideResult.adjusted,
+      reason: overrideResult.reason,
+      fixes_suppressed_count: suppressedCount,
+    })
 
     // Build adjusted evaluation
     const adjusted = {
@@ -602,6 +655,7 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       _original_grade: overrideResult.originalGrade,
       _original_score: overrideResult.originalScore,
       _signal_override_applied: overrideResult.adjusted,
+      _fixes_suppressed: suppressedCount,
     }
 
     adjustedEvaluations.push(adjusted)
@@ -659,6 +713,9 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       })),
     },
 
+    // Fix suppression details
+    suppression_reasons: allSuppressedFixes,
+
     // Before/After for every slide
     slide_by_slide: beforeAfterSummary.map(s => ({
       slide_number: s.slide,
@@ -669,6 +726,7 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       grade_after: s.after_grade,
       was_changed: s.changed,
       reason: s.reason,
+      fixes_suppressed: s.fixes_suppressed_count,
     })),
 
     // Detailed override results (for deep debugging)
