@@ -1573,11 +1573,15 @@ async function generateFullReport(supabase, deckId, options = {}) {
       v3ScoringDebug = rawDeckScoreResult.debug
       delete rawDeckScoreResult.debug // Don't include in main result
 
-      console.log(`[v3] Slide component: ${v3ScoringDebug.slide_score_component.component_score}`)
-      console.log(`[v3] Thesis component: ${v3ScoringDebug.thesis_score_component.component_score}`)
-      console.log(`[v3] Blended score: ${v3ScoringDebug.blending.blended_score}`)
-      if (v3ScoringDebug.thesis_lift.applied) {
-        console.log(`[v3] Thesis lift applied: +${v3ScoringDebug.thesis_lift.lift_amount}`)
+      console.log(`[v3] v3ScoringDebug captured: ${v3ScoringDebug ? 'YES' : 'NO'}`)
+      if (v3ScoringDebug) {
+        console.log(`[v3] Slide component: ${v3ScoringDebug.slide_score_component.component_score}`)
+        console.log(`[v3] Thesis component: ${v3ScoringDebug.thesis_score_component.component_score}`)
+        console.log(`[v3] Blended score: ${v3ScoringDebug.blending.blended_score}`)
+        console.log(`[v3] Final v3 score: ${v3ScoringDebug.final_score}`)
+        if (v3ScoringDebug.thesis_lift.applied) {
+          console.log(`[v3] Thesis lift applied: +${v3ScoringDebug.thesis_lift.lift_amount}`)
+        }
       }
     } else {
       // Use standard v2 scoring
@@ -1624,24 +1628,27 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
     // Build v3 debug object with full diagnostic info
     let debugInfo = null
-    if (evalArchitecture === 'v3' && evalContext) {
-      // Build rule injection summary from evalContext
+    console.log(`[v3 debug] Building debug info: arch=${evalArchitecture}, evalContext=${evalContext ? 'YES' : 'NO'}, v3ScoringDebug=${v3ScoringDebug ? 'YES' : 'NO'}`)
+
+    if (evalArchitecture === 'v3') {
+      // Build debug even if evalContext is partially missing
+      // Build rule injection summary from evalContext (using optional chaining for safety)
       const ruleInjectionSummary = {
-        rule_pack_key: evalContext.rulePack?.packKey || null,
-        rule_pack_version: evalContext.rulePack?.versionKey || null,
-        all_rules_loaded_count: evalContext.rulePack?.originalRuleCount || evalContext.rulePack?.ruleCount || 0,
-        injected_rules_count: evalContext.rulePack?.ruleCount || 0,
-        rule_keys: evalContext.rulePack?.ruleKeys || [],
-        rule_type_counts: evalContext.rulePack?.ruleTypeCounts || {},
-        category_counts: evalContext.rulePack?.categoryCounts || {},
+        rule_pack_key: evalContext?.rulePack?.packKey || null,
+        rule_pack_version: evalContext?.rulePack?.versionKey || null,
+        all_rules_loaded_count: evalContext?.rulePack?.originalRuleCount || evalContext?.rulePack?.ruleCount || 0,
+        injected_rules_count: evalContext?.rulePack?.ruleCount || 0,
+        rule_keys: evalContext?.rulePack?.ruleKeys || [],
+        rule_type_counts: evalContext?.rulePack?.ruleTypeCounts || {},
+        category_counts: evalContext?.rulePack?.categoryCounts || {},
       }
 
       // Include deck context classification if filtering was applied
-      const deckContextDebug = evalContext.deckContext || null
+      const deckContextDebug = evalContext?.deckContext || null
 
       // Build prompt info
-      const slidePrompt = getPromptByType(evalContext.promptVersions || [], 'slide_analysis')
-      const deckPrompt = getPromptByType(evalContext.promptVersions || [], 'deck_analysis')
+      const slidePrompt = getPromptByType(evalContext?.promptVersions || [], 'slide_analysis')
+      const deckPrompt = getPromptByType(evalContext?.promptVersions || [], 'deck_analysis')
 
       const promptInfo = {
         slide_analysis: slidePrompt ? {
@@ -1708,6 +1715,13 @@ async function generateFullReport(supabase, deckId, options = {}) {
     // Add debug info for v3 reports
     if (debugInfo) {
       reportContent.debug = debugInfo
+      console.log(`[v3 debug] Debug info attached to report content`)
+      console.log(`[v3 debug] Scoring included: ${debugInfo.scoring ? 'YES' : 'NO'}`)
+      if (debugInfo.scoring) {
+        console.log(`[v3 debug] Scoring keys: ${Object.keys(debugInfo.scoring).join(', ')}`)
+      }
+    } else {
+      console.log(`[v3 debug] No debug info to attach (debugInfo is null/undefined)`)
     }
 
     // Update report row

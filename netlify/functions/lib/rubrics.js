@@ -298,10 +298,15 @@ function computeDeckScore(slideEvaluations) {
  * @returns {Object} - deckScore, overallGrade, debug info
  */
 function computeDeckScoreV3(slideEvaluations, investmentThesis, options = {}) {
+  console.log('[v3 scoring] ========================================')
+  console.log('[v3 scoring] computeDeckScoreV3 CALLED')
+  console.log('[v3 scoring] ========================================')
+
   const { isSeedConsumerNetwork = false } = options
 
   // Select appropriate slide weights
   const slideWeights = isSeedConsumerNetwork ? V3_SEED_CONSUMER_WEIGHTS : SLIDE_WEIGHTS
+  console.log(`[v3 scoring] Weight profile: ${isSeedConsumerNetwork ? 'seed_consumer_network' : 'standard'}`)
 
   // ===== Calculate slide score component =====
   let totalSlideWeightedScore = 0
@@ -412,6 +417,14 @@ function computeDeckScoreV3(slideEvaluations, investmentThesis, options = {}) {
     final_grade: overallGrade,
     formula: `(slide_component × ${V3_BLEND_WEIGHTS.slides}) + (thesis_component × ${V3_BLEND_WEIGHTS.thesis}) + thesis_lift`,
   }
+
+  console.log('[v3 scoring] ----------------------------------------')
+  console.log(`[v3 scoring] Slide component: ${slideComponent.toFixed(2)}`)
+  console.log(`[v3 scoring] Thesis component: ${thesisComponent.toFixed(2)}`)
+  console.log(`[v3 scoring] Blended score: ${blendedScore.toFixed(2)}`)
+  console.log(`[v3 scoring] Thesis lift: ${thesisLift.toFixed(2)} (applied=${thesisLiftApplied})`)
+  console.log(`[v3 scoring] FINAL SCORE: ${finalScore.toFixed(2)} -> Grade ${overallGrade}`)
+  console.log('[v3 scoring] ========================================')
 
   return {
     deckScore: Math.round(finalScore * 100) / 100,
