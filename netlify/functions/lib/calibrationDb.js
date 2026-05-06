@@ -151,6 +151,32 @@ async function upsertCalibrationDeck(deck) {
   }
 }
 
+/**
+ * Delete a calibration deck from DB.
+ */
+async function deleteCalibrationDeck(deckId) {
+  try {
+    const supabase = getSupabaseClient()
+
+    const { error } = await supabase
+      .from('calibration_decks')
+      .delete()
+      .eq('id', deckId)
+
+    if (error) {
+      console.error('[calibration-db] Failed to delete deck:', error.message)
+      return false
+    }
+
+    console.log(`[calibration-db] Deleted calibration deck: ${deckId}`)
+    return true
+
+  } catch (err) {
+    console.error('[calibration-db] DB unavailable for delete:', err.message)
+    return false
+  }
+}
+
 // =============================================================================
 // CALIBRATION RUNS
 // =============================================================================
@@ -529,6 +555,7 @@ module.exports = {
   getLocalCalibrationDecks,
   getCalibrationDeck,
   upsertCalibrationDeck,
+  deleteCalibrationDeck,
 
   // Runs
   createCalibrationRun,

@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef, useMemo } from 'react'
 
 type Status = 'idle' | 'uploading' | 'processing' | 'success' | 'error' | 'timeout'
-type AdminView = 'upload' | 'reports'
+type AdminView = 'upload' | 'reports' | 'calibration'
 
 interface UploadResult {
   deck_id: string
@@ -172,14 +172,75 @@ interface ReportListItem {
   access_token: string | null
 }
 
+interface CalibrationDeck {
+  id: string
+  company: string
+  archetype: string
+  era: string | null
+  stage: string
+  year: number | null
+  deck_file: string | null
+  expected_grade_range: string[] | null
+  strengths: string[]
+  known_weaknesses: string[]
+  must_not_happen: string[]
+  notes: string | null
+  active: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+interface CalibrationFormData {
+  id: string
+  company: string
+  archetype: string
+  stage: string
+  era: string
+  year: number
+  expected_grade_min: string
+  expected_grade_max: string
+  strengths: string
+  known_weaknesses: string
+  must_not_happen: string
+  notes: string
+  active: boolean
+}
+
+const ARCHETYPES = [
+  { value: 'consumer_network', label: 'Consumer Network' },
+  { value: 'marketplace', label: 'Marketplace' },
+  { value: 'local_marketplace', label: 'Local Marketplace' },
+  { value: 'saas', label: 'SaaS' },
+  { value: 'developer_tools', label: 'Developer Tools' },
+  { value: 'infrastructure', label: 'Infrastructure' },
+  { value: 'ai_application', label: 'AI Application' },
+  { value: 'fintech', label: 'Fintech' },
+  { value: 'healthcare', label: 'Healthcare' },
+  { value: 'biotech', label: 'Biotech' },
+  { value: 'hardtech', label: 'Hardtech' },
+  { value: 'enterprise_ai', label: 'Enterprise AI' },
+  { value: 'consumer_ai', label: 'Consumer AI' },
+]
+
+const STAGES = [
+  { value: 'pre_seed', label: 'Pre-Seed' },
+  { value: 'seed', label: 'Seed' },
+  { value: 'series_a', label: 'Series A' },
+  { value: 'series_b', label: 'Series B' },
+]
+
+const ERAS = [
+  { value: 'sparse_classic', label: 'Sparse Classic (pre-2015)' },
+  { value: 'modern', label: 'Modern (2015+)' },
+]
+
+const GRADES = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'E']
+
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 const SESSION_KEY = 'pdc_authenticated'
 const SESSION_PASSWORD_KEY = 'pdc_admin_pw'
-const EVAL_ARCH_KEY = 'evaluation_architecture'
 const POLL_INTERVAL_MS = 2000
 const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
-
-type EvalArchitecture = 'v2' | 'v3'
 
 export default function App() {
   // Check for admin mode via URL param (user must already be authenticated)
@@ -193,16 +254,28 @@ export default function App() {
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsError, setReportsError] = useState('')
 
-  // Dev-only: Evaluation architecture toggle (v2/v3)
-  const [evalArch, setEvalArch] = useState<EvalArchitecture>(() => {
-    const stored = localStorage.getItem(EVAL_ARCH_KEY)
-    return stored === 'v3' ? 'v3' : 'v2'
+  // Calibration deck form state
+  const [calibrationDecks, setCalibrationDecks] = useState<CalibrationDeck[]>([])
+  const [calibrationLoading, setCalibrationLoading] = useState(false)
+  const [calibrationError, setCalibrationError] = useState('')
+  const [showCalibrationForm, setShowCalibrationForm] = useState(false)
+  const [editingDeck, setEditingDeck] = useState<CalibrationDeck | null>(null)
+  const [calibrationFormData, setCalibrationFormData] = useState<CalibrationFormData>({
+    id: '',
+    company: '',
+    archetype: 'saas',
+    stage: 'seed',
+    era: 'modern',
+    year: new Date().getFullYear(),
+    expected_grade_min: 'C',
+    expected_grade_max: 'B',
+    strengths: '',
+    known_weaknesses: '',
+    must_not_happen: '',
+    notes: '',
+    active: true,
   })
-
-  const handleEvalArchToggle = (arch: EvalArchitecture) => {
-    setEvalArch(arch)
-    localStorage.setItem(EVAL_ARCH_KEY, arch)
-  }
+  const [calibrationSaving, setCalibrationSaving] = useState(false)
 
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState('')
@@ -579,7 +652,7 @@ export default function App() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-evaluation-architecture': evalArch,
+        'x-evaluation-architecture': 'v3',
       },
       body: JSON.stringify({
         deck_id: deckId,
@@ -622,10 +695,163 @@ export default function App() {
     }
   }
 
+  const fetchCalibrationDecks = async () => {
+    setCalibrationLoading(true)
+    setCalibrationError('')
+
+    try {
+      const response = await fetch('/.netlify/functions/get-calibration-decks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.ok) {
+        setCalibrationDecks(data.decks || [])
+      } else {
+        setCalibrationError(data.error || 'Failed to fetch calibration decks')
+      }
+    } catch (err) {
+      console.error('Fetch calibration decks error:', err)
+      setCalibrationError('Failed to fetch calibration decks')
+    } finally {
+      setCalibrationLoading(false)
+    }
+  }
+
+  const resetCalibrationForm = () => {
+    setCalibrationFormData({
+      id: '',
+      company: '',
+      archetype: 'saas',
+      stage: 'seed',
+      era: 'modern',
+      year: new Date().getFullYear(),
+      expected_grade_min: 'C',
+      expected_grade_max: 'B',
+      strengths: '',
+      known_weaknesses: '',
+      must_not_happen: '',
+      notes: '',
+      active: true,
+    })
+    setEditingDeck(null)
+    setShowCalibrationForm(false)
+  }
+
+  const handleEditCalibrationDeck = (deck: CalibrationDeck) => {
+    setEditingDeck(deck)
+    setCalibrationFormData({
+      id: deck.id,
+      company: deck.company,
+      archetype: deck.archetype,
+      stage: deck.stage,
+      era: deck.era || 'modern',
+      year: deck.year || new Date().getFullYear(),
+      expected_grade_min: deck.expected_grade_range?.[0] || 'C',
+      expected_grade_max: deck.expected_grade_range?.[1] || 'B',
+      strengths: deck.strengths.join('\n'),
+      known_weaknesses: deck.known_weaknesses.join('\n'),
+      must_not_happen: deck.must_not_happen.join('\n'),
+      notes: deck.notes || '',
+      active: deck.active,
+    })
+    setShowCalibrationForm(true)
+  }
+
+  const handleSaveCalibrationDeck = async (e: FormEvent) => {
+    e.preventDefault()
+    setCalibrationSaving(true)
+    setCalibrationError('')
+
+    try {
+      // Generate ID from company name if new
+      const id = calibrationFormData.id ||
+        calibrationFormData.company.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_' + calibrationFormData.archetype
+
+      const payload = {
+        admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
+        deck: {
+          id,
+          company: calibrationFormData.company,
+          archetype: calibrationFormData.archetype,
+          stage: calibrationFormData.stage,
+          era: calibrationFormData.era,
+          year: calibrationFormData.year,
+          expected_grade_range: [calibrationFormData.expected_grade_min, calibrationFormData.expected_grade_max],
+          strengths: calibrationFormData.strengths.split('\n').map(s => s.trim()).filter(Boolean),
+          known_weaknesses: calibrationFormData.known_weaknesses.split('\n').map(s => s.trim()).filter(Boolean),
+          must_not_happen: calibrationFormData.must_not_happen.split('\n').map(s => s.trim()).filter(Boolean),
+          notes: calibrationFormData.notes || null,
+          active: calibrationFormData.active,
+        },
+      }
+
+      const response = await fetch('/.netlify/functions/upsert-calibration-deck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.ok) {
+        resetCalibrationForm()
+        fetchCalibrationDecks()
+      } else {
+        setCalibrationError(data.error || 'Failed to save calibration deck')
+      }
+    } catch (err) {
+      console.error('Save calibration deck error:', err)
+      setCalibrationError('Failed to save calibration deck')
+    } finally {
+      setCalibrationSaving(false)
+    }
+  }
+
+  const handleDeleteCalibrationDeck = async (deckId: string) => {
+    if (!confirm(`Delete calibration deck "${deckId}"? This cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const response = await fetch('/.netlify/functions/delete-calibration-deck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_password: sessionStorage.getItem(SESSION_PASSWORD_KEY) || '',
+          deck_id: deckId,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.ok) {
+        fetchCalibrationDecks()
+      } else {
+        setCalibrationError(data.error || 'Failed to delete calibration deck')
+      }
+    } catch (err) {
+      console.error('Delete calibration deck error:', err)
+      setCalibrationError('Failed to delete calibration deck')
+    }
+  }
+
   // Fetch reports list when admin view is 'reports' and user is authenticated
   useEffect(() => {
     if (isAuthenticated && isAdmin && adminView === 'reports') {
       fetchReportsList()
+    }
+  }, [isAuthenticated, isAdmin, adminView])
+
+  // Fetch calibration decks when admin view is 'calibration' and user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && isAdmin && adminView === 'calibration') {
+      fetchCalibrationDecks()
     }
   }, [isAuthenticated, isAdmin, adminView])
 
@@ -886,49 +1112,24 @@ export default function App() {
               >
                 Reports
               </button>
-            </div>
-            {/* Dev toggle: Evaluation architecture v2/v3 */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                fontSize: '12px',
-                fontFamily,
-              }}
-            >
-              <span style={{ color: '#9ca3af' }}>Eval:</span>
               <button
-                onClick={() => handleEvalArchToggle('v2')}
+                onClick={() => {
+                  setAdminView('calibration')
+                  fetchCalibrationDecks()
+                }}
                 style={{
-                  background: evalArch === 'v2' ? '#e5e7eb' : 'none',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '3px',
-                  padding: '2px 6px',
-                  fontSize: '11px',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: '14px',
+                  fontWeight: 500,
                   fontFamily,
-                  color: evalArch === 'v2' ? '#111827' : '#6b7280',
+                  color: adminView === 'calibration' ? '#2563eb' : '#6b7280',
                   cursor: 'pointer',
-                  fontWeight: evalArch === 'v2' ? 600 : 400,
+                  textDecoration: adminView === 'calibration' ? 'underline' : 'none',
                 }}
               >
-                v2
-              </button>
-              <button
-                onClick={() => handleEvalArchToggle('v3')}
-                style={{
-                  background: evalArch === 'v3' ? '#dbeafe' : 'none',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '3px',
-                  padding: '2px 6px',
-                  fontSize: '11px',
-                  fontFamily,
-                  color: evalArch === 'v3' ? '#1d4ed8' : '#6b7280',
-                  cursor: 'pointer',
-                  fontWeight: evalArch === 'v3' ? 600 : 400,
-                }}
-              >
-                v3
+                Calibration
               </button>
             </div>
           </div>
@@ -2233,6 +2434,472 @@ export default function App() {
                                 ? 'Deleting...'
                                 : 'Delete'}
                             </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Calibration View - Admin only */}
+          {isAdmin && adminView === 'calibration' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2
+                  style={{
+                    fontSize: '20px',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: 0,
+                  }}
+                >
+                  Calibration Decks
+                </h2>
+                <button
+                  onClick={() => {
+                    resetCalibrationForm()
+                    setShowCalibrationForm(true)
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    fontFamily,
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  + Add Deck
+                </button>
+              </div>
+
+              {calibrationError && (
+                <div
+                  style={{
+                    padding: '12px 16px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: '14px', color: '#dc2626' }}>
+                    {calibrationError}
+                  </p>
+                </div>
+              )}
+
+              {/* Add/Edit Form */}
+              {showCalibrationForm && (
+                <div
+                  style={{
+                    padding: '20px',
+                    backgroundColor: '#f9fafb',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                  }}
+                >
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#111827', margin: '0 0 16px 0' }}>
+                    {editingDeck ? `Edit: ${editingDeck.company}` : 'Add Calibration Deck'}
+                  </h3>
+                  <form onSubmit={handleSaveCalibrationDeck}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                          Company Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={calibrationFormData.company}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => setCalibrationFormData({ ...calibrationFormData, company: e.target.value })}
+                          required
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            fontSize: '14px',
+                            fontFamily,
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                          Archetype *
+                        </label>
+                        <select
+                          value={calibrationFormData.archetype}
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setCalibrationFormData({ ...calibrationFormData, archetype: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            fontSize: '14px',
+                            fontFamily,
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {ARCHETYPES.map((a) => (
+                            <option key={a.value} value={a.value}>{a.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                          Stage
+                        </label>
+                        <select
+                          value={calibrationFormData.stage}
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setCalibrationFormData({ ...calibrationFormData, stage: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            fontSize: '14px',
+                            fontFamily,
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {STAGES.map((s) => (
+                            <option key={s.value} value={s.value}>{s.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                          Era
+                        </label>
+                        <select
+                          value={calibrationFormData.era}
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setCalibrationFormData({ ...calibrationFormData, era: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            fontSize: '14px',
+                            fontFamily,
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {ERAS.map((e) => (
+                            <option key={e.value} value={e.value}>{e.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                          Year
+                        </label>
+                        <input
+                          type="number"
+                          value={calibrationFormData.year}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => setCalibrationFormData({ ...calibrationFormData, year: parseInt(e.target.value) || 2024 })}
+                          min={1990}
+                          max={2030}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            fontSize: '14px',
+                            fontFamily,
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '4px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#374151', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={calibrationFormData.active}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setCalibrationFormData({ ...calibrationFormData, active: e.target.checked })}
+                          />
+                          Active
+                        </label>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                          Expected Grade Min
+                        </label>
+                        <select
+                          value={calibrationFormData.expected_grade_min}
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setCalibrationFormData({ ...calibrationFormData, expected_grade_min: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            fontSize: '14px',
+                            fontFamily,
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {GRADES.map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                          Expected Grade Max
+                        </label>
+                        <select
+                          value={calibrationFormData.expected_grade_max}
+                          onChange={(e: ChangeEvent<HTMLSelectElement>) => setCalibrationFormData({ ...calibrationFormData, expected_grade_max: e.target.value })}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            fontSize: '14px',
+                            fontFamily,
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          {GRADES.map((g) => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                        Strengths (one per line)
+                      </label>
+                      <textarea
+                        value={calibrationFormData.strengths}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCalibrationFormData({ ...calibrationFormData, strengths: e.target.value })}
+                        placeholder="e.g., Clear viral growth mechanism&#10;Strong team background in video/media"
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          fontSize: '14px',
+                          fontFamily,
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                        Known Weaknesses (one per line)
+                      </label>
+                      <textarea
+                        value={calibrationFormData.known_weaknesses}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCalibrationFormData({ ...calibrationFormData, known_weaknesses: e.target.value })}
+                        placeholder="e.g., Missing detailed revenue model&#10;Competition slide is sparse"
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          fontSize: '14px',
+                          fontFamily,
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                        Must Not Happen (one per line)
+                      </label>
+                      <textarea
+                        value={calibrationFormData.must_not_happen}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCalibrationFormData({ ...calibrationFormData, must_not_happen: e.target.value })}
+                        placeholder="e.g., Grade below C&#10;Missing mention of viral coefficient"
+                        rows={2}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          fontSize: '14px',
+                          fontFamily,
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>
+                        Notes
+                      </label>
+                      <textarea
+                        value={calibrationFormData.notes}
+                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCalibrationFormData({ ...calibrationFormData, notes: e.target.value })}
+                        placeholder="Any additional notes..."
+                        rows={2}
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          fontSize: '14px',
+                          fontFamily,
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="submit"
+                        disabled={calibrationSaving}
+                        style={{
+                          padding: '8px 16px',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          fontFamily,
+                          backgroundColor: calibrationSaving ? '#9ca3af' : '#2563eb',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: calibrationSaving ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        {calibrationSaving ? 'Saving...' : (editingDeck ? 'Update Deck' : 'Add Deck')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetCalibrationForm}
+                        style={{
+                          padding: '8px 16px',
+                          fontSize: '14px',
+                          fontWeight: 500,
+                          fontFamily,
+                          backgroundColor: '#ffffff',
+                          color: '#374151',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Deck List */}
+              {calibrationLoading && (
+                <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading calibration decks...</p>
+              )}
+
+              {!calibrationLoading && calibrationDecks.length === 0 && !calibrationError && (
+                <p style={{ color: '#6b7280', fontSize: '14px' }}>No calibration decks found. Add one to get started.</p>
+              )}
+
+              {calibrationDecks.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {calibrationDecks.map((deck) => (
+                    <div
+                      key={deck.id}
+                      style={{
+                        padding: '12px 16px',
+                        backgroundColor: deck.active ? '#ffffff' : '#f9fafb',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        opacity: deck.active ? 1 : 0.7,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 500, color: '#111827' }}>
+                              {deck.company}
+                            </span>
+                            {!deck.active && (
+                              <span style={{ fontSize: '11px', padding: '1px 6px', backgroundColor: '#f3f4f6', borderRadius: '3px', color: '#6b7280' }}>
+                                Inactive
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#6b7280', flexWrap: 'wrap' }}>
+                            <span>{ARCHETYPES.find(a => a.value === deck.archetype)?.label || deck.archetype}</span>
+                            <span>{STAGES.find(s => s.value === deck.stage)?.label || deck.stage}</span>
+                            {deck.year && <span>{deck.year}</span>}
+                            {deck.expected_grade_range && (
+                              <span style={{ color: '#2563eb' }}>
+                                Expected: {deck.expected_grade_range[0]}–{deck.expected_grade_range[1]}
+                              </span>
+                            )}
+                          </div>
+                          {(deck.strengths.length > 0 || deck.known_weaknesses.length > 0) && (
+                            <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                              {deck.strengths.length > 0 && (
+                                <div>Strengths: {deck.strengths.length} items</div>
+                              )}
+                              {deck.known_weaknesses.length > 0 && (
+                                <div>Weaknesses: {deck.known_weaknesses.length} items</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={() => handleEditCalibrationDeck(deck)}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '12px',
+                              fontFamily,
+                              backgroundColor: '#ffffff',
+                              color: '#374151',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCalibrationDeck(deck.id)}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '12px',
+                              fontFamily,
+                              backgroundColor: '#ffffff',
+                              color: '#dc2626',
+                              border: '1px solid #fecaca',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Delete
                           </button>
                         </div>
                       </div>
