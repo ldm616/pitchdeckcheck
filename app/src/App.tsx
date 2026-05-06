@@ -243,6 +243,7 @@ export default function App() {
     }
   }, [])
 
+
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
@@ -618,6 +619,13 @@ export default function App() {
       setReportsLoading(false)
     }
   }
+
+  // Fetch reports list when admin view is 'reports' and user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && isAdmin && adminView === 'reports') {
+      fetchReportsList()
+    }
+  }, [isAuthenticated, isAdmin, adminView])
 
   const handleViewReport = async (item: ReportListItem) => {
     if (!item.access_token) {
