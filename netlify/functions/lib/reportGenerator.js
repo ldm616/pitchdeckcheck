@@ -1549,19 +1549,51 @@ async function generateFullReport(supabase, deckId, options = {}) {
     let signalOverrideDebug = null
     let finalSlideEvaluations = slideEvaluations
 
+    console.log(`[SIGNAL-OVERRIDE-INTEGRATION] evalArchitecture="${evalArchitecture}"`)
+
     // ALWAYS run signal override for v3 - force isSeedConsumerNetwork=true for now
     // to ensure fix suppression works while we verify the system
     if (evalArchitecture === 'v3') {
-      // For v3, always treat as seed consumer/network to enable fix suppression
-      // This ensures CAC/LTV/retention/moat recommendations are suppressed
-      const isSeedConsumerNetwork = true // Force enabled for v3
+      console.log('[SIGNAL-OVERRIDE-INTEGRATION] Entering v3 signal override block')
 
-      const overrideResult = applySignalOverride(slides, slideEvaluations, {
-        isSeedConsumerNetwork,
-      })
+      try {
+        // For v3, always treat as seed consumer/network to enable fix suppression
+        // This ensures CAC/LTV/retention/moat recommendations are suppressed
+        const isSeedConsumerNetwork = true // Force enabled for v3
 
-      finalSlideEvaluations = overrideResult.adjustedEvaluations
-      signalOverrideDebug = overrideResult.debug
+        console.log(`[SIGNAL-OVERRIDE-INTEGRATION] Calling applySignalOverride with ${slides.length} slides`)
+
+        const overrideResult = applySignalOverride(slides, slideEvaluations, {
+          isSeedConsumerNetwork,
+        })
+
+        console.log(`[SIGNAL-OVERRIDE-INTEGRATION] applySignalOverride returned:`)
+        console.log(`[SIGNAL-OVERRIDE-INTEGRATION]   adjustedEvaluations: ${overrideResult.adjustedEvaluations?.length || 'undefined'}`)
+        console.log(`[SIGNAL-OVERRIDE-INTEGRATION]   debug: ${overrideResult.debug ? 'PRESENT' : 'MISSING'}`)
+        console.log(`[SIGNAL-OVERRIDE-INTEGRATION]   totalLifted: ${overrideResult.totalLifted}`)
+        console.log(`[SIGNAL-OVERRIDE-INTEGRATION]   totalSuppressedFixes: ${overrideResult.totalSuppressedFixes}`)
+
+        if (overrideResult.debug) {
+          console.log(`[SIGNAL-OVERRIDE-INTEGRATION]   debug.status: ${overrideResult.debug.status}`)
+          console.log(`[SIGNAL-OVERRIDE-INTEGRATION]   debug.signal_override_executed: ${overrideResult.debug.signal_override_executed}`)
+        }
+
+        finalSlideEvaluations = overrideResult.adjustedEvaluations
+        signalOverrideDebug = overrideResult.debug
+
+        console.log(`[SIGNAL-OVERRIDE-INTEGRATION] signalOverrideDebug set: ${signalOverrideDebug ? 'YES' : 'NO'}`)
+      } catch (err) {
+        console.error('[SIGNAL-OVERRIDE-INTEGRATION] ERROR in signal override:', err)
+        console.error('[SIGNAL-OVERRIDE-INTEGRATION] Stack:', err.stack)
+        // Continue with original evaluations if signal override fails
+        signalOverrideDebug = {
+          error: true,
+          error_message: err.message,
+          error_stack: err.stack,
+        }
+      }
+    } else {
+      console.log('[SIGNAL-OVERRIDE-INTEGRATION] Skipping signal override (not v3)')
     }
     // ===== End V3 Signal Override Layer =====
 
@@ -1697,6 +1729,10 @@ async function generateFullReport(supabase, deckId, options = {}) {
         },
       }
 
+      console.log(`[DEBUG-BUILD] Building debugInfo object`)
+      console.log(`[DEBUG-BUILD] signalOverrideDebug is: ${signalOverrideDebug ? 'PRESENT' : 'NULL'}`)
+      console.log(`[DEBUG-BUILD] v3ScoringDebug is: ${v3ScoringDebug ? 'PRESENT' : 'NULL'}`)
+
       debugInfo = {
         generated_at: new Date().toISOString(),
         architecture: architectureMetadata,
@@ -1708,6 +1744,9 @@ async function generateFullReport(supabase, deckId, options = {}) {
         slide_evaluations: slideDebugInfo,
         thesis_evaluation: thesisDebugInfo,
       }
+
+      console.log(`[DEBUG-BUILD] debugInfo keys: ${Object.keys(debugInfo).join(', ')}`)
+      console.log(`[DEBUG-BUILD] debugInfo.signal_override is: ${debugInfo.signal_override ? 'PRESENT' : 'NULL'}`)
 
       // Log signal override summary
       if (signalOverrideDebug) {
