@@ -8,123 +8,183 @@
  * solely due to missing modern startup metrics.
  *
  * Evaluates investor signal quality, not compliance with modern deck conventions.
+ *
+ * IMPORTANT: This system is universal - it works across all deck types:
+ * SaaS, marketplace, consumer, infrastructure, healthcare, fintech, AI, B2B, etc.
  */
 
-// Module load confirmation
-console.log('[signal-override] ****************************************************')
-console.log('[signal-override] SIGNAL OVERRIDE MODULE LOADED')
-console.log('[signal-override] ****************************************************')
+console.log('[signal-override] SIGNAL OVERRIDE MODULE LOADED (v2 - improved detection)')
 
-// Signal patterns to detect in slide text
+// =============================================================================
+// SIGNAL PATTERNS - Broad semantic detection across all deck types
+// =============================================================================
+
 const SIGNAL_PATTERNS = {
-  // Strong behavioral insight - understanding of user behavior/psychology
-  behavioral_insight: [
-    /users? (want|need|crave|desire|love|hate|struggle|spend|waste)/i,
-    /behavior(al)? (shift|change|pattern)/i,
-    /people (are|have been|started) (watching|sharing|uploading|creating)/i,
-    /consumption (pattern|habit|behavior)/i,
-    /user (habit|addiction|engagement|retention)/i,
-    /(viral|organic) (growth|spread|adoption)/i,
-    /word[- ]of[- ]mouth/i,
-    /users? (tell|invite|share with) (friends|others)/i,
-  ],
-
-  // Strong timing insight - why now is the right moment
-  timing_insight: [
-    /now (is|becoming|possible|feasible)/i,
-    /(first time|finally|just became) (possible|feasible|affordable)/i,
-    /cost (of|for).*(dropped|decreased|fell|declining)/i,
-    /broadband (penetration|adoption|availability)/i,
-    /infrastructure (ready|available|mature|widespread)/i,
-    /(smartphone|mobile|internet) (adoption|penetration|ubiquity)/i,
-    /tipping point/i,
-    /inflection point/i,
-    /window (of opportunity|closing)/i,
-    /(technology|platform) (shift|change|transition)/i,
-  ],
-
-  // Infrastructure shift - new enabling technology/platform
-  infrastructure_shift: [
-    /broadband/i,
-    /smartphone/i,
-    /cloud (computing|infrastructure)/i,
-    /api[s]? (enable|allow|make possible)/i,
-    /platform (shift|change|emergence)/i,
-    /(new|emerging) (infrastructure|platform|technology)/i,
-    /flash (video|player|adoption)/i,
-    /streaming (technology|capability)/i,
-    /bandwidth (increase|improvement|availability)/i,
-    /processing (power|capability) (increase|improvement)/i,
-  ],
-
-  // Clear consumer pain - obvious user problem
+  // Consumer/user pain - problem language showing friction, inconvenience, broken workflow
   consumer_pain: [
-    /(frustrat|annoy|hate|difficult|hard|painful|tedious|slow|expensive)/i,
-    /problem (is|with|for)/i,
-    /pain (point|of)/i,
-    /waste (time|money|effort)/i,
-    /(no|lack of) (good|easy|simple) (way|option|solution)/i,
-    /current (solution|option|alternative)s? (are|is) (bad|poor|inadequate)/i,
-    /users? (struggle|have trouble|can't easily)/i,
+    // Direct pain language
+    /\b(frustrat|annoy|hate|difficult|hard|painful|tedious|slow|expensive|broken|manual|clunky)\w*/i,
+    /\b(problem|issue|challenge|gap|limitation|barrier|obstacle|bottleneck|friction)\b/i,
+    /\b(pain point|headache|nightmare|hassle|struggle)\b/i,
+    // Negative state
+    /\b(too large|too big|too slow|too expensive|too hard|too complex|too fragmented)\b/i,
+    /\b(can't|cannot|unable to|no way to|impossible to|hard to)\b/i,
+    /\b(waste|wasted|wasting) (time|money|effort|resources)\b/i,
+    /\b(lack of|missing|no|without) (standard|solution|option|alternative|tool)\b/i,
+    // Existing behavior failure
+    /\b(exist|current|today|traditional)\w* .{0,20}(fail|broken|inadequate|poor|bad|limited)\b/i,
+    /\b(isolated|fragmented|disconnected|siloed|scattered)\b/i,
+    // File/data problems (common in tech)
+    /\bfiles? (are |is )?(too |very )?(large|big|heavy|unwieldy)\b/i,
+    /\b(no |lack of |missing )standardization\b/i,
   ],
 
-  // Network effect potential - platform/marketplace dynamics
-  network_effect: [
-    /network effect/i,
-    /more users?.*(more|better) (content|value|utility)/i,
-    /more (content|creators|sellers).*(more|attract) (users|buyers|viewers)/i,
-    /flywheel/i,
-    /virtuous (cycle|circle)/i,
-    /marketplace (dynamics|effect)/i,
-    /two[- ]sided (market|platform|network)/i,
-    /platform (effect|dynamics)/i,
-    /user[- ]generated (content|value)/i,
-    /community[- ]driven/i,
-  ],
-
-  // Product simplicity - clear, focused value prop
+  // Product simplicity - clear action verbs and ease language
   product_simplicity: [
-    /simple|easy|one[- ]click|instant|free/i,
-    /just (upload|share|watch|click|sign up)/i,
-    /anyone can/i,
-    /no (download|install|software|cost) (required|needed)/i,
-    /(upload|share|watch|create) (anything|videos?|content)/i,
-    /frictionless/i,
-    /intuitive/i,
-    /self[- ]explanatory/i,
+    // Simple action verbs
+    /\b(upload|download|share|browse|watch|create|connect|automate|simplify|manage|search|discover|match|generate|analyze|track|monitor|sync|integrate|route|replace)\b/i,
+    // Ease language
+    /\b(simple|easy|instant|fast|quick|automatic|seamless|one[- ]?click|frictionless|intuitive|self[- ]?service)\b/i,
+    /\b(anyone can|just|simply|automatically|instantly)\b/i,
+    /\b(no .{0,15}(required|needed|necessary))\b/i,
+    /\b(free to|easy to|simple to)\b/i,
+    // Takes care of / handles
+    /\b(takes? care of|handles?|manages?|automates?) .{0,30}(for|automatically)\b/i,
+    // Platform value prop
+    /\b(platform|service|tool|app|solution) (that |which )?(lets?|allows?|enables?|helps?)\b/i,
+    // Conversion/transformation
+    /\b(converts?|transforms?|turns?) .{0,20}(into|to)\b/i,
   ],
 
-  // Founder-market fit signals
+  // Network effect / community / marketplace dynamics
+  network_effect: [
+    // Direct network language
+    /\bnetwork effect\b/i,
+    /\b(flywheel|virtuous cycle|virtuous circle)\b/i,
+    /\b(two[- ]?sided|multi[- ]?sided) (market|platform|network)\b/i,
+    // User-to-user dynamics
+    /\b(user[- ]?to[- ]?user|peer[- ]?to[- ]?peer|p2p|creator|audience|buyer|seller|supply|demand)\b/i,
+    /\b(connects?) .{0,20}(users?|people|buyers?|sellers?|creators?|viewers?)\b/i,
+    /\bconnects? .{0,15}to .{0,15}(users?|videos?|content|products?)\b/i,
+    // Community language
+    /\b(community|social|sharing|collaboration|collaborative|referral|invite|viral)\b/i,
+    /\b(user[- ]?generated|crowd[- ]?sourced|community[- ]?driven)\b/i,
+    // Marketplace language
+    /\b(marketplace|platform|ecosystem|hub|network)\b/i,
+    // Distribution dynamics
+    /\b(share|sharing|shared|shares) .{0,20}(with|to|among)\b/i,
+    /\b(spread|spreading|viral|organic)\b/i,
+  ],
+
+  // Founder-market fit - credibility, expertise, relevant background
   founder_market_fit: [
-    /founder[s]? (from|worked at|built|created|led)/i,
-    /years? (of|in) (experience|industry|domain)/i,
-    /previously (built|founded|led|created)/i,
-    /domain expert/i,
-    /insider (knowledge|experience|access)/i,
-    /(paypal|google|facebook|amazon|apple|microsoft) (alum|veteran|founder)/i,
-    /serial entrepreneur/i,
-    /technical (founder|co-founder|team)/i,
+    // Prior company credibility
+    /\b(paypal|google|facebook|meta|amazon|apple|microsoft|stripe|airbnb|uber|linkedin|twitter|netflix|salesforce|oracle|ibm|mckinsey|bain|bcg|goldman|morgan stanley)\b/i,
+    // Role/expertise language
+    /\b(founder|co[- ]?founder|ceo|cto|cpo|cmo|vp|director|head of|lead|senior|principal|partner)\b/i,
+    /\b(engineer|designer|product|architect|scientist|researcher|analyst|developer)\b/i,
+    // Background indicators
+    /\b(recruited|hired) by\b/i,
+    /\b(first|early|founding) (engineer|employee|designer|hire|team member)\b/i,
+    /\b(built|created|designed|led|managed|scaled|grew) .{0,30}(at|for|while)\b/i,
+    // Education signals
+    /\b(stanford|mit|harvard|yale|princeton|berkeley|carnegie mellon|caltech|oxford|cambridge)\b/i,
+    /\b(phd|doctorate|graduate student|researcher|professor)\b/i,
+    // Domain expertise
+    /\b(years? of|years? in) (experience|industry|domain)\b/i,
+    /\b(domain expert|subject matter expert|industry veteran|serial entrepreneur)\b/i,
+    /\bpreviously (built|founded|led|created|sold|exited)\b/i,
   ],
 
-  // Sparse but sharp communication
-  sparse_sharp: [
-    // Detected by brevity + clarity metrics, not regex
+  // Early pull / traction - evidence of user interest or growth
+  early_pull: [
+    // Launch/live indicators
+    /\b(launched|live|released|shipped|deployed|beta|alpha|pilot)\b/i,
+    // User/customer metrics (even qualitative)
+    /\b(users?|customers?|clients?|subscribers?|members?|accounts?)\b/i,
+    /\b(revenue|sales|bookings|arr|mrr|gmv)\b/i,
+    /\b(downloads?|installs?|signups?|registrations?)\b/i,
+    // Growth language
+    /\b(growth|growing|grew|traction|adoption|uptake|engagement|retention)\b/i,
+    /\b(dominant|leading|overtaken|surpassed|outpaced)\b/i,
+    /\b(million|thousand|100k|\d+k|\d+m)\b/i,
+    // Pipeline/interest indicators
+    /\b(waitlist|pipeline|loi|letter of intent|pilot|trial|poc|proof of concept)\b/i,
+    /\b(partnership|partner|integration|customer|testimonial)\b/i,
+    // Competitive position
+    /\b(market leader|dominant player|#1|number one|fastest growing)\b/i,
   ],
 
-  // Historical pattern recognition (consumer viral growth)
-  viral_growth_pattern: [
-    /viral/i,
-    /exponential (growth|adoption)/i,
-    /hockey[- ]stick/i,
-    /(rapid|explosive|massive) (growth|adoption|spread)/i,
-    /growing (fast|rapidly|exponentially)/i,
-    /doubl(e|ing) (every|each)/i,
-    /million (users|views|downloads)/i,
-    /organic (growth|adoption|spread)/i,
+  // Timing insight - why now is the right moment
+  timing_insight: [
+    // Now language
+    /\b(now|finally|first time|just became|recently|emerging)\b/i,
+    /\b(for the first time)\b/i,
+    // Shift/change language
+    /\b(shift|change|transition|transformation|disruption|inflection|tipping point)\b/i,
+    /\b(reached|reaching|hit|hitting) .{0,15}(critical mass|scale|tipping point|inflection)\b/i,
+    // Cost/capability changes
+    /\b(cost|price|expense) .{0,20}(drop|decline|decrease|fell|falling|cheaper)\b/i,
+    /\b(cheap enough|affordable|accessible|democratized)\b/i,
+    // Enabler language
+    /\b(enables?|enabled|enabling|makes? possible|made possible|unlocks?|unlocked)\b/i,
+    /\b(viable|feasible|practical|possible) .{0,15}(for the first time|now|finally)\b/i,
+    // Regulatory/market timing
+    /\b(regulation|regulatory|compliance|policy) .{0,15}(change|shift|new|recent)\b/i,
+    /\b(pandemic|covid|remote work|ai revolution|ai wave)\b/i,
+  ],
+
+  // Infrastructure shift - enabling technology or platform change
+  infrastructure_shift: [
+    // Technology platforms
+    /\b(broadband|5g|4g|lte|wifi|internet|web|mobile|smartphone|tablet|cloud|saas|api)\b/i,
+    /\b(ai|artificial intelligence|machine learning|ml|deep learning|llm|gpt|neural)\b/i,
+    /\b(blockchain|crypto|web3|defi)\b/i,
+    // Infrastructure language
+    /\b(infrastructure|platform|ecosystem|stack|framework|protocol)\b/i,
+    /\b(scalable|scalability|elastic|serverless|distributed)\b/i,
+    // Encoding/processing
+    /\b(encoding|processing|compute|storage|bandwidth|latency)\b/i,
+    /\b(flash|streaming|video|audio|media|content delivery)\b/i,
+    // Cost curves
+    /\b(mass[- ]?produce|commoditized|standardized|ubiquitous|widespread)\b/i,
+    /\b(penetration|adoption|availability|accessibility)\b/i,
+    // Data/sensors
+    /\b(sensors?|iot|data|analytics|telemetry|real[- ]?time)\b/i,
+  ],
+
+  // Behavioral insight - understanding of user behavior and psychology
+  behavioral_insight: [
+    // User behavior language
+    /\b(users?|people|consumers?|customers?) .{0,20}(want|need|prefer|choose|expect|demand|love|hate)\b/i,
+    /\b(behavior|habit|pattern|workflow|routine|practice)\b/i,
+    /\b(adoption|usage|engagement|interaction|activity)\b/i,
+    // Psychology language
+    /\b(trust|loyalty|satisfaction|delight|frustration|anxiety|fear|excitement)\b/i,
+    /\b(motivation|incentive|reward|gamification|sticky|addictive)\b/i,
+    // Discovery/sharing behavior
+    /\b(discover|share|recommend|refer|invite|spread|tell friends)\b/i,
+    /\b(word[- ]?of[- ]?mouth|organic|viral|social proof)\b/i,
+    // Switching/avoidance
+    /\b(switch|switching|migrate|abandon|leave|avoid|replace)\b/i,
+    // Repeated need
+    /\b(daily|weekly|monthly|regular|frequent|repeated|recurring|habitual)\b/i,
   ],
 }
 
-// Slide types that benefit from signal override (core thesis slides)
+// Slide types that boost specific signal detection
+const SLIDE_TYPE_SIGNAL_BOOST = {
+  problem: ['consumer_pain', 'behavioral_insight'],
+  solution: ['product_simplicity', 'infrastructure_shift'],
+  product: ['product_simplicity', 'network_effect'],
+  market: ['timing_insight', 'infrastructure_shift', 'behavioral_insight'],
+  traction: ['early_pull', 'network_effect'],
+  team: ['founder_market_fit'],
+  competition: ['timing_insight', 'product_simplicity'],
+  business_model: ['network_effect', 'product_simplicity'],
+}
+
+// Slide types eligible for score override
 const SIGNAL_OVERRIDE_ELIGIBLE_SLIDES = [
   'problem',
   'solution',
@@ -132,142 +192,229 @@ const SIGNAL_OVERRIDE_ELIGIBLE_SLIDES = [
   'traction',
   'team',
   'product',
+  'competition',
+  'business_model',
 ]
 
 // Score floors based on signal strength
-// If a slide has strong signals, it cannot score below this floor
 const SIGNAL_SCORE_FLOORS = {
-  exceptional: 4.0, // Multiple strong signals = minimum B+
-  strong: 3.5,      // Clear signal present = minimum B-
-  moderate: 3.0,    // Some signal detected = minimum C+
+  exceptional: 4.0, // 4+ signals = minimum B
+  strong: 3.5,      // 2-3 signals = minimum B-
+  moderate: 3.0,    // 1 signal = minimum C+
 }
 
-// Grade floors (letter grade equivalent)
 const SIGNAL_GRADE_FLOORS = {
   exceptional: 'B',
   strong: 'B',
   moderate: 'C',
 }
 
-// Fixes to suppress for seed consumer/network decks
-// These patterns match recommendations that are inappropriate for early-stage consumer/network companies
-const SUPPRESSED_FIX_PATTERNS = [
-  // CAC/LTV/Unit economics - any mention
-  /\bCAC\b/i,
-  /\bLTV\b/i,
-  /\bcustomer acquisition cost/i,
-  /\blifetime value/i,
-  /\bpayback period/i,
-  /\bunit economics/i,
-  /\bcontribution margin/i,
-  /\bgross margin/i,
-  /\bprofit margin/i,
-  /\bmargin[s]?\b/i,
+// =============================================================================
+// SUPPRESSION PATTERNS AND CONTEXT-SPECIFIC REPLACEMENTS
+// =============================================================================
 
-  // Retention metrics
-  /\bretention\b/i,
-  /\bchurn\b/i,
-  /\bcohort/i,
-  /\bDAU\b/i,
-  /\bMAU\b/i,
-  /\bDAU\/MAU/i,
-  /\bstickiness/i,
+// Categories of fixes to suppress with context-aware replacements
+const SUPPRESSION_CATEGORIES = {
+  unit_economics: {
+    patterns: [
+      /\bCAC\b/i,
+      /\bLTV\b/i,
+      /\bcustomer acquisition cost/i,
+      /\blifetime value/i,
+      /\bpayback period/i,
+      /\bunit economics/i,
+      /\bcontribution margin/i,
+      /\bgross margin/i,
+      /\bprofit margin/i,
+      /\bmargin[s]?\b/i,
+    ],
+    replacement_by_slide_type: {
+      business_model: 'At this stage, clarify which revenue stream is the primary wedge and what milestone would prove monetization potential.',
+      traction: 'At this stage, focus on demonstrating user pull and engagement patterns rather than unit economics.',
+      default: 'For seed-stage companies, demonstrate user traction and engagement before detailed unit economics.',
+    },
+  },
 
-  // Pricing recommendations
-  /\bpricing\b/i,
-  /\bprice point/i,
-  /\bmonetization/i,
-  /\brevenue model/i,
-  /\bARPU\b/i,
-  /\brevenue per user/i,
+  retention_metrics: {
+    patterns: [
+      /\bretention\b/i,
+      /\bchurn\b/i,
+      /\bcohort/i,
+      /\bDAU\b/i,
+      /\bMAU\b/i,
+      /\bDAU\/MAU/i,
+      /\bstickiness/i,
+      /\bengagement (rate|metric)/i,
+    ],
+    replacement_by_slide_type: {
+      traction: 'At this stage, provide the strongest available evidence of user pull, such as usage growth, repeat behavior, or competitor displacement.',
+      product: 'At this stage, show evidence that users return or engage repeatedly, even without formal cohort data.',
+      default: 'For seed-stage companies, qualitative evidence of repeat usage or user enthusiasm can substitute for formal retention metrics.',
+    },
+  },
 
-  // Moat/defensibility
-  /\bmoat\b/i,
-  /\bdefensib/i,
-  /\bbarrier to entry/i,
-  /\bcompetitive advantage/i,
-  /\bsustainable advantage/i,
-  /\bnetwork effect/i,  // Don't recommend "add network effect" - they should show it, not claim it
-  /\bpatent/i,
-  /\bintellectual property\b/i,
-  /\bIP strategy/i,
+  pricing: {
+    patterns: [
+      /\bpricing\b/i,
+      /\bprice point/i,
+      /\bmonetization\b/i,
+      /\brevenue model\b/i,
+      /\bARPU\b/i,
+      /\brevenue per user/i,
+      /\bsubscription (tier|plan|pricing)/i,
+    ],
+    replacement_by_slide_type: {
+      business_model: 'At this stage, identify the likely monetization path without requiring full pricing detail. Show which user behavior indicates willingness to pay.',
+      default: 'For seed-stage companies, demonstrate a plausible monetization path rather than detailed pricing.',
+    },
+  },
 
-  // PMF analytics
-  /\bproduct[- ]?market fit/i,
-  /\bNPS\b/i,
-  /\bnet promoter/i,
+  moat_defensibility: {
+    patterns: [
+      /\bmoat\b/i,
+      /\bdefensib/i,
+      /\bbarrier to entry/i,
+      /\bcompetitive advantage/i,
+      /\bsustainable advantage/i,
+      /\bpatent/i,
+      /\bintellectual property\b/i,
+      /\bIP strategy/i,
+      /\block[- ]?in/i,
+    ],
+    replacement_by_slide_type: {
+      competition: 'At this stage, clarify the specific user or product insight that explains why users choose this product over alternatives.',
+      solution: 'At this stage, show what makes the solution compelling to users rather than articulating formal defensibility.',
+      default: 'For seed-stage companies, demonstrate user preference and product insight rather than formal moat articulation.',
+    },
+  },
 
-  // Enterprise/SaaS specific
-  /\bsales cycle/i,
-  /\benterprise sales/i,
-  /\bcontract value/i,
-  /\bACV\b/i,
-  /\bARR\b/i,
-  /\bMRR\b/i,
-  /\bpipeline\b/i,
-  /\bquota\b/i,
+  market_quantification: {
+    patterns: [
+      /\bTAM\b/i,
+      /\bSAM\b/i,
+      /\bSOM\b/i,
+      /\bmarket size\b/i,
+      /\b(total|serviceable|obtainable) .{0,15}market/i,
+      /\bbottom[- ]?up .{0,10}(analysis|sizing|calculation)/i,
+      /\bmarket (quantif|sizing|calculation)/i,
+    ],
+    replacement_by_slide_type: {
+      market: 'At this stage, connect the market shift to the user behavior it unlocks and the initial segment most likely to adopt.',
+      default: 'For seed-stage companies, demonstrate a clear wedge into a large opportunity rather than formal market sizing.',
+    },
+  },
 
-  // Detailed projections
-  /\bdetailed (financial|revenue)/i,
-  /\b5[- ]year/i,
-  /\bburn rate/i,
-  /\brunway/i,
-  /\bbreak[- ]?even/i,
+  pmf_metrics: {
+    patterns: [
+      /\bproduct[- ]?market fit/i,
+      /\bNPS\b/i,
+      /\bnet promoter/i,
+      /\bsatisfaction score/i,
+    ],
+    replacement_by_slide_type: {
+      traction: 'At this stage, show qualitative evidence of product-market fit: user enthusiasm, organic growth, or strong engagement.',
+      default: 'For seed-stage companies, user behavior and organic growth are stronger PMF indicators than survey scores.',
+    },
+  },
 
-  // Specific metrics requests
-  /\bspecific metrics/i,
-  /\bquantif/i,
-  /\bmeasurable/i,
-]
+  enterprise_saas: {
+    patterns: [
+      /\bsales cycle/i,
+      /\benterprise sales/i,
+      /\bcontract value/i,
+      /\bACV\b/i,
+      /\bARR\b/i,
+      /\bMRR\b/i,
+      /\bpipeline\b/i,
+      /\bquota\b/i,
+      /\bsales team/i,
+    ],
+    replacement_by_slide_type: {
+      business_model: 'At this stage, show early customer interest (pilots, LOIs, design partners) rather than formal sales metrics.',
+      traction: 'At this stage, demonstrate customer pull through pilots, waitlists, or design partnerships.',
+      default: 'For seed-stage B2B companies, early customer engagement signals matter more than formal sales metrics.',
+    },
+  },
+
+  detailed_projections: {
+    patterns: [
+      /\bdetailed (financial|revenue)/i,
+      /\b5[- ]?year/i,
+      /\b(financial|revenue) projection/i,
+      /\bburn rate/i,
+      /\brunway/i,
+      /\bbreak[- ]?even/i,
+      /\bforecast/i,
+    ],
+    replacement_by_slide_type: {
+      financials: 'At this stage, show key assumptions driving growth rather than detailed multi-year projections.',
+      default: 'For seed-stage companies, focus on growth drivers and capital efficiency rather than detailed forecasts.',
+    },
+  },
+
+  specific_metrics: {
+    patterns: [
+      /\bspecific metrics/i,
+      /\bquantif/i,
+      /\bmeasurable/i,
+      /\bconcrete numbers/i,
+      /\bexact figures/i,
+    ],
+    replacement_by_slide_type: {
+      traction: 'At this stage, provide the strongest available evidence of momentum, even if qualitative.',
+      problem: 'At this stage, demonstrate the problem clearly through user examples or behavioral evidence.',
+      default: 'For seed-stage companies, directional evidence and user stories can be as compelling as precise metrics.',
+    },
+  },
+}
+
+// =============================================================================
+// SIGNAL DETECTION FUNCTIONS
+// =============================================================================
 
 /**
- * Detect signals in slide text.
- * Returns array of detected signal types with match details.
+ * Detect signals in slide text with slide-type context boosting.
  */
 function detectSignals(slideText, slideType) {
   if (!slideText || typeof slideText !== 'string') {
-    return { signals: [], signalCount: 0, signalStrength: 'none' }
+    return { signals: [], signalCount: 0, signalStrength: 'none', signalTypes: [] }
   }
 
-  const textLower = slideText.toLowerCase()
   const signals = []
+  const signalTypesFound = new Set()
+
+  // Get boosted signal types for this slide type
+  const boostedTypes = SLIDE_TYPE_SIGNAL_BOOST[slideType] || []
 
   for (const [signalType, patterns] of Object.entries(SIGNAL_PATTERNS)) {
-    if (signalType === 'sparse_sharp') continue // Handled separately
-
     for (const pattern of patterns) {
       const match = slideText.match(pattern)
       if (match) {
+        const isBoosted = boostedTypes.includes(signalType)
         signals.push({
           type: signalType,
           match: match[0],
           pattern: pattern.toString(),
+          boosted: isBoosted,
+          slide_type_context: slideType,
         })
-        break // One match per signal type is enough
+        signalTypesFound.add(signalType)
+        break // One match per signal type per slide
       }
     }
   }
 
-  // Detect sparse-but-sharp communication
-  // Short text that hits key points = high signal density
-  const wordCount = slideText.split(/\s+/).length
-  const signalDensity = signals.length / Math.max(1, wordCount / 50)
+  // Calculate signal strength
+  // Boosted signals count extra
+  const boostedCount = signals.filter(s => s.boosted).length
+  const effectiveCount = signals.length + (boostedCount * 0.5) // Boosted signals worth 1.5x
 
-  if (wordCount < 150 && signals.length >= 2 && signalDensity > 0.3) {
-    signals.push({
-      type: 'sparse_sharp',
-      match: `${wordCount} words, ${signals.length} signals, density ${signalDensity.toFixed(2)}`,
-      pattern: 'brevity + signal density',
-    })
-  }
-
-  // Determine overall signal strength
   let signalStrength = 'none'
-  if (signals.length >= 4) {
+  if (effectiveCount >= 4) {
     signalStrength = 'exceptional'
-  } else if (signals.length >= 2) {
+  } else if (effectiveCount >= 2) {
     signalStrength = 'strong'
-  } else if (signals.length >= 1) {
+  } else if (effectiveCount >= 1) {
     signalStrength = 'moderate'
   }
 
@@ -275,12 +422,13 @@ function detectSignals(slideText, slideType) {
     signals,
     signalCount: signals.length,
     signalStrength,
+    signalTypes: Array.from(signalTypesFound),
+    boostedCount,
   }
 }
 
 /**
  * Detect deck-wide signals across all slides.
- * Some signals are cumulative (e.g., timing + infrastructure = stronger).
  */
 function detectDeckSignals(slides) {
   const allSignals = []
@@ -292,18 +440,25 @@ function detectDeckSignals(slides) {
     signalsBySlide[slide.slide_number] = slideSignals
 
     for (const signal of slideSignals.signals) {
-      allSignals.push({ ...signal, slide_number: slide.slide_number })
+      allSignals.push({
+        ...signal,
+        slide_number: slide.slide_number,
+        slide_type: slide.inferred_type,
+      })
+
       if (!signalsByType[signal.type]) {
         signalsByType[signal.type] = []
       }
-      signalsByType[signal.type].push(slide.slide_number)
+      signalsByType[signal.type].push({
+        slide_number: slide.slide_number,
+        match: signal.match,
+      })
     }
   }
 
   // Check for synergistic signal combinations
   const synergies = []
 
-  // Timing + Infrastructure = very strong why-now
   if (signalsByType.timing_insight && signalsByType.infrastructure_shift) {
     synergies.push({
       name: 'timing_infrastructure_synergy',
@@ -312,7 +467,6 @@ function detectDeckSignals(slides) {
     })
   }
 
-  // Behavioral insight + Network effect = viral potential
   if (signalsByType.behavioral_insight && signalsByType.network_effect) {
     synergies.push({
       name: 'viral_potential_synergy',
@@ -321,7 +475,6 @@ function detectDeckSignals(slides) {
     })
   }
 
-  // Consumer pain + Product simplicity = clear value prop
   if (signalsByType.consumer_pain && signalsByType.product_simplicity) {
     synergies.push({
       name: 'clear_value_prop_synergy',
@@ -330,12 +483,19 @@ function detectDeckSignals(slides) {
     })
   }
 
-  // Founder-market fit + any domain signal = team strength
   if (signalsByType.founder_market_fit && Object.keys(signalsByType).length > 1) {
     synergies.push({
       name: 'founder_fit_synergy',
       description: 'Strong founder-market fit with domain signals',
       boost: 0.2,
+    })
+  }
+
+  if (signalsByType.early_pull && signalsByType.network_effect) {
+    synergies.push({
+      name: 'traction_network_synergy',
+      description: 'Early traction with network dynamics',
+      boost: 0.25,
     })
   }
 
@@ -348,6 +508,8 @@ function detectDeckSignals(slides) {
     deckSignalStrength = 'strong'
   } else if (uniqueSignalTypes >= 2) {
     deckSignalStrength = 'moderate'
+  } else if (uniqueSignalTypes >= 1) {
+    deckSignalStrength = 'weak'
   }
 
   return {
@@ -360,13 +522,14 @@ function detectDeckSignals(slides) {
   }
 }
 
+// =============================================================================
+// SLIDE OVERRIDE LOGIC
+// =============================================================================
+
 /**
  * Apply signal override to a single slide evaluation.
- * Returns adjusted score and debug info.
  */
 function applySlideSignalOverride(slideEval, slideSignals, deckSignals, options = {}) {
-  const { isSeedConsumerNetwork = false } = options
-
   const originalScore = slideEval.normalized_score
   const originalGrade = slideEval.grade
   const slideType = slideEval.type
@@ -380,6 +543,8 @@ function applySlideSignalOverride(slideEval, slideSignals, deckSignals, options 
       adjustedScore: originalScore,
       originalGrade,
       adjustedGrade: originalGrade,
+      signalsDetected: [],
+      signalTypes: [],
     }
   }
 
@@ -389,30 +554,29 @@ function applySlideSignalOverride(slideEval, slideSignals, deckSignals, options 
   // Use stronger of slide signal or deck signal (with dampening)
   let effectiveStrength = signalStrength
   if (deckStrength === 'exceptional' && signalStrength !== 'exceptional') {
-    // Deck-level exceptional signals can lift slides to at least 'moderate'
     effectiveStrength = signalStrength === 'none' ? 'moderate' : signalStrength
   } else if (deckStrength === 'strong' && signalStrength === 'none') {
     effectiveStrength = 'moderate'
   }
 
-  if (effectiveStrength === 'none') {
+  if (effectiveStrength === 'none' || effectiveStrength === 'weak') {
     return {
       adjusted: false,
-      reason: 'No investor signals detected',
+      reason: 'Insufficient investor signals detected',
       originalScore,
       adjustedScore: originalScore,
       originalGrade,
       adjustedGrade: originalGrade,
-      signalsDetected: [],
+      signalsDetected: slideSignals.signals.map(s => s.match),
+      signalTypes: slideSignals.signalTypes,
     }
   }
 
-  // Get the score floor for this signal strength
+  // Get score floor for this signal strength
   const scoreFloor = SIGNAL_SCORE_FLOORS[effectiveStrength]
   const gradeFloor = SIGNAL_GRADE_FLOORS[effectiveStrength]
 
-  // Check if override is needed
-  // Convert normalized score (0-1) to 5-point scale for comparison
+  // Convert normalized score (0-1) to 5-point scale
   const scoreOn5Scale = originalScore * 5
 
   if (scoreOn5Scale >= scoreFloor) {
@@ -423,23 +587,21 @@ function applySlideSignalOverride(slideEval, slideSignals, deckSignals, options 
       adjustedScore: originalScore,
       originalGrade,
       adjustedGrade: originalGrade,
-      signalsDetected: slideSignals.signals.map(s => s.type),
+      signalsDetected: slideSignals.signals.map(s => s.match),
+      signalTypes: slideSignals.signalTypes,
       signalStrength: effectiveStrength,
     }
   }
 
   // Apply the floor
   const adjustedScoreOn5Scale = scoreFloor
-  const adjustedNormalized = adjustedScoreOn5Scale / 5
-  const liftAmount = adjustedScoreOn5Scale - scoreOn5Scale
 
   // Calculate synergy bonus from deck-level signals
   let synergyBoost = 0
   for (const synergy of deckSignals.synergies) {
     synergyBoost += synergy.boost
   }
-  // Cap synergy boost at 0.5
-  synergyBoost = Math.min(0.5, synergyBoost)
+  synergyBoost = Math.min(0.5, synergyBoost) // Cap at 0.5
 
   // Apply synergy boost (but don't exceed 4.5 = A-)
   const finalScoreOn5Scale = Math.min(4.5, adjustedScoreOn5Scale + synergyBoost)
@@ -455,7 +617,7 @@ function applySlideSignalOverride(slideEval, slideSignals, deckSignals, options 
 
   return {
     adjusted: true,
-    reason: `Signal override applied: ${effectiveStrength} signals lifted score from ${scoreOn5Scale.toFixed(2)} to ${finalScoreOn5Scale.toFixed(2)}`,
+    reason: `Signal override: ${effectiveStrength} signals (${slideSignals.signalTypes.join(', ')}) lifted score from ${scoreOn5Scale.toFixed(2)} to ${finalScoreOn5Scale.toFixed(2)}`,
     originalScore,
     originalScoreOn5Scale: scoreOn5Scale,
     adjustedScore: finalNormalized,
@@ -463,7 +625,8 @@ function applySlideSignalOverride(slideEval, slideSignals, deckSignals, options 
     originalGrade,
     adjustedGrade,
     liftAmount: finalScoreOn5Scale - scoreOn5Scale,
-    signalsDetected: slideSignals.signals.map(s => s.type),
+    signalsDetected: slideSignals.signals.map(s => s.match),
+    signalTypes: slideSignals.signalTypes,
     signalStrength: effectiveStrength,
     deckSignalStrength: deckStrength,
     synergyBoost,
@@ -473,9 +636,12 @@ function applySlideSignalOverride(slideEval, slideSignals, deckSignals, options 
   }
 }
 
+// =============================================================================
+// FIX SUPPRESSION WITH CONTEXT-SPECIFIC REPLACEMENTS
+// =============================================================================
+
 /**
- * Suppress inappropriate fixes for seed consumer/network decks.
- * Returns filtered questions array with fixes cleaned up.
+ * Suppress inappropriate fixes with context-specific replacements.
  */
 function suppressInappropriateFixesForSlide(questions, slideType, options = {}) {
   const { isSeedConsumerNetwork = false } = options
@@ -488,26 +654,36 @@ function suppressInappropriateFixesForSlide(questions, slideType, options = {}) 
   let suppressedCount = 0
 
   const filteredQuestions = questions.map(q => {
-    if (!q.fix || q.fix === 'None needed') {
+    if (!q.fix || q.fix === 'None needed' || q.fix === 'None needed.') {
       return q
     }
 
-    // Check if fix matches suppression patterns
-    for (const pattern of SUPPRESSED_FIX_PATTERNS) {
-      if (pattern.test(q.fix)) {
-        suppressedCount++
-        suppressedFixes.push({
-          question: q.question,
-          originalFix: q.fix,
-          pattern: pattern.toString(),
-        })
+    // Check each suppression category
+    for (const [category, config] of Object.entries(SUPPRESSION_CATEGORIES)) {
+      for (const pattern of config.patterns) {
+        if (pattern.test(q.fix)) {
+          suppressedCount++
 
-        // Replace with stage-appropriate guidance
-        return {
-          ...q,
-          fix: 'For seed-stage consumer/network companies, focus on demonstrating user traction and engagement rather than detailed unit economics.',
-          fix_suppressed: true,
-          original_fix: q.fix,
+          // Get context-specific replacement
+          const replacement = config.replacement_by_slide_type[slideType] ||
+                              config.replacement_by_slide_type.default
+
+          suppressedFixes.push({
+            slide_type: slideType,
+            question: q.question,
+            original_fix: q.fix,
+            replacement_fix: replacement,
+            matched_pattern: pattern.toString(),
+            suppression_category: category,
+          })
+
+          return {
+            ...q,
+            fix: replacement,
+            fix_suppressed: true,
+            original_fix: q.fix,
+            suppression_category: category,
+          }
         }
       }
     }
@@ -522,76 +698,52 @@ function suppressInappropriateFixesForSlide(questions, slideType, options = {}) 
   }
 }
 
+// =============================================================================
+// MAIN ENTRY POINT
+// =============================================================================
+
 /**
- * Main entry point: Apply signal override adjustment to all slide evaluations.
- *
- * @param {Object[]} slides - Raw slide data with extracted_text
- * @param {Object[]} slideEvaluations - Evaluated slides with scores/grades
- * @param {Object} options - Configuration options
- * @returns {Object} - Adjusted evaluations with debug info
+ * Apply signal override adjustment to all slide evaluations.
  */
 function applySignalOverride(slides, slideEvaluations, options = {}) {
   const { isSeedConsumerNetwork = false } = options
 
   console.log('[signal-override] ========================================')
-  console.log('[signal-override] *** applySignalOverride ENTRY POINT ***')
-  console.log('[signal-override] ========================================')
-  console.log(`[signal-override] Timestamp: ${new Date().toISOString()}`)
+  console.log('[signal-override] applySignalOverride v2 CALLED')
   console.log(`[signal-override] isSeedConsumerNetwork: ${isSeedConsumerNetwork}`)
-  console.log(`[signal-override] Input slides count: ${slides.length}`)
-  console.log(`[signal-override] Input evaluations count: ${slideEvaluations.length}`)
-
-  // Log input slide types and grades
-  console.log('[signal-override] --- INPUT SLIDE GRADES (BEFORE OVERRIDE) ---')
-  for (const se of slideEvaluations) {
-    console.log(`[signal-override]   Slide ${se.slide_number} (${se.type}): grade=${se.grade}, normalized=${se.normalized_score?.toFixed(3) || 'N/A'}`)
-  }
+  console.log(`[signal-override] Slides: ${slides.length}, Evaluations: ${slideEvaluations.length}`)
 
   // Detect deck-wide signals
-  console.log('[signal-override] --- DETECTING DECK SIGNALS ---')
   const deckSignals = detectDeckSignals(slides)
+
   console.log(`[signal-override] Deck signal strength: ${deckSignals.deckSignalStrength}`)
   console.log(`[signal-override] Unique signal types: ${deckSignals.uniqueSignalTypes}`)
   console.log(`[signal-override] Signal types found: ${Object.keys(deckSignals.signalsByType).join(', ') || 'NONE'}`)
-  console.log(`[signal-override] Synergies detected: ${deckSignals.synergies.length}`)
-  if (deckSignals.synergies.length > 0) {
-    for (const syn of deckSignals.synergies) {
-      console.log(`[signal-override]   - ${syn.name}: ${syn.description} (+${syn.boost})`)
-    }
-  }
+  console.log(`[signal-override] Synergies: ${deckSignals.synergies.length}`)
 
-  // Log signals per slide
-  console.log('[signal-override] --- SIGNALS PER SLIDE ---')
-  for (const slideNum of Object.keys(deckSignals.signalsBySlide)) {
-    const ss = deckSignals.signalsBySlide[slideNum]
-    console.log(`[signal-override]   Slide ${slideNum}: ${ss.signalCount} signals (strength: ${ss.signalStrength})`)
-    if (ss.signals.length > 0) {
-      for (const sig of ss.signals) {
-        console.log(`[signal-override]     - ${sig.type}: "${sig.match}"`)
-      }
+  // Log all detected signals
+  if (deckSignals.allSignals.length > 0) {
+    console.log('[signal-override] All signals detected:')
+    for (const sig of deckSignals.allSignals) {
+      console.log(`[signal-override]   Slide ${sig.slide_number} (${sig.slide_type}): ${sig.type} = "${sig.match}"`)
     }
   }
 
   // Process each slide
-  console.log('[signal-override] --- PROCESSING SLIDES FOR OVERRIDE ---')
   const adjustedEvaluations = []
   const overrideResults = []
   let totalLifted = 0
   let totalSuppressedFixes = 0
   const beforeAfterSummary = []
-  const allSuppressedFixes = [] // Collect all suppressed fixes for debug
+  const allSuppressedFixes = []
 
   for (const slideEval of slideEvaluations) {
-    const slideData = slides.find(s => s.slide_number === slideEval.slide_number)
     const slideSignals = deckSignals.signalsBySlide[slideEval.slide_number] || {
       signals: [],
       signalCount: 0,
       signalStrength: 'none',
+      signalTypes: [],
     }
-
-    // Check eligibility
-    const isEligible = SIGNAL_OVERRIDE_ELIGIBLE_SLIDES.includes(slideEval.type)
-    console.log(`[signal-override] Slide ${slideEval.slide_number} (${slideEval.type}): eligible=${isEligible}, signals=${slideSignals.signalCount}, strength=${slideSignals.signalStrength}`)
 
     // Apply signal override
     const overrideResult = applySlideSignalOverride(slideEval, slideSignals, deckSignals, options)
@@ -603,9 +755,7 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
 
     if (overrideResult.adjusted) {
       totalLifted++
-      console.log(`[signal-override]   >>> LIFTED: ${overrideResult.originalGrade} -> ${overrideResult.adjustedGrade} (lift: +${overrideResult.liftAmount.toFixed(2)})`)
-    } else {
-      console.log(`[signal-override]   No change: ${overrideResult.reason}`)
+      console.log(`[signal-override] LIFTED: Slide ${slideEval.slide_number} (${slideEval.type}): ${overrideResult.originalGrade} -> ${overrideResult.adjustedGrade}`)
     }
 
     // Suppress inappropriate fixes
@@ -616,27 +766,20 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
     )
     totalSuppressedFixes += suppressedCount
 
-    // Track suppressed fixes for debug
     if (suppressedCount > 0) {
-      console.log(`[signal-override]   Suppressed ${suppressedCount} fix(es):`)
+      console.log(`[signal-override] Suppressed ${suppressedCount} fix(es) on slide ${slideEval.slide_number}`)
       for (const sf of suppressedFixes) {
-        console.log(`[signal-override]     - "${sf.originalFix.slice(0, 60)}..."`)
-        allSuppressedFixes.push({
-          slide_number: slideEval.slide_number,
-          slide_type: slideEval.type,
-          question: sf.question,
-          original_fix: sf.originalFix,
-          matched_pattern: sf.pattern,
-        })
+        allSuppressedFixes.push(sf)
       }
     }
 
-    // Track before/after including suppressed fixes
+    // Track before/after
     beforeAfterSummary.push({
       slide: slideEval.slide_number,
       type: slideEval.type,
-      eligible: isEligible,
-      signals: slideSignals.signalCount,
+      eligible: SIGNAL_OVERRIDE_ELIGIBLE_SLIDES.includes(slideEval.type),
+      signals_count: slideSignals.signalCount,
+      signal_types: slideSignals.signalTypes,
       before_grade: overrideResult.originalGrade,
       after_grade: overrideResult.adjustedGrade,
       changed: overrideResult.adjusted,
@@ -647,11 +790,9 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
     // Build adjusted evaluation
     const adjusted = {
       ...slideEval,
-      // Update score/grade if override was applied
       grade: overrideResult.adjustedGrade,
       normalized_score: overrideResult.adjustedScore,
       questions,
-      // Preserve original for debug
       _original_grade: overrideResult.originalGrade,
       _original_score: overrideResult.originalScore,
       _signal_override_applied: overrideResult.adjusted,
@@ -661,36 +802,25 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
     adjustedEvaluations.push(adjusted)
   }
 
-  // Final summary
-  console.log('[signal-override] --- OVERRIDE SUMMARY ---')
-  console.log(`[signal-override] Total slides processed: ${slideEvaluations.length}`)
-  console.log(`[signal-override] Total slides LIFTED: ${totalLifted}`)
-  console.log(`[signal-override] Total fixes SUPPRESSED: ${totalSuppressedFixes}`)
-  console.log('[signal-override] Before/After:')
-  for (const ba of beforeAfterSummary) {
-    const marker = ba.changed ? '>>>' : '   '
-    console.log(`[signal-override] ${marker} Slide ${ba.slide} (${ba.type}): ${ba.before_grade} -> ${ba.after_grade} [${ba.reason}]`)
-  }
+  console.log(`[signal-override] Total slides lifted: ${totalLifted}`)
+  console.log(`[signal-override] Total fixes suppressed: ${totalSuppressedFixes}`)
   console.log('[signal-override] ========================================')
 
-  // Build human-readable status message
+  // Build human-readable status
   const slidesChangedList = beforeAfterSummary
     .filter(s => s.changed)
     .map(s => `Slide ${s.slide} (${s.type}): ${s.before_grade} → ${s.after_grade}`)
 
-  const statusMessage = totalLifted > 0
+  const statusMessage = (totalLifted > 0 || totalSuppressedFixes > 0)
     ? `Signal override ACTIVE: lifted ${totalLifted} slide(s), suppressed ${totalSuppressedFixes} fix(es)`
-    : `Signal override ran but made NO changes (${slideEvaluations.length} slides processed, ${deckSignals.deckSignalStrength} deck signal strength)`
+    : `Signal override ran, no changes made (${deckSignals.deckSignalStrength} deck signal strength, ${deckSignals.uniqueSignalTypes} signal types)`
 
-  // Build debug output
+  // Build comprehensive debug output
   const debug = {
-    // ===== CONFIRMATION SECTION =====
-    // This confirms signal override ran and what it did
     status: statusMessage,
     signal_override_executed: true,
     executed_at: new Date().toISOString(),
 
-    // Quick summary
     summary: {
       any_changes_made: totalLifted > 0 || totalSuppressedFixes > 0,
       slides_processed: slideEvaluations.length,
@@ -700,28 +830,34 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       slides_changed: slidesChangedList,
     },
 
-    // Deck-level signal detection results
     deck_signal_analysis: {
       overall_strength: deckSignals.deckSignalStrength,
       unique_signal_types_found: deckSignals.uniqueSignalTypes,
       signal_types: Object.keys(deckSignals.signalsByType),
-      synergies_detected: deckSignals.synergies.map(s => s.name),
+      signals_by_type: Object.fromEntries(
+        Object.entries(deckSignals.signalsByType).map(([type, matches]) => [
+          type,
+          matches.map(m => ({ slide: m.slide_number, match: m.match }))
+        ])
+      ),
       all_signals_found: deckSignals.allSignals.map(s => ({
-        slide: s.slide_number,
+        slide_number: s.slide_number,
+        slide_type: s.slide_type,
         signal_type: s.type,
-        matched_text: s.match,
+        matched_phrase: s.match,
+        boosted: s.boosted,
       })),
+      synergies_detected: deckSignals.synergies,
     },
 
-    // Fix suppression details
     suppression_reasons: allSuppressedFixes,
 
-    // Before/After for every slide
     slide_by_slide: beforeAfterSummary.map(s => ({
       slide_number: s.slide,
       slide_type: s.type,
       eligible_for_override: s.eligible,
-      signals_detected: s.signals,
+      signals_detected: s.signals_count,
+      signal_types: s.signal_types,
       grade_before: s.before_grade,
       grade_after: s.after_grade,
       was_changed: s.changed,
@@ -729,10 +865,8 @@ function applySignalOverride(slides, slideEvaluations, options = {}) {
       fixes_suppressed: s.fixes_suppressed_count,
     })),
 
-    // Detailed override results (for deep debugging)
     detailed_overrides: overrideResults,
 
-    // Configuration that was used
     config: {
       is_seed_consumer_network: isSeedConsumerNetwork,
       eligible_slide_types: SIGNAL_OVERRIDE_ELIGIBLE_SLIDES,
@@ -758,5 +892,5 @@ module.exports = {
   SIGNAL_PATTERNS,
   SIGNAL_SCORE_FLOORS,
   SIGNAL_GRADE_FLOORS,
-  SUPPRESSED_FIX_PATTERNS,
+  SUPPRESSION_CATEGORIES,
 }
