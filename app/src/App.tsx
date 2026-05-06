@@ -90,6 +90,8 @@ interface V3DebugOutput {
   deck_context?: Record<string, unknown>
   rule_injection?: Record<string, unknown>
   prompts?: Record<string, unknown>
+  scoring?: Record<string, unknown>
+  signal_override?: Record<string, unknown>
   slide_evaluations?: Array<Record<string, unknown>>
   thesis_evaluation?: Record<string, unknown>
 }
@@ -1800,6 +1802,50 @@ export default function App() {
                           maxHeight: '400px',
                         }}>
                           {JSON.stringify(report.debug.prompts, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Scoring (V3 blended scoring debug) */}
+                    {report.debug.scoring && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase' }}>
+                          V3 Scoring
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '400px',
+                        }}>
+                          {JSON.stringify(report.debug.scoring, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Signal Override */}
+                    {report.debug.signal_override && (
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 600, color: '#111827', textTransform: 'uppercase', backgroundColor: '#fef3c7', padding: '4px 8px', borderRadius: '4px' }}>
+                          Signal Override {report.debug.signal_override.signal_override_executed ? '(ACTIVE)' : '(INACTIVE)'}
+                        </h4>
+                        <pre style={{
+                          margin: 0,
+                          padding: '12px',
+                          backgroundColor: '#1f2937',
+                          color: '#f9fafb',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          lineHeight: 1.5,
+                          overflow: 'auto',
+                          maxHeight: '500px',
+                        }}>
+                          {JSON.stringify(report.debug.signal_override, null, 2)}
                         </pre>
                       </div>
                     )}
