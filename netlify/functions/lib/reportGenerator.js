@@ -37,6 +37,7 @@ const {
   formatRulesForPrompt,
   applyDeckContextFiltering,
 } = require('./evaluationRulesLoader')
+const { applySignalOverride } = require('./signalOverride')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
@@ -1542,9 +1543,39 @@ async function generateFullReport(supabase, deckId, options = {}) {
       })
     }
 
+    // ===== V3 Signal Override Layer =====
+    // Post-rubric adjustment that detects when underlying investor signal
+    // is stronger than raw rubric deductions imply
+    let signalOverrideDebug = null
+    let finalSlideEvaluations = slideEvaluations
+
+    if (evalArchitecture === 'v3') {
+      // Determine if deck is seed-stage consumer/network
+      const isSeedConsumerNetwork = evalContext?.deckContext?.inferred_contexts?.includes('consumer_network') ||
+                                     evalContext?.deckContext?.inferred_contexts?.includes('marketplace')
+
+      console.log('[v3] Applying signal override layer...')
+
+      const overrideResult = applySignalOverride(slides, slideEvaluations, {
+        isSeedConsumerNetwork,
+      })
+
+      finalSlideEvaluations = overrideResult.adjustedEvaluations
+      signalOverrideDebug = overrideResult.debug
+
+      if (overrideResult.totalLifted > 0) {
+        console.log(`[v3] Signal override lifted ${overrideResult.totalLifted} slides`)
+      }
+      if (overrideResult.totalSuppressedFixes > 0) {
+        console.log(`[v3] Suppressed ${overrideResult.totalSuppressedFixes} inappropriate fixes`)
+      }
+    }
+    // ===== End V3 Signal Override Layer =====
+
     // Evaluate deck-level investment thesis first (needed for v3 scoring)
+    // Use signal-adjusted evaluations for thesis context
     console.log('Evaluating investment thesis...')
-    const thesisResult = await evaluateInvestmentThesis(openai, slides, slideEvaluations, evalContext)
+    const thesisResult = await evaluateInvestmentThesis(openai, slides, finalSlideEvaluations, evalContext)
     const investmentThesis = thesisResult.thesis
     const thesisDebugInfo = thesisResult.debug
 
@@ -1565,7 +1596,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
       console.log(`[v3] Using blended scoring (seed_consumer=${isSeedConsumerNetwork})`)
 
-      rawDeckScoreResult = computeDeckScoreV3(slideEvaluations, investmentThesis, {
+      rawDeckScoreResult = computeDeckScoreV3(finalSlideEvaluations, investmentThesis, {
         isSeedConsumerNetwork,
       })
 
@@ -1585,11 +1616,11 @@ async function generateFullReport(supabase, deckId, options = {}) {
       }
     } else {
       // Use standard v2 scoring
-      rawDeckScoreResult = computeDeckScore(slideEvaluations)
+      rawDeckScoreResult = computeDeckScore(finalSlideEvaluations)
     }
 
     // Apply grade calibration cap if conditions met (applies to both v2 and v3)
-    const deckScoreResult = applyGradeCalibrationCap(rawDeckScoreResult, slideEvaluations)
+    const deckScoreResult = applyGradeCalibrationCap(rawDeckScoreResult, finalSlideEvaluations)
 
     console.log(
       `Deck scoring: grade=${deckScoreResult.overallGrade}, ` +
@@ -1600,14 +1631,14 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
     // Generate deterministic summary (no model call)
     const summary = generateDeterministicSummary(
-      slideEvaluations,
+      finalSlideEvaluations,
       deckScoreResult.overallGrade,
       deckScoreResult.deckScore
     )
 
     // Generate recommended investment highlights based on deck strengths
     const recommendedHighlights = generateRecommendedInvestmentHighlights(
-      slideEvaluations,
+      finalSlideEvaluations,
       investmentThesis
     )
     console.log(`Generated ${recommendedHighlights.bullets?.length || 0} recommended investment highlights`)
@@ -1680,8 +1711,14 @@ async function generateFullReport(supabase, deckId, options = {}) {
         rule_injection: ruleInjectionSummary,
         prompts: promptInfo,
         scoring: v3ScoringDebug,
+        signal_override: signalOverrideDebug,
         slide_evaluations: slideDebugInfo,
         thesis_evaluation: thesisDebugInfo,
+      }
+
+      // Log signal override summary
+      if (signalOverrideDebug) {
+        console.log(`[v3 debug] Signal override: ${signalOverrideDebug.slides_lifted} slides lifted, ${signalOverrideDebug.fixes_suppressed} fixes suppressed`)
       }
     }
 
@@ -1700,7 +1737,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
       summary,
       investment_thesis: investmentThesis,
       recommended_investment_highlights: recommendedHighlights,
-      slides: slideEvaluations,
+      slides: finalSlideEvaluations,
     }
 
     // Derive free report subset from full report
