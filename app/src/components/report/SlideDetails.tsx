@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Expand, X } from 'lucide-react'
 import { GradeDot } from '../GradeBadge'
 import type { V1SlideDetail, SlideData } from '../../lib/types'
 
@@ -8,7 +9,7 @@ interface SlideDetailsProps {
 }
 
 export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
-  const [hoveredSlideNumber, setHoveredSlideNumber] = useState<number | null>(null)
+  const [selectedSlideNumber, setSelectedSlideNumber] = useState<number | null>(null)
 
   if (!slides || slides.length === 0) return null
 
@@ -24,6 +25,20 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
            lower === 'none' ||
            lower.includes('this slide does its job') ||
            lower.includes('effectively')
+  }
+
+  const handleThumbnailClick = (slideNumber: number) => {
+    setSelectedSlideNumber(slideNumber)
+  }
+
+  const handleCloseModal = () => {
+    setSelectedSlideNumber(null)
+  }
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handleCloseModal()
+    }
   }
 
   return (
@@ -43,17 +58,21 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
               {/* Header */}
               <div className="flex items-start gap-4 mb-4">
                 {imageUrl && (
-                  <div
-                    className="flex-shrink-0 w-20"
-                    onMouseEnter={() => setHoveredSlideNumber(slide.slide_number)}
-                    onMouseLeave={() => setHoveredSlideNumber(null)}
+                  <button
+                    type="button"
+                    onClick={() => handleThumbnailClick(slide.slide_number)}
+                    className="flex-shrink-0 w-20 relative group"
                   >
                     <img
                       src={imageUrl}
                       alt={`Slide ${slide.slide_number}`}
-                      className="w-full h-auto rounded border border-gray-200 cursor-pointer"
+                      className="w-full h-auto rounded border border-gray-200"
                     />
-                  </div>
+                    {/* Expand icon overlay */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors rounded flex items-center justify-center">
+                      <Expand className="w-4 h-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </button>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -99,22 +118,35 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
         })}
       </div>
 
-      {/* Hover preview overlay */}
-      {hoveredSlideNumber !== null && (() => {
-        const slideData = slideImages.find(s => s.slide_number === hoveredSlideNumber)
+      {/* Click/tap modal */}
+      {selectedSlideNumber !== null && (() => {
+        const slideData = slideImages.find(s => s.slide_number === selectedSlideNumber)
         const imageUrl = slideData?.image_url
         if (!imageUrl) return null
 
         return (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 pointer-events-none">
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
+            onClick={handleBackdropClick}
+          >
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors"
+              aria-label="Close preview"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
             <div className="max-w-[85vw] max-h-[85vh] flex flex-col items-center">
               <img
                 src={imageUrl}
-                alt={`Slide ${hoveredSlideNumber} preview`}
+                alt={`Slide ${selectedSlideNumber} preview`}
                 className="max-w-full max-h-[calc(85vh-40px)] rounded-lg"
               />
               <p className="mt-3 text-sm text-white/80">
-                Slide {hoveredSlideNumber}
+                Slide {selectedSlideNumber}
               </p>
             </div>
           </div>

@@ -151,6 +151,11 @@ export function ReportPage() {
   return (
     <div className="py-8 px-6">
       <div className="max-w-2xl mx-auto">
+        {/* Product label */}
+        <p className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6 text-center">
+          Pitch Deck Check
+        </p>
+
         <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
           <ReportHeader
             report={v1Report}
@@ -181,7 +186,7 @@ export function ReportPage() {
           <div className="mt-8 pt-6 border-t border-gray-100 text-center">
             <Link
               to={ROUTES.UPLOAD}
-              className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+              className="text-gray-500 hover:text-gray-700 text-sm"
             >
               Check another deck
             </Link>
