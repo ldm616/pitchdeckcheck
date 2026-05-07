@@ -5,6 +5,7 @@ import { ROUTES } from '../lib/routes'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { FounderHeader } from '../components/FounderHeader'
 import { FounderFooter } from '../components/FounderFooter'
+import { ContactModal } from '../components/ContactModal'
 import {
   ReportHeader,
   QualityBreakdown,
@@ -36,6 +37,7 @@ export function ReportPage() {
   const [report, setReport] = useState<ReportContent | null>(null)
   const [slides, setSlides] = useState<SlideData[]>([])
   const [reportCreatedAt, setReportCreatedAt] = useState<string | null>(null)
+  const [showContact, setShowContact] = useState(false)
   // Track secure credentials for email save flow
   const [secureCredentials, setSecureCredentials] = useState<{
     deckId: string
@@ -123,7 +125,7 @@ export function ReportPage() {
         {/* Card positioned slightly higher */}
         <main className="flex-1 flex flex-col items-center px-6 pt-8 sm:pt-16">
           <div className="bg-white rounded-xl shadow-sm px-8 py-10 max-w-[440px] w-full text-center">
-            <h1 className="text-lg font-semibold text-gray-900 mb-3">
+            <h1 className="text-xl font-semibold text-gray-900 mb-3">
               This report is no longer available
             </h1>
             <p className="text-sm text-gray-500 mb-6 leading-relaxed">
@@ -144,13 +146,18 @@ export function ReportPage() {
           <div className="mt-auto pb-8 pt-12">
             <button
               type="button"
-              onClick={() => window.location.href = 'mailto:hello@pitchdeckcheck.com'}
-              className="text-[11px] text-gray-400 hover:text-gray-500 transition-colors"
+              onClick={() => setShowContact(true)}
+              className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
             >
               Contact
             </button>
           </div>
         </main>
+
+        <ContactModal
+          isOpen={showContact}
+          onClose={() => setShowContact(false)}
+        />
       </div>
     )
   }
