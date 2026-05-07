@@ -4,8 +4,8 @@ import { ROUTES } from '../lib/routes'
 
 export function HomePage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <main className="flex-1 flex items-start justify-center pt-20 pb-12 px-6">
+    <div className="flex flex-col flex-1">
+      <main className="flex-1 flex items-start justify-center pt-12 pb-12 px-6">
         <div className="w-full max-w-xl text-center">
           {/* Hero */}
           <h1 className="text-4xl font-bold text-gray-900 tracking-tight leading-tight mb-4">

@@ -20,8 +20,7 @@ export function UploadPage() {
   } = useDeckUpload()
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <main className="flex-1 flex items-start justify-center pt-12 pb-12 px-6">
+    <div className="flex-1 flex items-start justify-center pt-8 pb-12 px-6">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-xl shadow-sm p-8">
             {/* Back link */}
@@ -120,7 +119,6 @@ export function UploadPage() {
             )}
           </div>
         </div>
-      </main>
-    </div>
+      </div>
   )
 }

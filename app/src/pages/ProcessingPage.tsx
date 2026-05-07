@@ -34,7 +34,7 @@ export function ProcessingPage() {
   // Handle missing credentials
   if (!deckId || !accessToken) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+      <div className="flex-1 flex items-center justify-center px-6">
         <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
           <h1 className="text-xl font-semibold text-gray-900 mb-4">
             Invalid Link
@@ -56,7 +56,7 @@ export function ProcessingPage() {
   // Error state
   if (status === 'error') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+      <div className="flex-1 flex items-center justify-center px-6">
         <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
           <h1 className="text-xl font-semibold text-gray-900 mb-4">
             Processing Failed
@@ -78,7 +78,7 @@ export function ProcessingPage() {
   // Timeout state
   if (status === 'timeout') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+      <div className="flex-1 flex items-center justify-center px-6">
         <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
           <h1 className="text-xl font-semibold text-gray-900 mb-4">
             Still Processing
@@ -99,7 +99,7 @@ export function ProcessingPage() {
 
   // Processing state
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+    <div className="flex-1 flex items-center justify-center px-6">
       <div className="bg-white rounded-xl shadow-sm p-12 max-w-md w-full">
         <ProcessingStatus
           status={processingStatus}

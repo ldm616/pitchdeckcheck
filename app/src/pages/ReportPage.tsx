@@ -57,7 +57,7 @@ export function ReportPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+      <div className="flex-1 flex items-center justify-center px-6">
         <div className="bg-white rounded-xl shadow-sm p-12 max-w-md w-full flex flex-col items-center">
           <LoadingSpinner size="lg" />
           <p className="mt-4 text-gray-500">Loading your report...</p>
@@ -69,7 +69,7 @@ export function ReportPage() {
   // Error state
   if (error || !report) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-6">
+      <div className="flex-1 flex items-center justify-center px-6">
         <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
           <h1 className="text-xl font-semibold text-gray-900 mb-4">
             {error || 'Report Not Found'}
@@ -93,7 +93,7 @@ export function ReportPage() {
   // No V1 report - show basic info
   if (!v1Report) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-6">
+      <div className="py-8 px-6">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-xl shadow-sm p-8">
             <h1 className="text-2xl font-semibold text-gray-900 mb-4">
@@ -119,7 +119,7 @@ export function ReportPage() {
 
   // Full V1 report
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-6">
+    <div className="py-8 px-6">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
           <ReportHeader
