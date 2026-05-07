@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { Check, Loader2 } from 'lucide-react'
 import { useReportPolling } from '../hooks/useReportPolling'
@@ -68,11 +68,27 @@ export function ProcessingPage() {
     onReportReady: handleReportReady,
   })
 
+  // Elapsed time timer
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
   useEffect(() => {
     if (deckId && accessToken) {
       startPolling(deckId, accessToken)
     }
   }, [deckId, accessToken, startPolling])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedSeconds(s => s + 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
 
   const handleCancel = () => {
     stopPolling()
@@ -183,6 +199,9 @@ export function ProcessingPage() {
             <StageItem label="Generating report" state={getState('generating')} />
           </ul>
 
+          <p className="text-xs text-gray-400 mb-2">
+            {formatTime(elapsedSeconds)}
+          </p>
           <button
             type="button"
             onClick={handleCancel}
