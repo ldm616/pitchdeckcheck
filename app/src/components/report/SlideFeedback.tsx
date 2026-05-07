@@ -73,15 +73,13 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
                     <span className="font-medium text-gray-500">{slide.grade}</span>
                   </div>
 
-                  {/* Full-width slide image */}
+                  {/* Slide image */}
                   {imageUrl && (
-                    <div className="bg-gray-50 rounded p-[30px] mb-3">
-                      <img
-                        src={imageUrl}
-                        alt={`Slide ${slide.slide_number}`}
-                        className="w-full h-auto"
-                      />
-                    </div>
+                    <img
+                      src={imageUrl}
+                      alt={`Slide ${slide.slide_number}`}
+                      className="w-full h-auto my-5 shadow-sm"
+                    />
                   )}
 
                   {/* Assessment */}
