@@ -1,16 +1,14 @@
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../lib/routes'
+import { FounderHeader } from '../components/FounderHeader'
 
 export function HomePage() {
   return (
     <div className="flex flex-col flex-1">
-      <main className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-lg text-center">
-          {/* Product label */}
-          <p className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-5">
-            Pitch Deck Check
-          </p>
+      <FounderHeader />
 
+      <main className="flex-1 flex items-center justify-center px-6 pb-16">
+        <div className="w-full max-w-lg text-center">
           {/* Hero headline */}
           <h1 className="text-4xl font-semibold text-gray-900 tracking-tight leading-tight mb-4">
             Is your pitch deck ready for investors?

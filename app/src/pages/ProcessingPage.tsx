@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { Check, Loader2 } from 'lucide-react'
 import { useReportPolling } from '../hooks/useReportPolling'
 import { getReportPath, ROUTES } from '../lib/routes'
+import { FounderHeader } from '../components/FounderHeader'
 
 type Stage = 'extracting' | 'analyzing' | 'generating'
 
@@ -160,29 +161,29 @@ export function ProcessingPage() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center px-6 py-16">
-      <div className="w-full max-w-md text-center">
-        <p className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-5">
-          Pitch Deck Check
-        </p>
+    <div className="flex flex-col flex-1">
+      <FounderHeader />
 
-        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-10">
-          Analyzing your deck
-        </h1>
+      <main className="flex-1 flex items-center justify-center px-6 pb-16">
+        <div className="w-full max-w-md text-center">
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-10">
+            Analyzing your deck
+          </h1>
 
-        <ul className="inline-flex flex-col items-start gap-5 text-base mb-12">
-          <StageItem label="Extracting slides" state={getState('extracting')} />
-          <StageItem label="Analyzing slides" state={getState('analyzing')} />
-          <StageItem label="Generating report" state={getState('generating')} />
-        </ul>
+          <ul className="inline-flex flex-col items-start gap-5 text-base mb-12">
+            <StageItem label="Extracting slides" state={getState('extracting')} />
+            <StageItem label="Analyzing slides" state={getState('analyzing')} />
+            <StageItem label="Generating report" state={getState('generating')} />
+          </ul>
 
-        <button
-          onClick={handleCancel}
-          className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
+          <button
+            onClick={handleCancel}
+            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </main>
     </div>
   )
 }

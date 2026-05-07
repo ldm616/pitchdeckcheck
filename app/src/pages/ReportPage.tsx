@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { getReport, getReportByCode } from '../lib/api'
 import { ROUTES, getReportPathByCode } from '../lib/routes'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { FounderHeader } from '../components/FounderHeader'
 import {
   ReportHeader,
   QualityBreakdown,
@@ -82,11 +83,14 @@ export function ReportPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="bg-white rounded-xl shadow-sm p-12 max-w-md w-full flex flex-col items-center">
-          <LoadingSpinner size="lg" />
-          <p className="mt-4 text-gray-500">Loading your report...</p>
-        </div>
+      <div className="flex flex-col flex-1">
+        <FounderHeader />
+        <main className="flex-1 flex items-center justify-center px-6 pb-16">
+          <div className="bg-white rounded-xl shadow-sm p-12 max-w-md w-full flex flex-col items-center">
+            <LoadingSpinner size="lg" />
+            <p className="mt-4 text-gray-500">Loading your report...</p>
+          </div>
+        </main>
       </div>
     )
   }
@@ -94,21 +98,24 @@ export function ReportPage() {
   // Error state
   if (error || !report) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
-          <h1 className="text-xl font-semibold text-gray-900 mb-4">
-            Report not found
-          </h1>
-          <p className="text-gray-500 mb-6">
-            Check the code or upload your deck again.
-          </p>
-          <button
-            onClick={() => navigate(ROUTES.UPLOAD)}
-            className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800"
-          >
-            Check a deck
-          </button>
-        </div>
+      <div className="flex flex-col flex-1">
+        <FounderHeader />
+        <main className="flex-1 flex items-center justify-center px-6 pb-16">
+          <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
+            <h1 className="text-xl font-semibold text-gray-900 mb-4">
+              Report not found
+            </h1>
+            <p className="text-gray-500 mb-6">
+              Check the code or upload your deck again.
+            </p>
+            <button
+              onClick={() => navigate(ROUTES.UPLOAD)}
+              className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800"
+            >
+              Check a deck
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
@@ -123,76 +130,77 @@ export function ReportPage() {
   // No V1 report - show basic info
   if (!v1Report) {
     return (
-      <div className="py-8 px-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-xl shadow-sm p-8">
-            <h1 className="text-2xl font-semibold text-gray-900 mb-4">
-              Your Report
-            </h1>
-            <p className="text-gray-500 mb-6">
-              Grade: {report.overall_grade}
-            </p>
-            <p className="text-gray-700">{report.summary}</p>
-            <div className="mt-8">
-              <Link
-                to={ROUTES.UPLOAD}
-                className="text-gray-900 hover:text-gray-700 text-sm font-medium"
-              >
-                Check another deck
-              </Link>
+      <div className="flex flex-col flex-1">
+        <FounderHeader />
+        <main className="flex-1 px-6 pb-16">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl shadow-sm p-8">
+              <h1 className="text-2xl font-semibold text-gray-900 mb-4">
+                Your Report
+              </h1>
+              <p className="text-gray-500 mb-6">
+                Grade: {report.overall_grade}
+              </p>
+              <p className="text-gray-700">{report.summary}</p>
+              <div className="mt-8">
+                <Link
+                  to={ROUTES.UPLOAD}
+                  className="text-gray-900 hover:text-gray-700 text-sm font-medium"
+                >
+                  Check another deck
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
+        </main>
       </div>
     )
   }
 
   // Full V1 report
   return (
-    <div className="py-8 px-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Product label */}
-        <p className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6 text-center">
-          Pitch Deck Check
-        </p>
+    <div className="flex flex-col flex-1">
+      <FounderHeader />
 
-        <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
-          <ReportHeader
-            report={v1Report}
-            slideCount={slides.length || v1Report.slide_summary?.length || 0}
-            reportCreatedAt={reportCreatedAt}
-          />
-
-          {reportCode && (
-            <SaveReportCard
-              reportCode={reportCode}
-              reportUrl={reportUrl}
+      <main className="flex-1 px-6 pb-16">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
+            <ReportHeader
+              report={v1Report}
+              slideCount={slides.length || v1Report.slide_summary?.length || 0}
+              reportCreatedAt={reportCreatedAt}
             />
-          )}
 
-          <QualityBreakdown dimensions={v1Report.quality_dimensions} />
+            {reportCode && (
+              <SaveReportCard
+                reportCode={reportCode}
+                reportUrl={reportUrl}
+              />
+            )}
 
-          <TopStrengths strengths={v1Report.top_strengths} />
+            <QualityBreakdown dimensions={v1Report.quality_dimensions} />
 
-          <TopImprovements improvements={v1Report.top_improvements} />
+            <TopStrengths strengths={v1Report.top_strengths} />
 
-          <NarrativeFlow narrativeFlow={v1Report.narrative_flow} />
+            <TopImprovements improvements={v1Report.top_improvements} />
 
-          <SlideSummaryTable slides={v1Report.slide_summary} />
+            <NarrativeFlow narrativeFlow={v1Report.narrative_flow} />
 
-          <SlideDetails slides={v1Report.slides} slideImages={slides} />
+            <SlideSummaryTable slides={v1Report.slide_summary} />
 
-          {/* Footer with upload link */}
-          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-            <Link
-              to={ROUTES.UPLOAD}
-              className="text-gray-500 hover:text-gray-700 text-sm"
-            >
-              Check another deck
-            </Link>
+            <SlideDetails slides={v1Report.slides} slideImages={slides} />
+
+            <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+              <Link
+                to={ROUTES.UPLOAD}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                Check another deck
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }
