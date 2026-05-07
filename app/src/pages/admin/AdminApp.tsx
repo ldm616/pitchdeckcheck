@@ -863,18 +863,20 @@ export function AdminApp() {
 
               {reportsList.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* Select all header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedDeckIds.size === reportsList.length && reportsList.length > 0}
-                      onChange={toggleSelectAll}
-                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                      {selectedDeckIds.size === reportsList.length ? 'Deselect all' : 'Select all'}
-                    </span>
-                  </div>
+                  {/* Select all header - only show when at least one is selected */}
+                  {selectedDeckIds.size > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDeckIds.size === reportsList.length}
+                        onChange={toggleSelectAll}
+                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                        {selectedDeckIds.size === reportsList.length ? 'Deselect all' : 'Select all'}
+                      </span>
+                    </div>
+                  )}
 
                   {reportsList.map((item) => {
                     const gradeColor = item.overall_grade?.startsWith('A') ? '#22c55e'
