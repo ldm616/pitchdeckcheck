@@ -1,10 +1,20 @@
 export const ROUTES = {
   HOME: '/',
   UPLOAD: '/upload',
-  FREE_REPORT: '/report/free/:deckId',
-  PAID_REPORT: '/report/paid/:deckId',
+  PROCESSING: '/processing/:deckId',
+  REPORT: '/report/:deckId',
+  ADMIN: '/admin',
 } as const
 
+export function getProcessingPath(deckId: string, accessToken: string): string {
+  return `/processing/${deckId}?token=${accessToken}`
+}
+
+export function getReportPath(deckId: string, accessToken: string): string {
+  return `/report/${deckId}?token=${accessToken}`
+}
+
+// Legacy routes (for backwards compatibility)
 export function getFreeReportPath(deckId: string): string {
   return `/report/free/${deckId}`
 }
