@@ -179,13 +179,16 @@ export function ProcessingPage() {
             Analyzing your deck
           </h1>
 
-          <ul className="inline-flex flex-col items-start gap-5 text-base mb-12">
-            <StageItem label="Extracting slides" state={getState('extracting')} />
-            <StageItem label="Analyzing slides" state={getState('analyzing')} />
-            <StageItem label="Generating report" state={getState('generating')} />
-          </ul>
+          <div className="flex justify-center mb-12">
+            <ul className="flex flex-col items-start gap-5 text-base">
+              <StageItem label="Extracting slides" state={getState('extracting')} />
+              <StageItem label="Analyzing slides" state={getState('analyzing')} />
+              <StageItem label="Generating report" state={getState('generating')} />
+            </ul>
+          </div>
 
           <button
+            type="button"
             onClick={handleCancel}
             className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >

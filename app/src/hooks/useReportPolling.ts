@@ -94,37 +94,44 @@ export function useReportPolling(options: UseReportPollingOptions = {}): UseRepo
 
     // Start polling
     pollIntervalRef.current = window.setInterval(async () => {
-      const statusData = await getDeckStatus(deckId, { access_token: accessToken })
+      try {
+        const statusData = await getDeckStatus(deckId, { access_token: accessToken })
 
-      if (!statusData) {
-        return
-      }
-
-      // Update processing status for UI
-      setProcessingStatus(statusData.processing_status)
-      setSlideCount(statusData.slide_count)
-
-      if (statusData.processing_status === 'ready') {
-        stopPolling()
-        // Fetch the full report with slides
-        const reportData = await getReport(deckId, accessToken)
-        if (reportData) {
-          setReport(reportData.content)
-          setReportCreatedAt(reportData.report_created_at || null)
-          setSlides(reportData.slides)
-          onReportReady?.(reportData)
+        if (!statusData) {
+          console.log('[polling] No status data returned')
+          return
         }
-        setStatus('success')
-        onStatusChange?.('success')
-      } else if (statusData.processing_status === 'failed') {
-        stopPolling()
-        const error = statusData.processing_error || 'Processing failed'
-        setErrorMessage(error)
-        onError?.(error)
-        setStatus('error')
-        onStatusChange?.('error')
+
+        console.log('[polling] Status:', statusData.processing_status)
+
+        // Update processing status for UI
+        setProcessingStatus(statusData.processing_status)
+        setSlideCount(statusData.slide_count)
+
+        if (statusData.processing_status === 'ready') {
+          stopPolling()
+          // Fetch the full report with slides
+          const reportData = await getReport(deckId, accessToken)
+          if (reportData) {
+            setReport(reportData.content)
+            setReportCreatedAt(reportData.report_created_at || null)
+            setSlides(reportData.slides)
+            onReportReady?.(reportData)
+          }
+          setStatus('success')
+          onStatusChange?.('success')
+        } else if (statusData.processing_status === 'failed') {
+          stopPolling()
+          const error = statusData.processing_error || 'Processing failed'
+          setErrorMessage(error)
+          onError?.(error)
+          setStatus('error')
+          onStatusChange?.('error')
+        }
+        // For extracting, extracted, analyzing, generating_free - continue polling
+      } catch (err) {
+        console.error('[polling] Error:', err)
       }
-      // For extracting, extracted, analyzing, generating_free - continue polling
     }, POLL_INTERVAL_MS)
   }, [stopPolling, onReportReady, onError, onStatusChange])
 
