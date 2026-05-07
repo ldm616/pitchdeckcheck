@@ -260,3 +260,22 @@ export async function sendReportLink(
     return { ok: false, error: 'Network error' }
   }
 }
+
+// Send contact form email
+export async function sendContactEmail(
+  name: string,
+  email: string,
+  message: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const response = await fetch('/.netlify/functions/send-contact-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, message }),
+    })
+
+    return response.json()
+  } catch {
+    return { ok: false, error: 'Network error' }
+  }
+}

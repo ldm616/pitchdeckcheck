@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../lib/routes'
 import { FounderHeader } from '../components/FounderHeader'
+import { ContactModal } from '../components/ContactModal'
 
 export function HomePage() {
+  const [showContact, setShowContact] = useState(false)
+
   return (
     <div className="flex flex-col flex-1">
       <FounderHeader />
@@ -43,13 +47,26 @@ export function HomePage() {
 
       {/* Footer */}
       <footer className="py-6 text-center">
+        <button
+          type="button"
+          onClick={() => setShowContact(true)}
+          className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
+        >
+          Contact
+        </button>
+        <span className="text-xs text-gray-300 mx-2">·</span>
         <Link
           to={ROUTES.ADMIN}
-          className="text-xs text-gray-400 hover:text-gray-500"
+          className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
         >
           Admin
         </Link>
       </footer>
+
+      <ContactModal
+        isOpen={showContact}
+        onClose={() => setShowContact(false)}
+      />
     </div>
   )
 }

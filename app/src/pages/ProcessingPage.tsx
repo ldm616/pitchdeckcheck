@@ -4,6 +4,7 @@ import { Check, Loader2 } from 'lucide-react'
 import { useReportPolling } from '../hooks/useReportPolling'
 import { getReportPath, ROUTES } from '../lib/routes'
 import { FounderHeader } from '../components/FounderHeader'
+import { FounderFooter } from '../components/FounderFooter'
 
 type Stage = 'extracting' | 'analyzing' | 'generating'
 
@@ -116,6 +117,7 @@ export function ProcessingPage() {
             </button>
           </div>
         </main>
+        <FounderFooter />
       </div>
     )
   }
@@ -141,6 +143,7 @@ export function ProcessingPage() {
             </button>
           </div>
         </main>
+        <FounderFooter />
       </div>
     )
   }
@@ -166,6 +169,7 @@ export function ProcessingPage() {
             </button>
           </div>
         </main>
+        <FounderFooter />
       </div>
     )
   }
@@ -211,6 +215,8 @@ export function ProcessingPage() {
           </button>
         </div>
       </main>
+
+      <FounderFooter />
     </div>
   )
 }

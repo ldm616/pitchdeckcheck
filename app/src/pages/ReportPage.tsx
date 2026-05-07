@@ -4,6 +4,7 @@ import { getReport, getReportByCode } from '../lib/api'
 import { ROUTES } from '../lib/routes'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { FounderHeader } from '../components/FounderHeader'
+import { FounderFooter } from '../components/FounderFooter'
 import {
   ReportHeader,
   QualityBreakdown,
@@ -101,6 +102,7 @@ export function ReportPage() {
             <p className="mt-4 text-gray-500">Loading your report...</p>
           </div>
         </main>
+        <FounderFooter />
       </div>
     )
   }
@@ -126,6 +128,7 @@ export function ReportPage() {
             </button>
           </div>
         </main>
+        <FounderFooter />
       </div>
     )
   }
@@ -158,6 +161,7 @@ export function ReportPage() {
             </div>
           </div>
         </main>
+        <FounderFooter />
       </div>
     )
   }
@@ -191,18 +195,11 @@ export function ReportPage() {
               details={v1Report.slides}
               slideImages={slides}
             />
-
-            <div className="mt-6 text-center">
-              <Link
-                to={ROUTES.UPLOAD}
-                className="text-gray-400 hover:text-gray-600 text-sm"
-              >
-                Check another deck
-              </Link>
-            </div>
           </div>
         </div>
       </main>
+
+      <FounderFooter />
     </div>
   )
 }

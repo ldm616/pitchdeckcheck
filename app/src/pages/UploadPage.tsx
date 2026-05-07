@@ -2,6 +2,7 @@ import { useDeckUpload } from '../hooks/useDeckUpload'
 import { UploadDropzone } from '../components/UploadDropzone'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { FounderHeader } from '../components/FounderHeader'
+import { FounderFooter } from '../components/FounderFooter'
 
 export function UploadPage() {
   const {
@@ -75,6 +76,8 @@ export function UploadPage() {
           )}
         </div>
       </main>
+
+      <FounderFooter />
     </div>
   )
 }

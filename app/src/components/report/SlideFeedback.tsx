@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
 import { GradeDot } from '../GradeBadge'
 import type { V1SlideDetail, SlideData } from '../../lib/types'
 
@@ -28,39 +27,21 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
   }
 
   return (
-    <div className="mb-8">
-      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
+    <div>
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-1">
         Slide Feedback
       </h2>
 
-      {!isExpanded && (
-        <>
-          <p className="text-sm text-gray-500 mb-4">
-            Detailed investor feedback for each slide.
-          </p>
-          <button
-            type="button"
-            onClick={() => setIsExpanded(true)}
-            className="group flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-          >
-            <span>Show detailed feedback per slide</span>
-            <ChevronDown className="w-4 h-4 transition-transform group-hover:translate-y-0.5" />
-          </button>
-        </>
-      )}
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+      >
+        {isExpanded ? 'Hide detailed investor feedback ↑' : 'Show detailed investor feedback for each slide ↓'}
+      </button>
 
       {isExpanded && (
-        <>
-          <button
-            type="button"
-            onClick={() => setIsExpanded(false)}
-            className="group flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-6"
-          >
-            <span>Hide detailed feedback</span>
-            <ChevronUp className="w-4 h-4 transition-transform group-hover:-translate-y-0.5" />
-          </button>
-
-          <div className="space-y-6">
+        <div className="mt-6 space-y-6">
             {details.map((slide) => {
               const slideData = slideImages.find(s => s.slide_number === slide.slide_number)
               const imageUrl = slideData?.image_url
@@ -114,8 +95,7 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
                 </div>
               )
             })}
-          </div>
-        </>
+        </div>
       )}
 
     </div>
