@@ -88,8 +88,8 @@ export function UploadDropzone({
         className={`
           relative border-2 border-dashed rounded-xl p-8 text-center transition-colors
           ${disabled ? 'bg-gray-50 cursor-not-allowed opacity-60' : 'cursor-pointer'}
-          ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-gray-50'}
-          ${error ? 'border-red-300 bg-red-50' : ''}
+          ${isDragging ? 'border-gray-400 bg-gray-100' : 'border-gray-200 hover:border-gray-300 bg-gray-50'}
+          ${error ? 'border-gray-300 bg-gray-100' : ''}
         `}
       >
         <input
@@ -103,12 +103,12 @@ export function UploadDropzone({
 
         {selectedFileName ? (
           <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FileText className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+              <FileText className="w-6 h-6 text-gray-600" />
             </div>
             <div>
               <p className="text-gray-900 font-medium">{selectedFileName}</p>
-              <p className="text-sm text-green-600 mt-1">Ready to upload</p>
+              <p className="text-sm text-gray-500 mt-1">Ready to upload</p>
             </div>
             {!disabled && (
               <button
@@ -141,7 +141,7 @@ export function UploadDropzone({
       </div>
 
       {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 text-sm text-gray-700">{error}</p>
       )}
     </div>
   )

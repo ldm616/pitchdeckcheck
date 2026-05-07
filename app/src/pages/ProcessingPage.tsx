@@ -44,7 +44,7 @@ export function ProcessingPage() {
           </p>
           <button
             onClick={() => navigate(ROUTES.UPLOAD)}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800"
           >
             Check a deck
           </button>
@@ -66,7 +66,7 @@ export function ProcessingPage() {
           </p>
           <button
             onClick={() => navigate(ROUTES.UPLOAD)}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800"
           >
             Check another deck
           </button>
@@ -88,7 +88,7 @@ export function ProcessingPage() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800"
           >
             Check Status
           </button>

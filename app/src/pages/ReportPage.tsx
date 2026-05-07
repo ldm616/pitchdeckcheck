@@ -104,7 +104,7 @@ export function ReportPage() {
           </p>
           <button
             onClick={() => navigate(ROUTES.UPLOAD)}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800"
           >
             Check a deck
           </button>
@@ -136,7 +136,7 @@ export function ReportPage() {
             <div className="mt-8">
               <Link
                 to={ROUTES.UPLOAD}
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                className="text-gray-900 hover:text-gray-700 text-sm font-medium"
               >
                 Check another deck
               </Link>
