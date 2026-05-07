@@ -306,6 +306,84 @@ BEFORE WRITING EACH SECTION: Have I already said this?
 The report should feel compressed and high-signal, not redundant.
 
 ═══════════════════════════════════════════════════════════════════
+INVESTOR QUESTIONS SECTION
+═══════════════════════════════════════════════════════════════════
+
+Generate an "investor_questions" section.
+
+Purpose:
+Evaluate whether the deck successfully answers the core questions investors use to evaluate an opportunity.
+
+This section is NOT a prediction of fundraising success.
+Do NOT predict whether investors would invest.
+Do NOT use the words:
+- fundable
+- investable
+- likely to raise
+- unlikely to raise
+
+Instead, evaluate whether the deck gives investors enough information and conviction to answer the following questions:
+
+1. Why this market?
+2. Why this product?
+3. Why this team?
+4. Why now?
+
+For each question:
+- assign one status:
+  - Strong
+  - Partial
+  - Weak
+- provide a concise explanation (1–2 sentences)
+- optionally provide one unresolved investor question if important ambiguity remains
+
+Definitions:
+
+Strong:
+The deck gives investors a clear, credible answer with enough evidence or logic to create conviction.
+
+Partial:
+The deck points investors in the right direction but leaves important gaps, ambiguity, or unanswered questions.
+
+Weak:
+The deck does not provide enough evidence, specificity, or reasoning for investors to understand or believe the answer.
+
+Style requirements:
+- Write like an experienced investor giving direct feedback to a founder.
+- Be specific to the actual company and narrative.
+- Reference actual themes from the deck.
+- Explain where investor conviction strengthens or weakens.
+- Avoid generic startup advice.
+- Avoid checklist language.
+- Avoid repeating the same issue across multiple questions unless truly necessary.
+
+Good example:
+"Investors understand that broadband adoption and cheaper digital cameras created a timely opening for online video, but the deck never quantifies how large this shift could become."
+
+Bad example:
+"The market slide needs more metrics."
+
+Good example:
+"The PayPal background gives the team real credibility for building a consumer internet platform with difficult technical infrastructure requirements."
+
+Bad example:
+"The team has relevant experience."
+
+The section should feel distinct from the Quality Breakdown section.
+
+Quality Breakdown evaluates:
+- clarity
+- brevity
+- flow
+- completeness
+
+Investor Questions evaluates:
+- market conviction
+- product conviction
+- team credibility
+- timing logic
+
+═══════════════════════════════════════════════════════════════════
 OUTPUT STRUCTURE (return as JSON)
 ═══════════════════════════════════════════════════════════════════
 
@@ -319,17 +397,36 @@ OUTPUT STRUCTURE (return as JSON)
     "completeness": { "grade": "A/B/C/D", "diagnostic": "Are key investor questions answered for this stage? (Not: are all sections present?)" }
   },
 
+  "investor_questions": [
+    {
+      "question": "Why this market?",
+      "status": "Strong | Partial | Weak",
+      "explanation": "1-2 sentence explanation specific to this deck",
+      "unresolved_question": "Optional: one specific investor question that remains unanswered, or null"
+    },
+    {
+      "question": "Why this product?",
+      "status": "Strong | Partial | Weak",
+      "explanation": "1-2 sentence explanation specific to this deck",
+      "unresolved_question": "Optional or null"
+    },
+    {
+      "question": "Why this team?",
+      "status": "Strong | Partial | Weak",
+      "explanation": "1-2 sentence explanation specific to this deck",
+      "unresolved_question": "Optional or null"
+    },
+    {
+      "question": "Why now?",
+      "status": "Strong | Partial | Weak",
+      "explanation": "1-2 sentence explanation specific to this deck",
+      "unresolved_question": "Optional or null"
+    }
+  ],
+
   "top_strengths": [
     { "strength": "What specific element builds investor conviction, and WHY it matters to investors (not just what it is)", "slide_type": "Problem" },
     { "strength": "Another specific conviction-building element with investor consequence", "slide_type": "..." }
-  ],
-
-  "top_improvements": [
-    {
-      "improvement": "The unresolved investor concern—what belief is missing",
-      "context": "Why this matters: what investor doubt or hesitation this creates, what conclusion has not been earned",
-      "slide_type": "Market"
-    }
   ],
 
   "narrative_flow": {
@@ -609,11 +706,12 @@ function buildV1Report(parsed, evaluationData) {
       slide_type: s.slide_type || 'General',
     })),
 
-    // 4. Top Improvement Priorities (limit to 3)
-    top_improvements: (parsed.top_improvements || []).slice(0, 3).map(imp => ({
-      improvement: imp.improvement || 'Improvement not specified',
-      context: imp.context || '',
-      slide_type: imp.slide_type || 'General',
+    // 4. Investor Questions
+    investor_questions: (parsed.investor_questions || []).map(q => ({
+      question: q.question || 'Question not specified',
+      status: q.status || 'Partial',
+      explanation: q.explanation || 'Assessment not available',
+      unresolved_question: q.unresolved_question || null,
     })),
 
     // 5. Narrative Flow
@@ -733,11 +831,12 @@ function generateFallbackReport(evaluationData, slides) {
     },
     quality_dimensions: dimensions,
     top_strengths: strengths.slice(0, 4),
-    top_improvements: improvements.slice(0, 3).map(i => ({
-      improvement: i.improvement,
-      context: i.context,
-      slide_type: i.slide_type,
-    })),
+    investor_questions: [
+      { question: 'Why this market?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
+      { question: 'Why this product?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
+      { question: 'Why this team?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
+      { question: 'Why now?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
+    ],
     narrative_flow: {
       strongest_sequence: {
         slides: strongestSlide ? `Slide ${strongestSlide.slide_number}` : 'Not identified',

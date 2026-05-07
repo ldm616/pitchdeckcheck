@@ -94,6 +94,13 @@ export interface V1Improvement {
   slide_type: string
 }
 
+export interface V1InvestorQuestion {
+  question: string
+  status: 'Strong' | 'Partial' | 'Weak'
+  explanation: string
+  unresolved_question: string | null
+}
+
 export interface V1NarrativeSequence {
   slides: string
   description: string
@@ -131,7 +138,8 @@ export interface V1Report {
   }
   quality_dimensions: V1QualityDimensions
   top_strengths: V1Strength[]
-  top_improvements: V1Improvement[]
+  investor_questions: V1InvestorQuestion[]
+  top_improvements?: V1Improvement[] // deprecated, kept for backwards compatibility
   narrative_flow: V1NarrativeFlow
   slide_summary: V1SlideSummary[]
   slides: V1SlideDetail[]

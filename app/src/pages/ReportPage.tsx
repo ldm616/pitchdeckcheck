@@ -8,7 +8,7 @@ import { FounderFooter } from '../components/FounderFooter'
 import {
   ReportHeader,
   QualityBreakdown,
-  TopImprovements,
+  InvestorQuestions,
   SlideFeedback,
   SaveReportSection,
 } from '../components/report'
@@ -189,7 +189,7 @@ export function ReportPage() {
 
             <QualityBreakdown dimensions={v1Report.quality_dimensions} />
 
-            <TopImprovements improvements={v1Report.top_improvements} />
+            <InvestorQuestions questions={v1Report.investor_questions} />
 
             <SlideFeedback
               details={v1Report.slides}
