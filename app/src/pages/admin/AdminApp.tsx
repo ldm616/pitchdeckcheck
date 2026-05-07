@@ -57,6 +57,10 @@ export function AdminApp() {
   const [actionError, setActionError] = useState('')
   const [regenProgress, setRegenProgress] = useState<string | null>(null)
 
+  // Bulk selection state
+  const [selectedDeckIds, setSelectedDeckIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Calibration state
   const [calibrationDecks, setCalibrationDecks] = useState<CalibrationDeck[]>([])
   const [calibrationLoading, setCalibrationLoading] = useState(false)
@@ -223,6 +227,47 @@ export function AdminApp() {
       setActionDeckId(null)
       setActionType(null)
     }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedDeckIds.size === 0) return
+    if (!confirm(`Delete ${selectedDeckIds.size} deck(s) and all associated data? This cannot be undone.`)) {
+      return
+    }
+
+    setBulkDeleting(true)
+    setActionError('')
+
+    try {
+      for (const deckId of selectedDeckIds) {
+        await deleteDeck(deckId)
+      }
+      setReportsList((prev) => prev.filter((r) => !selectedDeckIds.has(r.deck_id)))
+      setSelectedDeckIds(new Set())
+    } catch (err) {
+      console.error('Bulk delete error:', err)
+      setActionError('Some deletes failed')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedDeckIds.size === reportsList.length) {
+      setSelectedDeckIds(new Set())
+    } else {
+      setSelectedDeckIds(new Set(reportsList.map(r => r.deck_id)))
+    }
+  }
+
+  const toggleSelectDeck = (deckId: string) => {
+    const newSet = new Set(selectedDeckIds)
+    if (newSet.has(deckId)) {
+      newSet.delete(deckId)
+    } else {
+      newSet.add(deckId)
+    }
+    setSelectedDeckIds(newSet)
   }
 
   const stopRegenPolling = () => {
@@ -558,8 +603,6 @@ export function AdminApp() {
         <div
           style={{
             width: '100%',
-            borderBottom: '1px solid #e5e7eb',
-            backgroundColor: '#ffffff',
           }}
         >
           <div
@@ -572,31 +615,18 @@ export function AdminApp() {
               justifyContent: 'space-between',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h1
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: 0,
-                  letterSpacing: '-0.025em',
-                }}
-              >
-                Pitch Deck Check
-              </h1>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  backgroundColor: '#fef3c7',
-                  color: '#92400e',
-                  borderRadius: '4px',
-                }}
-              >
-                Admin
-              </span>
-            </div>
+            <h1
+              style={{
+                fontSize: '14px',
+                fontWeight: 500,
+                color: '#9ca3af',
+                margin: 0,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Admin
+            </h1>
             <button
               onClick={() => {
                 setViewingReport(false)
@@ -609,7 +639,7 @@ export function AdminApp() {
                 fontSize: '14px',
                 fontWeight: 500,
                 fontFamily,
-                color: '#2563eb',
+                color: '#6b7280',
                 cursor: 'pointer',
               }}
             >
@@ -631,37 +661,34 @@ export function AdminApp() {
             }}
           >
             {/* Simple report display for admin - uses same data */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
-              <div
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '12px',
-                  backgroundColor: report.overall_grade?.startsWith('A') ? '#22c55e'
-                    : report.overall_grade?.startsWith('B') ? '#84cc16'
-                    : report.overall_grade?.startsWith('C') ? '#eab308'
-                    : report.overall_grade?.startsWith('D') ? '#f97316'
-                    : '#ef4444',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '28px',
-                  fontWeight: 700,
-                  color: '#ffffff',
-                }}
-              >
-                {report.overall_grade || report.v1_report?.overall.grade || '?'}
-              </div>
-              <div>
-                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827' }}>
-                  Report
-                </h2>
-                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
-                  {slideCount || 0} slides
-                  {reportCreatedAt && ` • ${new Date(reportCreatedAt).toLocaleDateString()}`}
-                </p>
-              </div>
-            </div>
+            {(() => {
+              const grade = report.overall_grade || report.v1_report?.overall.grade || '?'
+              const gradeColor = grade.startsWith('A') ? '#22c55e'
+                : grade.startsWith('B') ? '#84cc16'
+                : grade.startsWith('C') ? '#eab308'
+                : grade.startsWith('D') ? '#f97316'
+                : '#ef4444'
+
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                  <span
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: gradeColor,
+                    }}
+                  />
+                  <span style={{ fontSize: '24px', fontWeight: 600, color: '#111827' }}>
+                    {grade}
+                  </span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                    {slideCount || 0} slides
+                    {reportCreatedAt && ` · ${new Date(reportCreatedAt).toLocaleDateString()}`}
+                  </span>
+                </div>
+              )
+            })()}
 
             <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
               <p style={{ margin: 0, fontSize: '15px', color: '#374151', lineHeight: 1.7 }}>
@@ -687,8 +714,6 @@ export function AdminApp() {
       <div
         style={{
           width: '100%',
-          borderBottom: '1px solid #e5e7eb',
-          backgroundColor: '#ffffff',
         }}
       >
         <div
@@ -701,31 +726,18 @@ export function AdminApp() {
             justifyContent: 'space-between',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#111827',
-                margin: 0,
-                letterSpacing: '-0.025em',
-              }}
-            >
-              Pitch Deck Check
-            </h1>
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                padding: '2px 8px',
-                backgroundColor: '#fef3c7',
-                color: '#92400e',
-                borderRadius: '4px',
-              }}
-            >
-              Admin
-            </span>
-          </div>
+          <h1
+            style={{
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#9ca3af',
+              margin: 0,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Admin
+          </h1>
           <div style={{ display: 'flex', gap: '16px' }}>
             <button
               onClick={() => setAdminView('reports')}
@@ -772,7 +784,7 @@ export function AdminApp() {
                 cursor: 'pointer',
               }}
             >
-              Exit Admin
+              Exit
             </button>
           </div>
         </div>
@@ -793,16 +805,37 @@ export function AdminApp() {
           {/* Reports View */}
           {adminView === 'reports' && (
             <div>
-              <h2
-                style={{
-                  fontSize: '20px',
-                  fontWeight: 600,
-                  color: '#111827',
-                  margin: '0 0 20px 0',
-                }}
-              >
-                Reports
-              </h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2
+                  style={{
+                    fontSize: '20px',
+                    fontWeight: 600,
+                    color: '#111827',
+                    margin: 0,
+                  }}
+                >
+                  Reports
+                </h2>
+                {selectedDeckIds.size > 0 && (
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '13px',
+                      fontFamily,
+                      backgroundColor: '#ffffff',
+                      color: '#6b7280',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      cursor: bulkDeleting ? 'not-allowed' : 'pointer',
+                      opacity: bulkDeleting ? 0.5 : 1,
+                    }}
+                  >
+                    {bulkDeleting ? 'Deleting...' : `Delete ${selectedDeckIds.size} selected`}
+                  </button>
+                )}
+              </div>
 
               {reportsLoading && (
                 <p style={{ color: '#6b7280', fontSize: '14px' }}>Loading reports...</p>
@@ -830,151 +863,157 @@ export function AdminApp() {
 
               {reportsList.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {reportsList.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => handleViewReport(item)}
-                      style={{
-                        padding: '12px 16px',
-                        backgroundColor: '#ffffff',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.15s',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f9fafb'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff'
-                      }}
-                    >
+                  {/* Select all header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedDeckIds.size === reportsList.length && reportsList.length > 0}
+                      onChange={toggleSelectAll}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                      {selectedDeckIds.size === reportsList.length ? 'Deselect all' : 'Select all'}
+                    </span>
+                  </div>
+
+                  {reportsList.map((item) => {
+                    const gradeColor = item.overall_grade?.startsWith('A') ? '#22c55e'
+                      : item.overall_grade?.startsWith('B') ? '#84cc16'
+                      : item.overall_grade?.startsWith('C') ? '#eab308'
+                      : item.overall_grade?.startsWith('D') ? '#f97316'
+                      : '#ef4444'
+
+                    return (
                       <div
+                        key={item.id}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '12px',
-                          flexWrap: 'wrap',
+                          padding: '12px 16px',
+                          backgroundColor: selectedDeckIds.has(item.deck_id) ? '#f9fafb' : '#ffffff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          transition: 'background-color 0.15s',
                         }}
                       >
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                          <p
-                            style={{
-                              margin: '0 0 4px 0',
-                              fontSize: '14px',
-                              fontWeight: 500,
-                              color: '#111827',
-                            }}
-                          >
-                            {item.email || 'No email'}
-                          </p>
-                          <p
-                            style={{
-                              margin: 0,
-                              fontSize: '12px',
-                              color: '#6b7280',
-                            }}
-                          >
-                            {item.original_filename || 'Unknown file'} {item.slide_count || 0} slides
-                          </p>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          {item.overall_grade && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '200px' }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedDeckIds.has(item.deck_id)}
+                              onChange={() => toggleSelectDeck(item.deck_id)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
                             <div
+                              onClick={() => handleViewReport(item)}
+                              style={{ cursor: 'pointer', flex: 1 }}
+                            >
+                              <p
+                                style={{
+                                  margin: '0 0 4px 0',
+                                  fontSize: '14px',
+                                  fontWeight: 500,
+                                  color: '#111827',
+                                }}
+                              >
+                                {item.email || 'No email'}
+                              </p>
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: '12px',
+                                  color: '#6b7280',
+                                }}
+                              >
+                                {item.original_filename || 'Unknown file'} · {item.slide_count || 0} slides
+                              </p>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {item.overall_grade && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span
+                                  style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    backgroundColor: gradeColor,
+                                  }}
+                                />
+                                <span style={{ fontSize: '14px', fontWeight: 500, color: '#374151' }}>
+                                  {item.overall_grade}
+                                </span>
+                              </div>
+                            )}
+
+                            <span
                               style={{
-                                width: '32px',
-                                height: '32px',
-                                borderRadius: '6px',
-                                backgroundColor: item.overall_grade.startsWith('A') ? '#22c55e'
-                                  : item.overall_grade.startsWith('B') ? '#84cc16'
-                                  : item.overall_grade.startsWith('C') ? '#eab308'
-                                  : item.overall_grade.startsWith('D') ? '#f97316'
-                                  : '#ef4444',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                color: '#ffffff',
+                                fontSize: '12px',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: '#f3f4f6',
+                                color: '#6b7280',
                               }}
                             >
-                              {item.overall_grade}
-                            </div>
-                          )}
+                              {actionDeckId === item.deck_id && actionType === 'regenerate'
+                                ? regenProgress || 'Regenerating...'
+                                : item.status}
+                            </span>
 
-                          <span
-                            style={{
-                              fontSize: '12px',
-                              padding: '2px 8px',
-                              borderRadius: '4px',
-                              backgroundColor: actionDeckId === item.deck_id && actionType === 'regenerate'
-                                ? '#fef3c7'
-                                : item.status === 'ready'
-                                  ? '#dcfce7'
-                                  : item.status === 'failed'
-                                    ? '#fef2f2'
-                                    : '#f3f4f6',
-                              color: actionDeckId === item.deck_id && actionType === 'regenerate'
-                                ? '#92400e'
-                                : item.status === 'ready'
-                                  ? '#166534'
-                                  : item.status === 'failed'
-                                    ? '#dc2626'
-                                    : '#6b7280',
-                            }}
-                          >
-                            {actionDeckId === item.deck_id && actionType === 'regenerate'
-                              ? regenProgress || 'Regenerating...'
-                              : item.status}
-                          </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRegenerateReport(item.deck_id)
+                              }}
+                              disabled={actionDeckId === item.deck_id}
+                              style={{
+                                padding: '4px 12px',
+                                fontSize: '12px',
+                                fontFamily,
+                                backgroundColor: '#ffffff',
+                                color: '#6b7280',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
+                                opacity: actionDeckId === item.deck_id ? 0.5 : 1,
+                              }}
+                            >
+                              Regen
+                            </button>
 
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRegenerateReport(item.deck_id)
-                            }}
-                            disabled={actionDeckId === item.deck_id}
-                            style={{
-                              padding: '4px 12px',
-                              fontSize: '12px',
-                              fontFamily,
-                              backgroundColor: '#ffffff',
-                              color: '#2563eb',
-                              border: '1px solid #bfdbfe',
-                              borderRadius: '4px',
-                              cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
-                              opacity: actionDeckId === item.deck_id ? 0.5 : 1,
-                            }}
-                          >
-                            Regen
-                          </button>
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteReport(item.deck_id)
-                            }}
-                            disabled={actionDeckId === item.deck_id}
-                            style={{
-                              padding: '4px 12px',
-                              fontSize: '12px',
-                              fontFamily,
-                              backgroundColor: '#ffffff',
-                              color: '#dc2626',
-                              border: '1px solid #fecaca',
-                              borderRadius: '4px',
-                              cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
-                              opacity: actionDeckId === item.deck_id ? 0.5 : 1,
-                            }}
-                          >
-                            Delete
-                          </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteReport(item.deck_id)
+                              }}
+                              disabled={actionDeckId === item.deck_id}
+                              style={{
+                                padding: '4px 12px',
+                                fontSize: '12px',
+                                fontFamily,
+                                backgroundColor: '#ffffff',
+                                color: '#6b7280',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '4px',
+                                cursor: actionDeckId === item.deck_id ? 'not-allowed' : 'pointer',
+                                opacity: actionDeckId === item.deck_id ? 0.5 : 1,
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

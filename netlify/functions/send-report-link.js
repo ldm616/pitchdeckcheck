@@ -155,13 +155,11 @@ exports.handler = async (event) => {
       text: `Your Pitch Deck Report\n\nHere's your private link to access your pitch deck report:\n\n${reportLink}\n\nThis link is private. Only people with this link can view your report.\n\n—\nPitch Deck Check`,
     })
 
-    // Optionally update the deck with the email if not already set
-    if (!deck.email) {
-      await supabase
-        .from('decks')
-        .update({ email })
-        .eq('id', deck_id)
-    }
+    // Always update the deck with the email so admin can see it
+    await supabase
+      .from('decks')
+      .update({ email })
+      .eq('id', deck_id)
 
     return {
       statusCode: 200,
