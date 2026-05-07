@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import { Expand, X, ChevronDown } from 'lucide-react'
 import { GradeDot } from '../GradeBadge'
-import type { V1SlideDetail, SlideData } from '../../lib/types'
+import type { V1SlideSummary, V1SlideDetail, SlideData } from '../../lib/types'
 
-interface SlideDetailsProps {
-  slides: V1SlideDetail[]
+interface SlideFeedbackProps {
+  summary: V1SlideSummary[]
+  details: V1SlideDetail[]
   slideImages: SlideData[]
 }
 
-export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+export function SlideFeedback({ summary, details, slideImages }: SlideFeedbackProps) {
+  const [showDetails, setShowDetails] = useState(false)
   const [selectedSlideNumber, setSelectedSlideNumber] = useState<number | null>(null)
 
-  if (!slides || slides.length === 0) return null
+  if (!summary || summary.length === 0) return null
 
   // Helper to check if text is essentially "no improvement needed"
   const isNoAction = (text: string) => {
@@ -28,10 +29,6 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
            lower.includes('no changes needed')
   }
 
-  const handleThumbnailClick = (slideNumber: number) => {
-    setSelectedSlideNumber(slideNumber)
-  }
-
   const handleCloseModal = () => {
     setSelectedSlideNumber(null)
   }
@@ -43,25 +40,53 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
   }
 
   return (
-    <div className="mb-10">
-      {/* Collapsible header */}
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between py-3 text-left group"
-      >
-        <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide group-hover:text-gray-500 transition-colors">
-          Detailed Slide Feedback
-        </h2>
-        <ChevronDown
-          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-        />
-      </button>
+    <div className="mb-8">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">
+        Slide Feedback
+      </h2>
 
-      {/* Expandable content */}
-      {isExpanded && (
-        <div className="mt-6 space-y-8">
-          {slides.map((slide) => {
+      {/* Compact overview list */}
+      <div className="space-y-2">
+        {summary.map((slide) => (
+          <div
+            key={slide.slide_number}
+            className="flex items-start gap-3 py-2"
+          >
+            <span className="text-sm text-gray-400 w-6 flex-shrink-0">
+              {slide.slide_number}
+            </span>
+            <span className="text-sm text-gray-500 w-24 flex-shrink-0">
+              {slide.type}
+            </span>
+            <div className="flex items-center gap-1.5 w-12 flex-shrink-0">
+              <GradeDot grade={slide.grade} />
+              <span className="text-sm text-gray-500">{slide.grade}</span>
+            </div>
+            <p className="text-sm text-gray-600 leading-relaxed flex-1">
+              {slide.key_takeaway}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Expand toggle */}
+      {details && details.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowDetails(!showDetails)}
+          className="mt-6 flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <span>{showDetails ? 'Hide' : 'Show'} detailed feedback</span>
+          <ChevronDown
+            className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`}
+          />
+        </button>
+      )}
+
+      {/* Detailed feedback */}
+      {showDetails && details && (
+        <div className="mt-6 space-y-6">
+          {details.map((slide) => {
             const slideData = slideImages.find(s => s.slide_number === slide.slide_number)
             const imageUrl = slideData?.image_url
             const hasImprovement = slide.highest_impact_improvement && !isNoAction(slide.highest_impact_improvement)
@@ -77,13 +102,13 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
             const assessment = assessmentParts.join(' ')
 
             return (
-              <div key={slide.slide_number} className="pb-8 border-b border-gray-100 last:border-0 last:pb-0">
-                {/* Header: Slide # — Type — Grade */}
+              <div key={slide.slide_number} className="pt-6 border-t border-gray-100 first:border-0 first:pt-0">
+                {/* Header */}
                 <div className="flex items-start gap-4 mb-3">
                   {imageUrl && (
                     <button
                       type="button"
-                      onClick={() => handleThumbnailClick(slide.slide_number)}
+                      onClick={() => setSelectedSlideNumber(slide.slide_number)}
                       className="flex-shrink-0 w-16 relative group"
                     >
                       <img
@@ -108,17 +133,17 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
                   </div>
                 </div>
 
-                {/* Assessment prose */}
+                {/* Assessment */}
                 {assessment && (
                   <p className="text-sm text-gray-600 leading-relaxed mb-3">
                     {assessment}
                   </p>
                 )}
 
-                {/* Highest-leverage improvement */}
+                {/* Improvement */}
                 {hasImprovement && (
                   <p className="text-sm text-gray-500 leading-relaxed">
-                    <span className="text-gray-400 font-medium">Highest-leverage improvement: </span>
+                    <span className="text-gray-400 font-medium">Fix: </span>
                     {slide.highest_impact_improvement}
                   </p>
                 )}

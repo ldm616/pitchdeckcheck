@@ -40,7 +40,7 @@ export function SaveReportSection({ deckId, accessToken }: SaveReportSectionProp
   // Success state
   if (status === 'sent') {
     return (
-      <div className="mb-12 py-6 border-y border-gray-100">
+      <div className="mb-8 pb-8 border-b border-gray-100">
         <p className="text-sm text-gray-600">
           Private link sent.
         </p>
@@ -49,7 +49,7 @@ export function SaveReportSection({ deckId, accessToken }: SaveReportSectionProp
   }
 
   return (
-    <div className="mb-12 py-6 border-y border-gray-100">
+    <div className="mb-8 pb-8 border-b border-gray-100">
       <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
         Save this report
       </h2>

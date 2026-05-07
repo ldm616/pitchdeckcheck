@@ -8,8 +8,7 @@ import {
   ReportHeader,
   QualityBreakdown,
   TopImprovements,
-  SlideSummaryTable,
-  SlideDetails,
+  SlideFeedback,
   SaveReportSection,
 } from '../components/report'
 import type { ReportContent, SlideData } from '../lib/types'
@@ -188,14 +187,16 @@ export function ReportPage() {
 
             <TopImprovements improvements={v1Report.top_improvements} />
 
-            <SlideSummaryTable slides={v1Report.slide_summary} />
+            <SlideFeedback
+              summary={v1Report.slide_summary}
+              details={v1Report.slides}
+              slideImages={slides}
+            />
 
-            <SlideDetails slides={v1Report.slides} slideImages={slides} />
-
-            <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+            <div className="mt-6 text-center">
               <Link
                 to={ROUTES.UPLOAD}
-                className="text-gray-500 hover:text-gray-700 text-sm"
+                className="text-gray-400 hover:text-gray-600 text-sm"
               >
                 Check another deck
               </Link>

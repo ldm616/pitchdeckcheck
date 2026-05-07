@@ -9,9 +9,9 @@ interface ReportHeaderProps {
 
 export function ReportHeader({ report, slideCount, reportCreatedAt }: ReportHeaderProps) {
   return (
-    <div className="mb-10">
+    <div className="mb-8">
       {/* Grade and metadata */}
-      <div className="flex items-center gap-5 mb-6">
+      <div className="flex items-center gap-5 mb-5">
         <GradeWithAccent grade={report.overall.grade} size="lg" />
         <p className="text-sm text-gray-400">
           {slideCount || report.slide_summary?.length || 0} slides
@@ -28,7 +28,7 @@ export function ReportHeader({ report, slideCount, reportCreatedAt }: ReportHead
 
       {/* Overall Assessment */}
       <div>
-        <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
+        <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
           Overall Assessment
         </h2>
         <p className="text-sm text-gray-700 leading-relaxed">
@@ -36,7 +36,7 @@ export function ReportHeader({ report, slideCount, reportCreatedAt }: ReportHead
         </p>
       </div>
 
-      <p className="mt-4 text-xs text-gray-400">
+      <p className="mt-3 text-xs text-gray-400">
         {report.overall.positioning_note}
       </p>
     </div>
