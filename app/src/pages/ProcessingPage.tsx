@@ -46,7 +46,7 @@ export function ProcessingPage() {
             onClick={() => navigate(ROUTES.UPLOAD)}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
           >
-            Analyze a deck
+            Check a deck
           </button>
         </div>
       </div>
@@ -68,7 +68,7 @@ export function ProcessingPage() {
             onClick={() => navigate(ROUTES.UPLOAD)}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
           >
-            Analyze another deck
+            Check another deck
           </button>
         </div>
       </div>

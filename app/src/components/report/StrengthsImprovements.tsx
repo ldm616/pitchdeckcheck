@@ -8,20 +8,17 @@ export function TopStrengths({ strengths }: TopStrengthsProps) {
   if (!strengths || strengths.length === 0) return null
 
   return (
-    <div className="mb-8">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Top Strengths
-      </h3>
-      <div className="flex flex-col gap-2.5">
+    <div className="mb-12">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
+        What Works
+      </h2>
+      <div className="space-y-4">
         {strengths.map((s, idx) => (
-          <div
-            key={idx}
-            className="p-3.5 bg-green-50 rounded-lg border-l-3 border-green-500"
-          >
-            <p className="text-sm text-green-700 leading-relaxed">
+          <div key={idx} className="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
+            <p className="text-sm text-gray-700 leading-relaxed">
               {s.strength}
             </p>
-            <p className="mt-1.5 text-xs text-gray-500">
+            <p className="mt-1.5 text-xs text-gray-400">
               {s.slide_type}
             </p>
           </div>
@@ -39,25 +36,22 @@ export function TopImprovements({ improvements }: TopImprovementsProps) {
   if (!improvements || improvements.length === 0) return null
 
   return (
-    <div className="mb-8">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Top Improvement Priorities
-      </h3>
-      <div className="flex flex-col gap-2.5">
+    <div className="mb-12">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
+        Key Improvements
+      </h2>
+      <div className="space-y-6">
         {improvements.map((imp, idx) => (
-          <div
-            key={idx}
-            className="p-3.5 bg-amber-50 rounded-lg border-l-3 border-amber-500"
-          >
-            <p className="text-sm text-amber-800 leading-relaxed font-medium">
-              {idx + 1}. {imp.improvement}
+          <div key={idx} className="pb-6 border-b border-gray-100 last:border-0 last:pb-0">
+            <p className="text-sm text-gray-700 leading-relaxed">
+              {imp.improvement}
             </p>
             {imp.context && (
-              <p className="mt-1.5 text-sm text-stone-600 leading-relaxed">
+              <p className="mt-2 text-sm text-gray-500 leading-relaxed">
                 {imp.context}
               </p>
             )}
-            <p className="mt-1.5 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-gray-400">
               {imp.slide_type}
             </p>
           </div>

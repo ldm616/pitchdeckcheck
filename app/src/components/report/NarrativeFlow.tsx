@@ -8,39 +8,39 @@ export function NarrativeFlow({ narrativeFlow }: NarrativeFlowProps) {
   if (!narrativeFlow) return null
 
   return (
-    <div className="mb-8">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="mb-12">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
         Narrative Flow
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      </h2>
+      <div className="space-y-6">
         {/* Strongest Sequence */}
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <p className="mb-2 text-xs font-semibold text-green-700 uppercase tracking-wide">
-            Strongest Sequence
+        <div className="pb-6 border-b border-gray-100">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+            Strongest sequence
           </p>
-          <p className="mb-1.5 text-sm font-semibold text-green-900">
+          <p className="text-sm font-medium text-gray-900 mb-2">
             {narrativeFlow.strongest_sequence.slides}
           </p>
-          <p className="mb-2 text-sm text-green-700 leading-relaxed">
+          <p className="text-sm text-gray-700 leading-relaxed mb-2">
             {narrativeFlow.strongest_sequence.description}
           </p>
-          <p className="text-xs text-green-500 italic">
+          <p className="text-sm text-gray-500 italic">
             {narrativeFlow.strongest_sequence.investor_reaction}
           </p>
         </div>
 
         {/* Weakest Sequence */}
-        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-          <p className="mb-2 text-xs font-semibold text-red-700 uppercase tracking-wide">
-            Needs Work
+        <div>
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+            Needs work
           </p>
-          <p className="mb-1.5 text-sm font-semibold text-red-900">
+          <p className="text-sm font-medium text-gray-900 mb-2">
             {narrativeFlow.weakest_sequence.slides}
           </p>
-          <p className="mb-2 text-sm text-red-700 leading-relaxed">
+          <p className="text-sm text-gray-700 leading-relaxed mb-2">
             {narrativeFlow.weakest_sequence.description}
           </p>
-          <p className="text-xs text-red-400 italic">
+          <p className="text-sm text-gray-500 italic">
             {narrativeFlow.weakest_sequence.investor_reaction}
           </p>
         </div>

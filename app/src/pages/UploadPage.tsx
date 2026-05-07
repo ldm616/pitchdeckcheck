@@ -73,7 +73,7 @@ export function UploadPage() {
                     {status === 'uploading' ? 'Uploading...' : 'Processing...'}
                   </>
                 ) : (
-                  'Analyze My Pitch Deck'
+                  'Check My Deck'
                 )}
               </button>
             </form>
