@@ -1787,7 +1787,11 @@ async function generateFullReport(supabase, deckId, options = {}) {
     console.log(`[eval] Generating V1 founder-facing report...`)
     let v1Report = null
     try {
-      v1Report = await generateV1Report(fullReport, slides)
+      // Pass deck context for stage-calibrated synthesis
+      const v1Options = {
+        deckContext: evalContext?.deckContext || null,
+      }
+      v1Report = await generateV1Report(fullReport, slides, v1Options)
       console.log(`[eval] V1 report generated successfully`)
     } catch (v1Error) {
       console.error(`[eval] V1 report generation failed:`, v1Error.message)

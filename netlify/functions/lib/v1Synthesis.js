@@ -1,61 +1,40 @@
 /**
  * V1 Founder-Facing Report Synthesis
  *
- * This module transforms detailed evaluation data into a clean, concise,
- * founder-facing report optimized for usefulness over technical completeness.
+ * Single-pass GPT-4 synthesis that transforms evaluation data into a coherent,
+ * founder-facing report. This replaces the previous 3-call + mechanical extraction
+ * approach with one unified call that generates all V1 content together.
  *
- * Report Structure:
- * 1. Overall Deck Quality (grade + deck-specific synthesis)
- * 2. Quality Dimensions (Clarity, Brevity, Flow, Completeness)
- * 3. Top Strengths (3-4 deck-specific strengths)
- * 4. Top Improvement Priorities (3 highest-impact improvements)
- * 5. Narrative Flow Analysis
- * 6. Slide Summary Table
- * 7. Slide Details (concise: What Works, Biggest Gap, Highest-Impact Fix)
+ * Key principles:
+ * - Deck quality focus (not fundability prediction)
+ * - Stage-calibrated recommendations (seed sparse ≠ Series A SaaS)
+ * - Prioritized, non-repetitive feedback
+ * - Honest criticism for weak decks
+ * - Explains where investor understanding builds or breaks
  */
 
 const OpenAI = require('openai')
 
 // V1 Report Version
-const V1_REPORT_VERSION = 'v1.0.0'
+const V1_REPORT_VERSION = 'v1.1.0'
 
-// Quality dimension definitions
+// Quality dimension definitions (for fallback and UI display)
 const QUALITY_DIMENSIONS = {
   clarity: {
     name: 'Clarity',
     description: 'How clearly the deck communicates what the company does and why it matters',
-    key_questions: [
-      'Can someone understand the product in 30 seconds?',
-      'Is the value proposition obvious?',
-      'Are technical concepts explained simply?',
-    ],
   },
   brevity: {
     name: 'Brevity',
     description: 'Whether the deck is appropriately concise without unnecessary content',
-    key_questions: [
-      'Is each slide focused on one key point?',
-      'Are there redundant or filler slides?',
-      'Does text density feel appropriate?',
-    ],
   },
   flow: {
     name: 'Flow',
     description: 'How logically the narrative builds from problem to solution to ask',
-    key_questions: [
-      'Does the story build logically?',
-      'Are transitions between sections smooth?',
-      'Does momentum build toward the ask?',
-    ],
   },
   completeness: {
     name: 'Completeness',
     description: 'Whether the deck addresses the key questions investors need answered',
-    key_questions: [
-      'Are core investor questions addressed?',
-      'Are there obvious missing sections?',
-      'Is enough evidence provided?',
-    ],
   },
 }
 
@@ -77,106 +56,122 @@ const SLIDE_TYPE_NAMES = {
   vision: 'Vision',
   contact: 'Contact',
   appendix: 'Appendix',
+  other: 'Other',
 }
 
 /**
- * Prompt for generating deck-specific synthesis.
- * This produces the 1-2 paragraph summary that feels human and specific.
+ * Unified V1 Synthesis Prompt
+ *
+ * Generates the complete founder-facing report in one coherent pass.
  */
-const V1_SYNTHESIS_PROMPT = `You are a sharp, experienced pitch deck reviewer helping founders improve their decks.
+const V1_UNIFIED_PROMPT = `You are a sharp, experienced pitch deck reviewer helping founders improve their decks before investor meetings.
 
-Your job is to write a 1-2 paragraph synthesis of this deck that:
-- Summarizes the actual narrative (what the company does, who it serves, what problem it solves)
-- Identifies the strongest investor signals in this specific deck
-- Identifies the biggest missing pieces or gaps
-- Feels specific to THIS deck, not template-generated
-- Uses concrete references to actual content
+You will receive detailed evaluation data for a pitch deck and must generate a complete founder-facing quality report as JSON.
 
-DO NOT:
-- Use generic phrases like "the deck is well-structured" or "needs more detail"
-- Mention the scoring system or rubrics
-- Use academic or evaluator language
-- Repeat the same point twice
+CRITICAL PRINCIPLES:
 
-DO:
-- Reference the actual product, market, or company
-- Be direct and specific about what works and what doesn't
-- Sound like a helpful human reviewer, not an AI
-- Keep it concise (2-4 sentences per paragraph)
+1. DECK QUALITY, NOT FUNDABILITY
+   - You are evaluating how well the deck communicates, not whether the company will succeed
+   - A deck can be high-quality for a weak business, or low-quality for a great business
+   - Never predict fundraising outcomes
 
-EXAMPLE GOOD SYNTHESIS:
-"This is a sparse but high-signal seed deck that clearly communicates a painful consumer problem around video sharing friction, strong timing around broadband adoption, and a simple product vision. The presentation lacks quantified evidence and detailed financials, but the core narrative is easy to understand and logically structured. The biggest gap is competitive positioning—investors will want to understand why YouTube wins against existing video platforms."
+2. STAGE-CALIBRATED FEEDBACK
+   - Sparse 6-8 slide seed decks should NOT be penalized like 20-slide Series A decks
+   - Pre-seed decks often lack metrics—that's expected. Focus on clarity of vision and problem.
+   - Series A decks SHOULD have detailed traction, unit economics, and competitive positioning.
+   - Adapt your expectations to the apparent stage.
 
-Return ONLY the synthesis text, no JSON or formatting.`
+3. PRIORITIZED, NON-REPETITIVE FEEDBACK
+   - Do NOT give checklist-style "add X, add Y, add Z" recommendations
+   - Do NOT repeat "add metrics" across multiple sections
+   - Identify the 2-3 things that would MOST improve investor understanding
+   - Each strength and improvement should be distinct and deck-specific
 
-/**
- * Prompt for generating quality dimension assessments.
- */
-const V1_DIMENSIONS_PROMPT = `You are evaluating a pitch deck across 4 quality dimensions. For each dimension, provide:
-- A grade (A, B, C, D)
-- A 1-sentence deck-specific diagnostic
+4. HONEST CRITICISM
+   - Weak decks should be criticized honestly
+   - Do not soften feedback with excessive hedging
+   - Be direct about fundamental problems (unclear product, missing differentiation, etc.)
 
-DIMENSIONS:
-1. CLARITY - How clearly the deck communicates what the company does
-2. BREVITY - Whether the deck is appropriately concise
-3. FLOW - How logically the narrative builds
-4. COMPLETENESS - Whether key investor questions are addressed
+5. INVESTOR UNDERSTANDING FOCUS
+   - Explain WHERE in the deck investor conviction builds or breaks
+   - Connect feedback to what investors are actually thinking
+   - "At slide 5, an investor would wonder..." is useful framing
 
-CRITICAL RULES:
-- Each diagnostic MUST reference actual deck content
-- Do NOT use generic phrases like "the deck is clear" or "flow is logical"
-- DO reference specific slides, product features, or narrative elements
+OUTPUT STRUCTURE (return as JSON):
 
-BAD: "The deck is easy to understand."
-GOOD: "The deck clearly communicates that YouTube solves the friction of uploading, hosting, and sharing video online."
-
-BAD: "The flow is logical."
-GOOD: "The narrative builds from video-sharing pain points → enabling technology shift → simple product solution → early traction evidence."
-
-Return JSON:
 {
-  "clarity": { "grade": "B", "diagnostic": "..." },
-  "brevity": { "grade": "B", "diagnostic": "..." },
-  "flow": { "grade": "B", "diagnostic": "..." },
-  "completeness": { "grade": "C", "diagnostic": "..." }
-}`
+  "synthesis": "1-2 paragraph deck-specific summary. Reference actual product/market. Identify strongest signals and biggest gaps. NO generic phrases.",
 
-/**
- * Prompt for generating narrative flow analysis.
- */
-const V1_NARRATIVE_FLOW_PROMPT = `Analyze the narrative flow of this pitch deck.
-
-Identify:
-1. The strongest sequence of slides (where investor conviction builds)
-2. The weakest sequence (where narrative momentum weakens or gaps appear)
-
-For each, explain:
-- Which slides form the sequence
-- Why it works or doesn't work
-- What an investor would think at that point
-
-Be specific about slide content and narrative logic.
-
-Return JSON:
-{
-  "strongest_sequence": {
-    "slides": "Slides 2-4",
-    "description": "The problem → solution → product sequence builds clear conviction around the core value proposition.",
-    "investor_reaction": "By slide 4, investors understand the pain point and see a simple, elegant solution."
+  "quality_dimensions": {
+    "clarity": { "grade": "A-D", "diagnostic": "1 sentence referencing actual deck content" },
+    "brevity": { "grade": "A-D", "diagnostic": "..." },
+    "flow": { "grade": "A-D", "diagnostic": "..." },
+    "completeness": { "grade": "A-D", "diagnostic": "..." }
   },
-  "weakest_sequence": {
-    "slides": "Slides 6-7",
-    "description": "The market → competition transition loses momentum with generic claims.",
-    "investor_reaction": "Investors start questioning whether the market size is real and how this wins against alternatives."
-  }
-}`
+
+  "top_strengths": [
+    { "strength": "Deck-specific strength with concrete reference", "slide_type": "Problem" },
+    { "strength": "...", "slide_type": "..." }
+  ],
+
+  "top_improvements": [
+    { "improvement": "Specific, actionable improvement", "context": "Why this matters to investors", "slide_type": "Market" },
+    { "improvement": "...", "context": "...", "slide_type": "..." }
+  ],
+
+  "narrative_flow": {
+    "strongest_sequence": {
+      "slides": "Slides X-Y",
+      "description": "Why this sequence builds conviction",
+      "investor_reaction": "What investors think/feel at this point"
+    },
+    "weakest_sequence": {
+      "slides": "Slides X-Y",
+      "description": "Why this sequence loses momentum",
+      "investor_reaction": "What questions or doubts arise"
+    }
+  },
+
+  "slide_summary": [
+    { "slide_number": 1, "type": "Cover", "grade": "B", "key_takeaway": "10-15 word summary of main issue or strength" }
+  ],
+
+  "slide_details": [
+    {
+      "slide_number": 1,
+      "type": "Cover",
+      "grade": "B",
+      "what_works": "Specific positive (or 'Limited strong elements' if weak)",
+      "biggest_gap": "Most important missing piece (or 'No significant gaps' if strong)",
+      "highest_impact_improvement": "One concrete fix (or 'No changes needed' if strong)"
+    }
+  ]
+}
+
+ANTI-PATTERNS TO AVOID:
+- "The deck would benefit from more metrics" (too generic)
+- "Consider adding traction data" (repeated across sections)
+- "The flow is logical" (empty praise)
+- "Needs more detail" (vague)
+- "Well-structured deck" (template language)
+- Starting every strength with "The deck..."
+- Identical or near-identical recommendations across slides
+
+GOOD PATTERNS:
+- "The problem slide's restaurant scenario makes the pain point immediately relatable"
+- "Investors lose conviction at slide 6 when market size claims lack sourcing"
+- "The cover slide's tagline 'Share video online' communicates the core value in 3 words"
+- "Adding monthly active users would transform the traction slide from assertion to proof"
+- "The competition matrix is missing—investors will wonder why Vimeo isn't addressed"
+
+Return ONLY valid JSON. No markdown, no explanation outside the JSON.`
 
 /**
  * Generate V1 founder-facing report from evaluation data.
  *
- * @param {Object} evaluationData - Full evaluation results from existing pipeline
+ * @param {Object} evaluationData - Full evaluation results from existing pipeline (fullReport)
  * @param {Array} slides - Slide data with extracted text
- * @param {Object} options - Generation options
+ * @param {Object} options - Generation options (may include debugInfo for context)
  * @returns {Object} V1 report structure
  */
 async function generateV1Report(evaluationData, slides, options = {}) {
@@ -187,25 +182,160 @@ async function generateV1Report(evaluationData, slides, options = {}) {
 
   const openai = new OpenAI({ apiKey: openaiKey })
 
-  // Build deck context for synthesis
-  const deckContext = buildDeckContext(slides, evaluationData)
+  // Build comprehensive context for the unified synthesis
+  const synthesisContext = buildSynthesisContext(evaluationData, slides, options)
 
-  // Generate all synthesis components in parallel
-  const [synthesis, dimensions, narrativeFlow] = await Promise.all([
-    generateSynthesis(openai, deckContext, evaluationData),
-    generateDimensions(openai, deckContext, evaluationData),
-    generateNarrativeFlow(openai, deckContext, evaluationData),
-  ])
+  console.log(`[v1-synthesis] Starting unified V1 generation for ${slides.length} slides...`)
 
-  // Generate strengths and improvements from evaluation data (no API call)
-  const topStrengths = extractTopStrengths(evaluationData, deckContext)
-  const topImprovements = extractTopImprovements(evaluationData, deckContext)
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: V1_UNIFIED_PROMPT },
+        { role: 'user', content: synthesisContext },
+      ],
+      temperature: 0.6,
+      max_tokens: 4000,
+      response_format: { type: 'json_object' },
+    })
 
-  // Generate slide summary table (no API call)
-  const slideSummaryTable = generateSlideSummaryTable(evaluationData)
+    const content = response.choices[0]?.message?.content
+    const parsed = JSON.parse(content)
 
-  // Generate concise slide details (no API call)
-  const slideDetails = generateSlideDetails(evaluationData)
+    console.log(`[v1-synthesis] Unified generation complete`)
+
+    // Validate and structure the response
+    return buildV1Report(parsed, evaluationData)
+  } catch (err) {
+    console.error(`[v1-synthesis] Unified generation failed:`, err.message)
+    // Fall back to deterministic generation
+    return generateFallbackReport(evaluationData, slides)
+  }
+}
+
+/**
+ * Build comprehensive context string for the unified synthesis prompt.
+ */
+function buildSynthesisContext(evaluationData, slides, options = {}) {
+  const parts = []
+
+  // 1. Deck metadata
+  parts.push(`=== DECK METADATA ===
+Overall Grade: ${evaluationData.overall_grade}
+Deck Score: ${(evaluationData.deck_score * 100).toFixed(0)}%
+Slide Count: ${slides.length}
+Architecture: ${evaluationData.architecture?.architecture_version || 'v2'}`)
+
+  // Add detected context if available (from v3 debug)
+  if (options.deckContext) {
+    const ctx = options.deckContext
+    if (ctx.is_sparse) {
+      parts.push(`Deck Type: SPARSE (likely early-stage seed deck)`)
+    }
+    if (ctx.inferred_contexts?.length > 0) {
+      parts.push(`Detected Categories: ${ctx.inferred_contexts.join(', ')}`)
+    }
+  }
+
+  // 2. Slide content with evaluations
+  parts.push(`\n=== SLIDES WITH EVALUATIONS ===`)
+
+  for (const slide of slides) {
+    const evalSlide = evaluationData.slides?.find(s => s.slide_number === slide.slide_number)
+    const typeName = SLIDE_TYPE_NAMES[slide.inferred_type] || slide.inferred_type
+    const text = (slide.extracted_text || '').substring(0, 500).replace(/\n+/g, ' ').trim()
+
+    let slideSection = `\n--- Slide ${slide.slide_number}: ${typeName} (Grade: ${evalSlide?.grade || 'N/A'}) ---`
+    slideSection += `\nContent: ${text}${slide.extracted_text?.length > 500 ? '...' : ''}`
+
+    // Add evaluation details if available
+    if (evalSlide?.questions?.length > 0) {
+      slideSection += `\n\nEvaluation:`
+      for (const q of evalSlide.questions) {
+        slideSection += `\n- ${q.question} (${q.score}/5)`
+        if (q.assessment) slideSection += `\n  Assessment: ${q.assessment}`
+        if (q.gap && q.gap !== 'None - fully addressed') slideSection += `\n  Gap: ${q.gap}`
+        if (q.fix && q.fix !== 'None needed') slideSection += `\n  Fix: ${q.fix}`
+      }
+    }
+
+    parts.push(slideSection)
+  }
+
+  // 3. Investment thesis evaluation (if available)
+  if (evaluationData.investment_thesis) {
+    parts.push(`\n=== INVESTMENT THESIS EVALUATION ===`)
+    const thesis = evaluationData.investment_thesis
+
+    for (const [key, value] of Object.entries(thesis)) {
+      if (value && typeof value === 'object') {
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        parts.push(`\n${label}: ${value.score}/5`)
+        if (value.assessment) parts.push(`  Assessment: ${value.assessment}`)
+        if (value.gaps && value.gaps !== 'None - thesis is well-supported') {
+          parts.push(`  Gaps: ${value.gaps}`)
+        }
+      }
+    }
+  }
+
+  // 4. Instructions
+  parts.push(`\n=== INSTRUCTIONS ===
+Generate the complete V1 founder-facing report JSON based on the above evaluation data.
+Remember:
+- This is deck QUALITY review, not fundability prediction
+- Calibrate expectations to apparent stage (sparse seed vs detailed Series A)
+- Prioritize 2-3 highest-impact improvements, don't create a checklist
+- Reference actual deck content in all feedback
+- Be honest about fundamental problems`)
+
+  return parts.join('\n')
+}
+
+/**
+ * Build the final V1 report structure from GPT response.
+ */
+function buildV1Report(parsed, evaluationData) {
+  // Ensure slide_summary and slide_details have correct structure
+  const slideSummary = (parsed.slide_summary || []).map(s => ({
+    slide_number: s.slide_number,
+    type: s.type || SLIDE_TYPE_NAMES[s.type] || 'Unknown',
+    grade: s.grade || 'C',
+    key_takeaway: s.key_takeaway || 'No summary available',
+  }))
+
+  const slideDetails = (parsed.slide_details || []).map(s => ({
+    slide_number: s.slide_number,
+    type: s.type || SLIDE_TYPE_NAMES[s.type] || 'Unknown',
+    grade: s.grade || 'C',
+    what_works: s.what_works || 'Assessment not available',
+    biggest_gap: s.biggest_gap || 'No significant gaps identified',
+    highest_impact_improvement: s.highest_impact_improvement || 'No changes needed',
+  }))
+
+  // Ensure quality dimensions have required structure
+  const dimensions = {
+    clarity: {
+      grade: parsed.quality_dimensions?.clarity?.grade || 'C',
+      diagnostic: parsed.quality_dimensions?.clarity?.diagnostic || 'Assessment not available',
+      description: QUALITY_DIMENSIONS.clarity.description,
+    },
+    brevity: {
+      grade: parsed.quality_dimensions?.brevity?.grade || 'C',
+      diagnostic: parsed.quality_dimensions?.brevity?.diagnostic || 'Assessment not available',
+      description: QUALITY_DIMENSIONS.brevity.description,
+    },
+    flow: {
+      grade: parsed.quality_dimensions?.flow?.grade || 'C',
+      diagnostic: parsed.quality_dimensions?.flow?.diagnostic || 'Assessment not available',
+      description: QUALITY_DIMENSIONS.flow.description,
+    },
+    completeness: {
+      grade: parsed.quality_dimensions?.completeness?.grade || 'C',
+      diagnostic: parsed.quality_dimensions?.completeness?.diagnostic || 'Assessment not available',
+      description: QUALITY_DIMENSIONS.completeness.description,
+    },
+  }
 
   return {
     report_version: V1_REPORT_VERSION,
@@ -214,24 +344,42 @@ async function generateV1Report(evaluationData, slides, options = {}) {
     overall: {
       grade: evaluationData.overall_grade,
       score: evaluationData.deck_score,
-      synthesis,
-      positioning_note: 'This score reflects deck quality and completeness—not whether investors would ultimately fund the company.',
+      synthesis: parsed.synthesis || 'Synthesis not available',
+      positioning_note: 'This score reflects deck quality and clarity—not a prediction of fundraising success.',
     },
 
     // 2. Quality Dimensions
     quality_dimensions: dimensions,
 
-    // 3. Top Strengths
-    top_strengths: topStrengths,
+    // 3. Top Strengths (limit to 4)
+    top_strengths: (parsed.top_strengths || []).slice(0, 4).map(s => ({
+      strength: s.strength || 'Strength not specified',
+      slide_type: s.slide_type || 'General',
+    })),
 
-    // 4. Top Improvement Priorities
-    top_improvements: topImprovements,
+    // 4. Top Improvement Priorities (limit to 3)
+    top_improvements: (parsed.top_improvements || []).slice(0, 3).map(imp => ({
+      improvement: imp.improvement || 'Improvement not specified',
+      context: imp.context || '',
+      slide_type: imp.slide_type || 'General',
+    })),
 
     // 5. Narrative Flow
-    narrative_flow: narrativeFlow,
+    narrative_flow: parsed.narrative_flow || {
+      strongest_sequence: {
+        slides: 'Not identified',
+        description: 'Unable to assess narrative flow',
+        investor_reaction: 'N/A',
+      },
+      weakest_sequence: {
+        slides: 'Not identified',
+        description: 'Unable to assess narrative flow',
+        investor_reaction: 'N/A',
+      },
+    },
 
     // 6. Slide Summary Table
-    slide_summary: slideSummaryTable,
+    slide_summary: slideSummary,
 
     // 7. Slide Details
     slides: slideDetails,
@@ -239,380 +387,119 @@ async function generateV1Report(evaluationData, slides, options = {}) {
 }
 
 /**
- * Build deck context string for synthesis prompts.
+ * Generate fallback report when API call fails.
+ * Uses deterministic extraction from evaluation data.
  */
-function buildDeckContext(slides, evaluationData) {
-  const slideOutlines = slides.map((s) => {
-    const typeName = SLIDE_TYPE_NAMES[s.inferred_type] || s.inferred_type
-    const text = s.extracted_text || ''
-    const preview = text.substring(0, 300).replace(/\n+/g, ' ').trim()
-    return `Slide ${s.slide_number} (${typeName}): ${preview}${text.length > 300 ? '...' : ''}`
-  }).join('\n\n')
+function generateFallbackReport(evaluationData, slides) {
+  console.log(`[v1-synthesis] Using fallback deterministic generation`)
 
-  // Include evaluation grades for context
-  const gradeContext = evaluationData.slides.map((s) => {
-    const typeName = SLIDE_TYPE_NAMES[s.type] || s.type
-    return `Slide ${s.slide_number} (${typeName}): Grade ${s.grade}`
-  }).join('\n')
+  const slideEvals = evaluationData.slides || []
 
-  return `DECK CONTENT:\n${slideOutlines}\n\nEVALUATION GRADES:\n${gradeContext}\n\nOVERALL GRADE: ${evaluationData.overall_grade}`
-}
+  // Fallback synthesis
+  const strongestSlide = [...slideEvals].sort((a, b) => (b.normalized_score || 0) - (a.normalized_score || 0))[0]
+  const weakestSlide = [...slideEvals].sort((a, b) => (a.normalized_score || 0) - (b.normalized_score || 0))[0]
 
-/**
- * Generate deck-specific synthesis using GPT-4.
- */
-async function generateSynthesis(openai, deckContext, evaluationData) {
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: V1_SYNTHESIS_PROMPT },
-        { role: 'user', content: deckContext },
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-    })
+  const synthesis = `This ${slides.length}-slide deck received an overall grade of ${evaluationData.overall_grade}. ` +
+    (strongestSlide ? `The strongest content appears in the ${SLIDE_TYPE_NAMES[strongestSlide.type] || strongestSlide.type} section. ` : '') +
+    (weakestSlide ? `The ${SLIDE_TYPE_NAMES[weakestSlide.type] || weakestSlide.type} section has the most room for improvement.` : '')
 
-    return response.choices[0]?.message?.content?.trim() || generateFallbackSynthesis(evaluationData)
-  } catch (err) {
-    console.error('[v1-synthesis] Synthesis generation error:', err.message)
-    return generateFallbackSynthesis(evaluationData)
+  // Fallback dimensions based on overall grade
+  const baseGrade = evaluationData.overall_grade?.charAt(0) || 'C'
+  const dimensions = {
+    clarity: { grade: baseGrade, diagnostic: 'Detailed assessment not available', description: QUALITY_DIMENSIONS.clarity.description },
+    brevity: { grade: baseGrade, diagnostic: 'Detailed assessment not available', description: QUALITY_DIMENSIONS.brevity.description },
+    flow: { grade: baseGrade, diagnostic: 'Detailed assessment not available', description: QUALITY_DIMENSIONS.flow.description },
+    completeness: { grade: baseGrade, diagnostic: 'Detailed assessment not available', description: QUALITY_DIMENSIONS.completeness.description },
   }
-}
 
-/**
- * Generate quality dimension assessments using GPT-4.
- */
-async function generateDimensions(openai, deckContext, evaluationData) {
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: V1_DIMENSIONS_PROMPT },
-        { role: 'user', content: deckContext },
-      ],
-      temperature: 0.5,
-      max_tokens: 600,
-      response_format: { type: 'json_object' },
-    })
-
-    const content = response.choices[0]?.message?.content
-    const parsed = JSON.parse(content)
-
-    // Validate and enrich with metadata
-    return {
-      clarity: {
-        grade: parsed.clarity?.grade || 'C',
-        diagnostic: parsed.clarity?.diagnostic || 'Unable to assess clarity.',
-        description: QUALITY_DIMENSIONS.clarity.description,
-      },
-      brevity: {
-        grade: parsed.brevity?.grade || 'C',
-        diagnostic: parsed.brevity?.diagnostic || 'Unable to assess brevity.',
-        description: QUALITY_DIMENSIONS.brevity.description,
-      },
-      flow: {
-        grade: parsed.flow?.grade || 'C',
-        diagnostic: parsed.flow?.diagnostic || 'Unable to assess flow.',
-        description: QUALITY_DIMENSIONS.flow.description,
-      },
-      completeness: {
-        grade: parsed.completeness?.grade || 'C',
-        diagnostic: parsed.completeness?.diagnostic || 'Unable to assess completeness.',
-        description: QUALITY_DIMENSIONS.completeness.description,
-      },
-    }
-  } catch (err) {
-    console.error('[v1-synthesis] Dimensions generation error:', err.message)
-    return generateFallbackDimensions(evaluationData)
-  }
-}
-
-/**
- * Generate narrative flow analysis using GPT-4.
- */
-async function generateNarrativeFlow(openai, deckContext, evaluationData) {
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: V1_NARRATIVE_FLOW_PROMPT },
-        { role: 'user', content: deckContext },
-      ],
-      temperature: 0.5,
-      max_tokens: 500,
-      response_format: { type: 'json_object' },
-    })
-
-    const content = response.choices[0]?.message?.content
-    return JSON.parse(content)
-  } catch (err) {
-    console.error('[v1-synthesis] Narrative flow generation error:', err.message)
-    return generateFallbackNarrativeFlow(evaluationData)
-  }
-}
-
-/**
- * Extract top 3-4 strengths from evaluation data.
- * Prioritizes deck-specific, insightful observations.
- */
-function extractTopStrengths(evaluationData, deckContext) {
+  // Extract strengths from high-scoring questions
   const strengths = []
-
-  // Collect high-scoring questions with good assessments
-  for (const slide of evaluationData.slides) {
+  for (const slide of slideEvals) {
     for (const q of slide.questions || []) {
-      if (q.score >= 4 && q.assessment && q.assessment.length > 20) {
-        strengths.push({
-          text: q.assessment,
-          slide_type: slide.type,
-          score: q.score,
-        })
+      if (q.score >= 4 && q.assessment?.length > 20) {
+        strengths.push({ strength: q.assessment, slide_type: SLIDE_TYPE_NAMES[slide.type] || slide.type })
       }
     }
   }
 
-  // Sort by score, then by length (longer = more specific)
-  strengths.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score
-    return b.text.length - a.text.length
-  })
-
-  // Take top 4, deduplicate by content similarity
-  const unique = []
-  for (const s of strengths) {
-    const isDuplicate = unique.some((u) =>
-      u.text.toLowerCase().includes(s.text.toLowerCase().substring(0, 30)) ||
-      s.text.toLowerCase().includes(u.text.toLowerCase().substring(0, 30))
-    )
-    if (!isDuplicate) {
-      unique.push(s)
-    }
-    if (unique.length >= 4) break
-  }
-
-  return unique.map((s) => ({
-    strength: s.text,
-    slide_type: SLIDE_TYPE_NAMES[s.slide_type] || s.slide_type,
-  }))
-}
-
-/**
- * Extract top 3 highest-impact improvements from evaluation data.
- * Focuses on leverage, not checklist items.
- */
-function extractTopImprovements(evaluationData, deckContext) {
+  // Extract improvements from low-scoring questions
   const improvements = []
-
-  // Slide type importance for prioritization
-  const typeImportance = {
-    traction: 5,
-    market: 4,
-    team: 4,
-    problem: 3,
-    solution: 3,
-    business_model: 3,
-    competition: 2,
-    product: 2,
-    ask: 2,
-  }
-
-  // Collect low-scoring questions with specific fixes
-  for (const slide of evaluationData.slides) {
-    const importance = typeImportance[slide.type] || 1
-
+  const typeImportance = { traction: 5, market: 4, team: 4, problem: 3, solution: 3 }
+  for (const slide of slideEvals) {
     for (const q of slide.questions || []) {
       if (q.score <= 2 && q.fix && q.fix !== 'None needed' && q.fix.length > 20) {
         improvements.push({
-          text: q.fix,
-          gap: q.gap,
-          slide_type: slide.type,
-          score: q.score,
-          importance,
+          improvement: q.fix,
+          context: q.gap || '',
+          slide_type: SLIDE_TYPE_NAMES[slide.type] || slide.type,
+          importance: typeImportance[slide.type] || 1,
         })
       }
     }
   }
+  improvements.sort((a, b) => b.importance - a.importance)
 
-  // Sort by importance, then by score (lower = more critical)
-  improvements.sort((a, b) => {
-    if (b.importance !== a.importance) return b.importance - a.importance
-    return a.score - b.score
+  // Build slide summary
+  const slideSummary = slideEvals.map(s => {
+    const bestQ = s.questions?.find(q => q.score >= 4)
+    const worstQ = s.questions?.reduce((min, q) => (!min || q.score < min.score) ? q : min, null)
+    const takeaway = s.grade?.startsWith('A') || s.grade?.startsWith('B')
+      ? (bestQ?.assessment?.substring(0, 80) || 'Solid slide')
+      : (worstQ?.gap?.substring(0, 80) || 'Needs improvement')
+    return {
+      slide_number: s.slide_number,
+      type: SLIDE_TYPE_NAMES[s.type] || s.type,
+      grade: s.grade,
+      key_takeaway: takeaway,
+    }
   })
 
-  // Take top 3, clean up the fix text
-  return improvements.slice(0, 3).map((imp) => ({
-    improvement: cleanFixText(imp.text),
-    context: imp.gap,
-    slide_type: SLIDE_TYPE_NAMES[imp.slide_type] || imp.slide_type,
-  }))
-}
-
-/**
- * Clean up fix text to be more founder-friendly.
- */
-function cleanFixText(text) {
-  // Remove conditional phrasing that's too hedging
-  let cleaned = text
-    .replace(/^If available[,:]?\s*/i, '')
-    .replace(/^If true[,:]?\s*/i, '')
-    .replace(/^If already tracked[,:]?\s*/i, '')
-    .trim()
-
-  // Capitalize first letter
-  if (cleaned.length > 0) {
-    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
-  }
-
-  return cleaned
-}
-
-/**
- * Generate slide summary table.
- */
-function generateSlideSummaryTable(evaluationData) {
-  return evaluationData.slides.map((slide) => {
-    // Find the most important takeaway
-    let keyTakeaway
-
-    if (slide.grade === 'A' || slide.grade === 'A-') {
-      // For strong slides, highlight the best assessment
-      const best = slide.questions?.find((q) => q.score >= 4)
-      keyTakeaway = best?.assessment?.substring(0, 100) || 'Strong slide meeting investor expectations.'
-    } else if (slide.grade.startsWith('B')) {
-      // For good slides, note the minor gap
-      const gap = slide.questions?.find((q) => q.score <= 3)
-      keyTakeaway = gap?.gap?.substring(0, 100) || 'Good foundation with minor gaps.'
-    } else {
-      // For weaker slides, highlight the biggest gap
-      const weakest = slide.questions?.reduce((min, q) =>
-        (!min || q.score < min.score) ? q : min, null)
-      keyTakeaway = weakest?.gap?.substring(0, 100) || 'Needs improvement.'
-    }
+  // Build slide details
+  const slideDetails = slideEvals.map(s => {
+    const questions = s.questions || []
+    const bestQ = questions.find(q => q.score >= 4)
+    const worstQ = questions.reduce((min, q) => (!min || q.score < min.score) ? q : min, null)
+    const fixQ = questions.filter(q => q.score <= 3 && q.fix && q.fix !== 'None needed').sort((a, b) => a.score - b.score)[0]
 
     return {
-      slide_number: slide.slide_number,
-      type: SLIDE_TYPE_NAMES[slide.type] || slide.type,
-      grade: slide.grade,
-      key_takeaway: keyTakeaway,
+      slide_number: s.slide_number,
+      type: SLIDE_TYPE_NAMES[s.type] || s.type,
+      grade: s.grade,
+      what_works: bestQ?.assessment || (questions[0]?.score >= 3 ? questions[0].assessment : 'Limited strong elements'),
+      biggest_gap: worstQ?.score <= 3 ? worstQ.gap : 'No significant gaps',
+      highest_impact_improvement: fixQ?.fix || 'No specific changes needed',
     }
   })
-}
-
-/**
- * Generate concise slide details.
- * Each slide gets: What Works, Biggest Gap, Highest-Impact Improvement
- */
-function generateSlideDetails(evaluationData) {
-  return evaluationData.slides.map((slide) => {
-    const questions = slide.questions || []
-
-    // What Works: best assessment from high-scoring questions
-    const strengths = questions.filter((q) => q.score >= 4)
-    const whatWorks = strengths.length > 0
-      ? strengths[0].assessment
-      : questions.length > 0 && questions[0].score >= 3
-        ? questions[0].assessment
-        : 'This slide has limited strong elements.'
-
-    // Biggest Gap: from lowest-scoring question
-    const weakest = questions.reduce((min, q) =>
-      (!min || q.score < min.score) ? q : min, null)
-    const biggestGap = weakest && weakest.score <= 3
-      ? weakest.gap
-      : 'No significant gaps identified.'
-
-    // Highest-Impact Improvement: from lowest-scoring with good fix
-    const needsFix = questions
-      .filter((q) => q.score <= 3 && q.fix && q.fix !== 'None needed')
-      .sort((a, b) => a.score - b.score)[0]
-    const improvement = needsFix
-      ? cleanFixText(needsFix.fix)
-      : 'No specific improvements needed.'
-
-    return {
-      slide_number: slide.slide_number,
-      type: SLIDE_TYPE_NAMES[slide.type] || slide.type,
-      grade: slide.grade,
-      what_works: whatWorks,
-      biggest_gap: biggestGap,
-      highest_impact_improvement: improvement,
-    }
-  })
-}
-
-/**
- * Fallback synthesis when API call fails.
- */
-function generateFallbackSynthesis(evaluationData) {
-  const grade = evaluationData.overall_grade
-  const slideCount = evaluationData.slides?.length || 0
-
-  // Find strongest and weakest slides
-  const sorted = [...(evaluationData.slides || [])].sort((a, b) =>
-    b.normalized_score - a.normalized_score)
-  const strongest = sorted[0]
-  const weakest = sorted[sorted.length - 1]
-
-  if (!strongest || !weakest) {
-    return `This ${slideCount}-slide deck received an overall grade of ${grade}. The deck requires further analysis to provide specific feedback.`
-  }
-
-  return `This ${slideCount}-slide deck received an overall grade of ${grade}. The strongest content is in the ${SLIDE_TYPE_NAMES[strongest.type] || strongest.type} section. The biggest opportunity for improvement is the ${SLIDE_TYPE_NAMES[weakest.type] || weakest.type} section, which needs more specific evidence or clarity.`
-}
-
-/**
- * Fallback dimensions when API call fails.
- */
-function generateFallbackDimensions(evaluationData) {
-  const grade = evaluationData.overall_grade
-  const baseGrade = grade.charAt(0)
 
   return {
-    clarity: {
-      grade: baseGrade,
-      diagnostic: 'Assessment requires further analysis.',
-      description: QUALITY_DIMENSIONS.clarity.description,
+    report_version: V1_REPORT_VERSION,
+    overall: {
+      grade: evaluationData.overall_grade,
+      score: evaluationData.deck_score,
+      synthesis,
+      positioning_note: 'This score reflects deck quality and clarity—not a prediction of fundraising success.',
     },
-    brevity: {
-      grade: baseGrade,
-      diagnostic: 'Assessment requires further analysis.',
-      description: QUALITY_DIMENSIONS.brevity.description,
+    quality_dimensions: dimensions,
+    top_strengths: strengths.slice(0, 4),
+    top_improvements: improvements.slice(0, 3).map(i => ({
+      improvement: i.improvement,
+      context: i.context,
+      slide_type: i.slide_type,
+    })),
+    narrative_flow: {
+      strongest_sequence: {
+        slides: strongestSlide ? `Slide ${strongestSlide.slide_number}` : 'Not identified',
+        description: strongestSlide ? `The ${SLIDE_TYPE_NAMES[strongestSlide.type] || strongestSlide.type} section shows the strongest content.` : 'Unable to identify',
+        investor_reaction: 'This section builds the most conviction.',
+      },
+      weakest_sequence: {
+        slides: weakestSlide ? `Slide ${weakestSlide.slide_number}` : 'Not identified',
+        description: weakestSlide ? `The ${SLIDE_TYPE_NAMES[weakestSlide.type] || weakestSlide.type} section needs the most work.` : 'Unable to identify',
+        investor_reaction: 'This section may raise questions.',
+      },
     },
-    flow: {
-      grade: baseGrade,
-      diagnostic: 'Assessment requires further analysis.',
-      description: QUALITY_DIMENSIONS.flow.description,
-    },
-    completeness: {
-      grade: baseGrade,
-      diagnostic: 'Assessment requires further analysis.',
-      description: QUALITY_DIMENSIONS.completeness.description,
-    },
-  }
-}
-
-/**
- * Fallback narrative flow when API call fails.
- */
-function generateFallbackNarrativeFlow(evaluationData) {
-  const slides = evaluationData.slides || []
-  const sorted = [...slides].sort((a, b) => b.normalized_score - a.normalized_score)
-
-  const strongest = sorted.slice(0, 2)
-  const weakest = sorted.slice(-2)
-
-  return {
-    strongest_sequence: {
-      slides: strongest.map((s) => `Slide ${s.slide_number}`).join(', '),
-      description: 'These slides present the strongest content in the deck.',
-      investor_reaction: 'Investors find these sections most compelling.',
-    },
-    weakest_sequence: {
-      slides: weakest.map((s) => `Slide ${s.slide_number}`).join(', '),
-      description: 'These slides have the most room for improvement.',
-      investor_reaction: 'Investors may have questions after these sections.',
-    },
+    slide_summary: slideSummary,
+    slides: slideDetails,
   }
 }
 
