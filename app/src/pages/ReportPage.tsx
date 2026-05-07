@@ -107,28 +107,50 @@ export function ReportPage() {
     )
   }
 
-  // Error state
+  // Error state - calm, minimal, private
   if (error || !report) {
     return (
       <div className="flex flex-col flex-1">
-        <FounderHeader />
-        <main className="flex-1 flex items-center justify-center px-6 pb-16">
-          <div className="bg-white rounded-xl shadow-sm p-8 max-w-md w-full text-center">
-            <h1 className="text-xl font-semibold text-gray-900 mb-4">
-              Report not found
+        {/* Subdued header */}
+        <header className="py-6 text-center">
+          <Link to={ROUTES.HOME} className="hover:text-gray-400 transition-colors">
+            <span className="text-sm font-medium text-gray-300 uppercase tracking-wide">
+              Pitch Deck Check
+            </span>
+          </Link>
+        </header>
+
+        {/* Card positioned slightly higher */}
+        <main className="flex-1 flex flex-col items-center px-6 pt-8 sm:pt-16">
+          <div className="bg-white rounded-xl shadow-sm px-8 py-10 max-w-[440px] w-full text-center">
+            <h1 className="text-lg font-semibold text-gray-900 mb-3">
+              This report is no longer available
             </h1>
-            <p className="text-gray-500 mb-6">
-              This link may have expired or the report doesn't exist.
+            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+              The link may be invalid, expired, or no longer active.
             </p>
             <button
               onClick={() => navigate(ROUTES.UPLOAD)}
-              className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800"
+              className="px-6 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
             >
-              Check a deck
+              Check my deck
+            </button>
+            <p className="mt-5 text-xs text-gray-400">
+              Reports are private and accessible only through valid links.
+            </p>
+          </div>
+
+          {/* Contact link - subtle, positioned below */}
+          <div className="mt-auto pb-8 pt-12">
+            <button
+              type="button"
+              onClick={() => window.location.href = 'mailto:hello@pitchdeckcheck.com'}
+              className="text-[11px] text-gray-400 hover:text-gray-500 transition-colors"
+            >
+              Contact
             </button>
           </div>
         </main>
-        <FounderFooter />
       </div>
     )
   }
