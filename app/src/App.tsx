@@ -385,6 +385,7 @@ export default function App() {
   const [debugExpanded, setDebugExpanded] = useState(false)
   const [expandedDimension, setExpandedDimension] = useState<string | null>(null)
   const [showLanding, setShowLanding] = useState(true)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
 
   // Store credentials for fetching report
   const deckCredentialsRef = useRef<{ deckId: string; accessToken: string } | null>(null)
@@ -420,6 +421,13 @@ export default function App() {
         clearTimeout(timeoutRef.current)
       }
     }
+  }, [])
+
+  // Track mobile viewport for responsive layout
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   const stopPolling = () => {
@@ -1253,7 +1261,7 @@ export default function App() {
                 lineHeight: 1.6,
               }}
             >
-              Get clear, non-generic feedback on your pitch deck in under 2 minutes.
+              Upload your deck and get free, instant feedback on clarity, brevity, flow, and completeness — so you know what to fix before sending it to investors.
             </p>
 
             {/* CTA Button */}
@@ -1273,7 +1281,7 @@ export default function App() {
                 boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
               }}
             >
-              Upload your deck for free
+              Get free deck feedback
             </button>
 
             {/* What you'll get */}
@@ -1417,7 +1425,7 @@ export default function App() {
               Email
             </label>
             <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 6px 0' }}>
-              We'll save your report link so you can come back to it.
+              We'll use this to save your private report link so you can return to it later.
             </p>
             <input
               id="email"
@@ -1511,6 +1519,13 @@ export default function App() {
           >
             {getStatusText()}
           </button>
+
+          {/* Secondary reassurance */}
+          {status === 'idle' && (
+            <p style={{ marginTop: '16px', fontSize: '12px', color: '#9ca3af', textAlign: 'center' }}>
+              Your report is saved privately and linked to your email so you can come back later.
+            </p>
+          )}
         </form>
 
         {status === 'error' && (
@@ -1638,7 +1653,7 @@ export default function App() {
                   <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
                     Quality Breakdown
                   </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '12px' }}>
                     {(['clarity', 'brevity', 'flow', 'completeness'] as const).map((dim) => {
                       const dimension = report.v1_report!.quality_dimensions[dim]
                       const isExpanded = expandedDimension === dim
@@ -1775,7 +1790,7 @@ export default function App() {
                     <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
                       Narrative Flow
                     </h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '16px' }}>
                       {/* Strongest Sequence */}
                       <div
                         style={{
@@ -1831,8 +1846,8 @@ export default function App() {
                     <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
                       Slide Summary
                     </h3>
-                    <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden', overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '480px' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#f9fafb' }}>
                             <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Slide</th>
@@ -2034,7 +2049,7 @@ export default function App() {
                   <div>
                     <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
                       Overall Grade
-                      {report.deck_score && (
+                      {isAdmin && report.deck_score && (
                         <span style={{ marginLeft: '8px', fontWeight: 500 }}>
                           ({report.deck_score.toFixed(2)}/5.0)
                         </span>
@@ -2042,7 +2057,7 @@ export default function App() {
                     </p>
                     <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
                       {slideCount || report.slides?.length || 0} slides analyzed
-                      {report.report_version && (
+                      {isAdmin && report.report_version && (
                         <span style={{ marginLeft: '8px' }}>• {report.report_version}</span>
                       )}
                       {reportCreatedAt && (
@@ -2050,11 +2065,6 @@ export default function App() {
                           • {new Date(reportCreatedAt).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
-                          })}{' '}
-                          {new Date(reportCreatedAt).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true,
                           })}
                         </span>
                       )}
