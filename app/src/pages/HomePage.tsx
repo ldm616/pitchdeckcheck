@@ -56,19 +56,19 @@ export function HomePage() {
         </div>
       </main>
 
-      {/* Footer - understated */}
+      {/* Footer */}
       <footer className="py-6 text-center">
         <button
           type="button"
           onClick={() => setShowContact(true)}
-          className="text-[11px] text-gray-300 hover:text-gray-400 transition-colors"
+          className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
         >
           Contact
         </button>
-        <span className="text-[11px] text-gray-200 mx-2">·</span>
+        <span className="text-xs text-gray-300 mx-2">·</span>
         <Link
           to={ROUTES.ADMIN}
-          className="text-[11px] text-gray-300 hover:text-gray-400 transition-colors"
+          className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
         >
           Admin
         </Link>
