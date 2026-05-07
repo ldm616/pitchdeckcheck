@@ -797,7 +797,7 @@ export function AdminApp() {
                 >
                   Reports
                 </h2>
-                {selectedDeckIds.size > 0 && (
+                {selectedDeckIds.size > 1 && (
                   <button
                     onClick={handleBulkDelete}
                     disabled={bulkDeleting}
