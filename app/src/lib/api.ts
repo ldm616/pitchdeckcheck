@@ -27,7 +27,7 @@ export async function verifyPassword(password: string): Promise<{ ok: boolean; e
 }
 
 // Upload a deck
-export async function uploadDeck(file: File, email?: string): Promise<UploadResult> {
+export async function uploadDeck(file: File, email?: string, signal?: AbortSignal): Promise<UploadResult> {
   const formData = new FormData()
   if (email) {
     formData.append('email', email)
@@ -37,6 +37,7 @@ export async function uploadDeck(file: File, email?: string): Promise<UploadResu
   const response = await fetch('/.netlify/functions/upload-deck', {
     method: 'POST',
     body: formData,
+    signal,
   })
 
   if (!response.ok) {

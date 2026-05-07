@@ -1,4 +1,4 @@
-import { useState, useCallback, ChangeEvent, FormEvent } from 'react'
+import { useState, useCallback, useRef, ChangeEvent, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadDeck, triggerBackgroundProcessing } from '../lib/api'
 import { getProcessingPath } from '../lib/routes'
@@ -14,6 +14,7 @@ interface UseDeckUploadReturn {
   handleFileChange: (e: ChangeEvent<HTMLInputElement>) => void
   handleFileDrop: (file: File) => void
   handleSubmit: (e: FormEvent) => Promise<void>
+  cancelUpload: () => void
   clearFile: () => void
   reset: () => void
 }
@@ -24,6 +25,7 @@ export function useDeckUpload(): UseDeckUploadReturn {
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const isProcessing = status === 'uploading' || status === 'processing'
   const isDisabled = isProcessing || !file
@@ -54,12 +56,15 @@ export function useDeckUpload(): UseDeckUploadReturn {
     e.preventDefault()
     if (!file) return
 
+    // Create new abort controller for this upload
+    abortControllerRef.current = new AbortController()
+
     setStatus('uploading')
     setErrorMessage(null)
 
     try {
       // Upload the deck (no email required)
-      const uploadResult = await uploadDeck(file)
+      const uploadResult = await uploadDeck(file, undefined, abortControllerRef.current.signal)
 
       // Switch to processing state
       setStatus('processing')
@@ -73,11 +78,28 @@ export function useDeckUpload(): UseDeckUploadReturn {
       // Navigate to processing page
       navigate(getProcessingPath(uploadResult.deck_id, uploadResult.access_token), { replace: true })
     } catch (err) {
+      // Check if this was a cancellation
+      if (err instanceof Error && err.name === 'AbortError') {
+        setStatus('idle')
+        setErrorMessage(null)
+        return
+      }
       console.error('Upload error:', err)
       setStatus('error')
       setErrorMessage('Upload failed. Please try again.')
+    } finally {
+      abortControllerRef.current = null
     }
   }, [file, navigate])
+
+  const cancelUpload = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setStatus('idle')
+    setErrorMessage(null)
+  }, [])
 
   const clearFile = useCallback(() => {
     setFile(null)
@@ -100,6 +122,7 @@ export function useDeckUpload(): UseDeckUploadReturn {
     handleFileChange,
     handleFileDrop,
     handleSubmit,
+    cancelUpload,
     clearFile,
     reset,
   }

@@ -15,6 +15,7 @@ export function UploadPage() {
     handleFileChange,
     handleFileDrop,
     handleSubmit,
+    cancelUpload,
     clearFile,
   } = useDeckUpload()
 
@@ -78,6 +79,17 @@ export function UploadPage() {
                   'Check My Deck'
                 )}
               </button>
+
+              {/* Cancel button */}
+              {status === 'uploading' && (
+                <button
+                  type="button"
+                  onClick={cancelUpload}
+                  className="w-full mt-3 py-2 px-4 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+              )}
             </form>
 
             {/* Error state */}
