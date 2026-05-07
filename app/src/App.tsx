@@ -338,7 +338,7 @@ export default function App() {
     return localStorage.getItem(ADMIN_MODE_KEY) === 'true'
   }, [])
 
-  const [adminView, setAdminView] = useState<AdminView>('reports')
+  const [adminView, setAdminView] = useState<AdminView>('upload')
   const [reportsList, setReportsList] = useState<ReportListItem[]>([])
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsError, setReportsError] = useState('')
@@ -1108,7 +1108,7 @@ export default function App() {
 
   // Determine max width based on view and content
   const getMaxWidth = () => {
-    if (isAdmin) return '900px' // Consistent width for admin views
+    if (adminView === 'reports') return '900px' // Wide for reports list
     if (showingReport) return '720px'
     return '440px'
   }
@@ -1124,7 +1124,7 @@ export default function App() {
         fontFamily,
       }}
     >
-      {/* Admin Header */}
+      {/* Admin Header - simplified, just shows All Reports link */}
       {isAdmin && (
         <div
           style={{
@@ -1140,113 +1140,83 @@ export default function App() {
               padding: '12px 24px',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
             }}
           >
-            <h1
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#111827',
-                margin: 0,
-                letterSpacing: '-0.025em',
-              }}
-            >
-              Pitch Deck Check
-            </h1>
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '24px',
-              }}
-            >
-              <button
-                onClick={() => {
-                  setAdminView('upload')
-                  // Reset report state to show the upload form
-                  setReport(null)
-                  setStatus('idle')
-                  setSlides([])
-                  setSlideCount(null)
-                }}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h1
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  fontFamily,
-                  color: adminView === 'upload' ? '#2563eb' : '#6b7280',
-                  cursor: 'pointer',
-                  textDecoration: adminView === 'upload' ? 'underline' : 'none',
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: 0,
+                  letterSpacing: '-0.025em',
                 }}
               >
-                Upload
-              </button>
-              <button
-                onClick={() => {
-                  setAdminView('reports')
-                  fetchReportsList()
-                }}
+                Pitch Deck Check
+              </h1>
+              <span
                 style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  fontFamily,
-                  color: adminView === 'reports' ? '#2563eb' : '#6b7280',
-                  cursor: 'pointer',
-                  textDecoration: adminView === 'reports' ? 'underline' : 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  backgroundColor: '#fef3c7',
+                  color: '#92400e',
+                  borderRadius: '4px',
                 }}
               >
-                Reports
-              </button>
-              <button
-                onClick={() => {
-                  setAdminView('calibration')
-                  fetchCalibrationDecks()
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  fontFamily,
-                  color: adminView === 'calibration' ? '#2563eb' : '#6b7280',
-                  cursor: 'pointer',
-                  textDecoration: adminView === 'calibration' ? 'underline' : 'none',
-                }}
-              >
-                Calibration
-              </button>
+                Admin
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '16px' }}>
+              {adminView === 'reports' ? (
+                <button
+                  onClick={() => {
+                    setAdminView('upload')
+                    setReport(null)
+                    setStatus('idle')
+                    setSlides([])
+                    setSlideCount(null)
+                    setShowLanding(true)
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    fontFamily,
+                    color: '#2563eb',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ← Back to Upload
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setAdminView('reports')
+                    fetchReportsList()
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    fontFamily,
+                    color: '#2563eb',
+                    cursor: 'pointer',
+                  }}
+                >
+                  View All Reports →
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Admin Mode Indicator */}
-      {isAdmin && !showingReport && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '16px',
-            right: '16px',
-            padding: '6px 12px',
-            backgroundColor: '#fef3c7',
-            border: '1px solid #fcd34d',
-            borderRadius: '6px',
-            fontSize: '11px',
-            fontWeight: 600,
-            color: '#92400e',
-            zIndex: 1000,
-          }}
-        >
-          Admin Mode
-        </div>
-      )}
 
       {/* Main Content */}
       <div
@@ -1255,11 +1225,11 @@ export default function App() {
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'center',
-          padding: isAdmin ? '32px 24px 24px' : showLanding && status === 'idle' ? '80px 24px 24px' : '50px 24px 24px',
+          padding: adminView === 'reports' ? '32px 24px 24px' : showLanding && status === 'idle' ? '80px 24px 24px' : '50px 24px 24px',
         }}
       >
-        {/* Founder Landing Page */}
-        {!isAdmin && showLanding && status === 'idle' && (
+        {/* Landing Page - shown to founders and admins (when in upload view) */}
+        {(!isAdmin || adminView === 'upload') && showLanding && status === 'idle' && (
           <div style={{ width: '100%', maxWidth: '640px', textAlign: 'center' }}>
             {/* Hero */}
             <h1
@@ -1367,7 +1337,7 @@ export default function App() {
         )}
 
         {/* Upload Form & Report View */}
-        {(isAdmin || !showLanding || status !== 'idle') && (
+        {(adminView === 'reports' || !showLanding || status !== 'idle') && (
         <div
           style={{
             width: '100%',
@@ -1385,49 +1355,45 @@ export default function App() {
               {/* Hide header and form when viewing a report in admin mode */}
               {!(isAdmin && showingReport) && (
                 <>
-                  <div style={{ textAlign: isAdmin ? 'left' : 'center', marginBottom: '32px' }}>
-                    {/* Back link for founders */}
-                    {!isAdmin && (
-                      <button
-                        onClick={() => setShowLanding(true)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          padding: 0,
-                          fontSize: '13px',
-                          color: '#6b7280',
-                          cursor: 'pointer',
-                          marginBottom: '16px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        ← Back
-                      </button>
-                    )}
+                  <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                    {/* Back link to landing */}
+                    <button
+                      onClick={() => setShowLanding(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        fontSize: '13px',
+                        color: '#6b7280',
+                        cursor: 'pointer',
+                        marginBottom: '16px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      ← Back
+                    </button>
                     <h1
                       style={{
-                        fontSize: isAdmin ? '20px' : '24px',
+                        fontSize: '24px',
                         fontWeight: 600,
                         color: '#111827',
-                        margin: isAdmin ? '0 0 8px 0' : '0 0 12px 0',
+                        margin: '0 0 12px 0',
                         letterSpacing: '-0.025em',
                       }}
                     >
-                      {isAdmin ? 'Upload Deck' : 'Upload Your Pitch Deck'}
+                      Upload Your Pitch Deck
                     </h1>
                     <p
                       style={{
-                        fontSize: isAdmin ? '14px' : '15px',
+                        fontSize: '15px',
                         color: '#6b7280',
                         margin: 0,
                         lineHeight: 1.5,
                       }}
                     >
-                      {isAdmin
-                        ? 'Upload a pitch deck to evaluate.'
-                        : 'Get your deck quality report in under 2 minutes.'}
+                      Get your deck quality report in under 2 minutes.
                     </p>
                   </div>
 
@@ -1445,11 +1411,9 @@ export default function App() {
             >
               Email
             </label>
-            {!isAdmin && (
-              <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 6px 0' }}>
-                We'll save your report link so you can come back to it.
-              </p>
-            )}
+            <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 6px 0' }}>
+              We'll save your report link so you can come back to it.
+            </p>
             <input
               id="email"
               type="email"
