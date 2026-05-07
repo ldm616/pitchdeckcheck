@@ -1,4 +1,4 @@
-import { useState, useEffect, FormEvent, ChangeEvent, useRef, useMemo } from 'react'
+import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react'
 import { BarChart3, Target, CheckCircle2, FileText, ShieldCheck } from 'lucide-react'
 
 type Status = 'idle' | 'uploading' | 'processing' | 'success' | 'error' | 'timeout'
@@ -324,20 +324,9 @@ const DIMENSION_DEFINITIONS = {
 }
 
 export default function App() {
-  // Check for admin mode via URL param or localStorage
-  const isAdmin = useMemo(() => {
-    const params = new URLSearchParams(window.location.search)
-    const hasAdminParam = params.has('admin') || params.get('admin') === '1'
-
-    // If URL has admin param, store in localStorage
-    if (hasAdminParam) {
-      localStorage.setItem(ADMIN_MODE_KEY, 'true')
-      return true
-    }
-
-    // Check localStorage for existing admin mode
-    return localStorage.getItem(ADMIN_MODE_KEY) === 'true'
-  }, [])
+  // Admin mode - only enabled after successful password entry
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showAdminLogin, setShowAdminLogin] = useState(false)
 
   const [adminView, setAdminView] = useState<AdminView>('upload')
   const [reportsList, setReportsList] = useState<ReportListItem[]>([])
@@ -408,6 +397,10 @@ export default function App() {
     const authenticated = sessionStorage.getItem(SESSION_KEY)
     if (authenticated === 'true') {
       setIsAuthenticated(true)
+      // Restore admin mode if previously authenticated
+      if (localStorage.getItem(ADMIN_MODE_KEY) === 'true') {
+        setIsAdmin(true)
+      }
     }
   }, [])
 
@@ -549,7 +542,10 @@ export default function App() {
       if (response.ok && data.ok) {
         sessionStorage.setItem(SESSION_KEY, 'true')
         sessionStorage.setItem(SESSION_PASSWORD_KEY, password)
+        localStorage.setItem(ADMIN_MODE_KEY, 'true')
         setIsAuthenticated(true)
+        setIsAdmin(true)
+        setShowAdminLogin(false)
       } else {
         setPasswordError(data.error || 'Invalid password')
       }
@@ -997,8 +993,8 @@ export default function App() {
     return 'Upload Deck'
   }
 
-  // Password gate - only for admin mode
-  if (isAdmin && !isAuthenticated) {
+  // Admin login modal
+  if (showAdminLogin) {
     return (
       <div
         style={{
@@ -1083,6 +1079,30 @@ export default function App() {
               }}
             >
               {checkingPassword ? 'Checking...' : 'Enter'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowAdminLogin(false)
+                setPassword('')
+                setPasswordError('')
+              }}
+              style={{
+                width: '100%',
+                marginTop: '12px',
+                padding: '10px 16px',
+                fontSize: '15px',
+                fontWeight: 500,
+                fontFamily,
+                color: '#6b7280',
+                backgroundColor: 'transparent',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
             </button>
           </form>
 
@@ -3579,6 +3599,30 @@ export default function App() {
         </div>
         )}
       </div>
+
+      {/* Footer with admin link */}
+      {!isAdmin && (
+        <footer
+          style={{
+            padding: '24px',
+            textAlign: 'center',
+          }}
+        >
+          <button
+            onClick={() => setShowAdminLogin(true)}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '12px',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              fontFamily,
+            }}
+          >
+            Admin
+          </button>
+        </footer>
+      )}
 
       {/* Hover preview overlay */}
       {hoveredSlideNumber !== null && (() => {
