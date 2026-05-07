@@ -123,36 +123,53 @@ exports.handler = async (event) => {
   try {
     const fromEmail = process.env.FROM_EMAIL || 'reports@pitchdeckcheck.com'
 
+    // TODO: Add feedback tracking endpoint, then wire feedback links here
     await resend.emails.send({
       from: `Pitch Deck Check <${fromEmail}>`,
       to: email,
-      subject: 'Your Pitch Deck Report',
+      subject: 'Your private pitch deck report is ready',
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-          <h1 style="font-size: 20px; font-weight: 600; color: #111; margin: 0 0 24px 0;">
-            Your Pitch Deck Report
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 48px 20px;">
+          <div style="margin: 0 0 40px 0;">
+            <p style="font-size: 14px; font-weight: 600; color: #111; margin: 0 0 4px 0;">Pitch Deck Check</p>
+            <p style="font-size: 13px; color: #888; margin: 0;">Investor-oriented pitch deck feedback for founders.</p>
+          </div>
+
+          <h1 style="font-size: 18px; font-weight: 600; color: #111; margin: 0 0 12px 0;">
+            Your private pitch deck report is ready
           </h1>
 
-          <p style="font-size: 15px; color: #444; line-height: 1.6; margin: 0 0 24px 0;">
-            Here's your private link to access your pitch deck report. Bookmark it or save this email to return later.
+          <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 28px 0;">
+            Use the link below to reopen your report anytime.
           </p>
 
           <a href="${reportLink}" style="display: inline-block; background: #111; color: #fff; padding: 14px 28px; font-size: 15px; font-weight: 500; text-decoration: none; border-radius: 8px;">
             View my report
           </a>
 
-          <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 32px 0 0 0;">
-            This link is private. Only people with this link can view your report.
+          <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 28px 0 0 0;">
+            Only people with this link can access your report.
           </p>
 
-          <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+          <hr style="border: none; border-top: 1px solid #eee; margin: 40px 0 32px 0;" />
 
-          <p style="font-size: 12px; color: #999; margin: 0;">
-            Pitch Deck Check
-          </p>
+          <p style="font-size: 13px; font-weight: 500; color: #666; margin: 0 0 4px 0;">Pitch Deck Check</p>
+          <p style="font-size: 12px; color: #999; margin: 0;">Investor-oriented pitch deck feedback for founders.</p>
         </div>
       `,
-      text: `Your Pitch Deck Report\n\nHere's your private link to access your pitch deck report:\n\n${reportLink}\n\nThis link is private. Only people with this link can view your report.\n\n—\nPitch Deck Check`,
+      text: `Pitch Deck Check
+Investor-oriented pitch deck feedback for founders.
+
+Your private pitch deck report is ready.
+
+Use this link to reopen your report anytime:
+${reportLink}
+
+Only people with this link can access your report.
+
+—
+Pitch Deck Check
+Investor-oriented pitch deck feedback for founders.`,
     })
 
     // Always update the deck with the email so admin can see it

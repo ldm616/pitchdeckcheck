@@ -37,7 +37,11 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
         onClick={() => setIsExpanded(!isExpanded)}
         className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
       >
-        {isExpanded ? 'Hide detailed investor feedback ↑' : 'Show detailed investor feedback for each slide ↓'}
+        {isExpanded ? (
+          <>Hide detailed investor feedback <span className="text-gray-400">↑</span></>
+        ) : (
+          <>Show detailed investor feedback for each slide <span className="text-blue-500">↓</span></>
+        )}
       </button>
 
       {isExpanded && (
