@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { Check, Loader2 } from 'lucide-react'
 import { useReportPolling } from '../hooks/useReportPolling'
@@ -55,6 +55,12 @@ export function ProcessingPage() {
   const accessToken = searchParams.get('token')
   const navigate = useNavigate()
 
+  const handleReportReady = useCallback(() => {
+    if (deckId && accessToken) {
+      navigate(getReportPath(deckId, accessToken), { replace: true })
+    }
+  }, [deckId, accessToken, navigate])
+
   const {
     status,
     processingStatus,
@@ -62,12 +68,7 @@ export function ProcessingPage() {
     startPolling,
     stopPolling,
   } = useReportPolling({
-    onReportReady: () => {
-      // Navigate to report page when ready
-      if (deckId && accessToken) {
-        navigate(getReportPath(deckId, accessToken), { replace: true })
-      }
-    },
+    onReportReady: handleReportReady,
   })
 
   useEffect(() => {
