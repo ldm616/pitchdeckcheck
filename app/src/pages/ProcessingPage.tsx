@@ -33,12 +33,14 @@ function StageItem({
           ? 'text-gray-500'
           : 'text-gray-300'
     }>
-      {state === 'complete' && (
-        <Check className="w-4 h-4 inline mr-1.5 -mt-0.5" strokeWidth={2.5} />
-      )}
-      {state === 'active' && (
-        <Loader2 className="w-4 h-4 inline mr-1.5 -mt-0.5 animate-spin" />
-      )}
+      <span className="inline-block w-5 text-center mr-1">
+        {state === 'complete' && (
+          <Check className="w-4 h-4 inline -mt-0.5" strokeWidth={2.5} />
+        )}
+        {state === 'active' && (
+          <Loader2 className="w-4 h-4 inline -mt-0.5 animate-spin" />
+        )}
+      </span>
       {label}
     </li>
   )
