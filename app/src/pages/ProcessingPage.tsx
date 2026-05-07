@@ -84,21 +84,24 @@ export function ProcessingPage() {
   // Handle missing credentials
   if (!deckId || !accessToken) {
     return (
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-md text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
-            Invalid Link
-          </h1>
-          <p className="text-base text-gray-500 mb-8">
-            This link appears to be invalid or expired.
-          </p>
-          <button
-            onClick={() => navigate(ROUTES.UPLOAD)}
-            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            Check a deck
-          </button>
-        </div>
+      <div className="flex flex-col flex-1">
+        <FounderHeader />
+        <main className="flex-1 flex items-center justify-center px-6 pb-16">
+          <div className="w-full max-w-md text-center">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
+              Invalid Link
+            </h1>
+            <p className="text-base text-gray-500 mb-8">
+              This link appears to be invalid or expired.
+            </p>
+            <button
+              onClick={() => navigate(ROUTES.UPLOAD)}
+              className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Check a deck
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
@@ -106,21 +109,24 @@ export function ProcessingPage() {
   // Error state
   if (status === 'error') {
     return (
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-md text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
-            Processing Failed
-          </h1>
-          <p className="text-base text-gray-500 mb-8">
-            {errorMessage || 'Something went wrong while processing your deck.'}
-          </p>
-          <button
-            onClick={() => navigate(ROUTES.UPLOAD)}
-            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            Try again
-          </button>
-        </div>
+      <div className="flex flex-col flex-1">
+        <FounderHeader />
+        <main className="flex-1 flex items-center justify-center px-6 pb-16">
+          <div className="w-full max-w-md text-center">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
+              Processing Failed
+            </h1>
+            <p className="text-base text-gray-500 mb-8">
+              {errorMessage || 'Something went wrong while processing your deck.'}
+            </p>
+            <button
+              onClick={() => navigate(ROUTES.UPLOAD)}
+              className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
@@ -128,21 +134,24 @@ export function ProcessingPage() {
   // Timeout state
   if (status === 'timeout') {
     return (
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-md text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
-            Still Processing
-          </h1>
-          <p className="text-base text-gray-500 mb-8">
-            Your deck is taking longer than expected. Please check back shortly.
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            Check Status
-          </button>
-        </div>
+      <div className="flex flex-col flex-1">
+        <FounderHeader />
+        <main className="flex-1 flex items-center justify-center px-6 pb-16">
+          <div className="w-full max-w-md text-center">
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
+              Still Processing
+            </h1>
+            <p className="text-base text-gray-500 mb-8">
+              Your deck is taking longer than expected. Please check back shortly.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Check Status
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
