@@ -188,7 +188,6 @@ export function ReportPage() {
             <TopImprovements improvements={v1Report.top_improvements} />
 
             <SlideFeedback
-              summary={v1Report.slide_summary}
               details={v1Report.slides}
               slideImages={slides}
             />

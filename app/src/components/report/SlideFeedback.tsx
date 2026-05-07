@@ -1,19 +1,18 @@
 import { useState } from 'react'
-import { Expand, X, ChevronDown } from 'lucide-react'
+import { Expand, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { GradeDot } from '../GradeBadge'
-import type { V1SlideSummary, V1SlideDetail, SlideData } from '../../lib/types'
+import type { V1SlideDetail, SlideData } from '../../lib/types'
 
 interface SlideFeedbackProps {
-  summary: V1SlideSummary[]
   details: V1SlideDetail[]
   slideImages: SlideData[]
 }
 
-export function SlideFeedback({ summary, details, slideImages }: SlideFeedbackProps) {
-  const [showDetails, setShowDetails] = useState(false)
+export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
   const [selectedSlideNumber, setSelectedSlideNumber] = useState<number | null>(null)
 
-  if (!summary || summary.length === 0) return null
+  if (!details || details.length === 0) return null
 
   // Helper to check if text is essentially "no improvement needed"
   const isNoAction = (text: string) => {
@@ -41,116 +40,104 @@ export function SlideFeedback({ summary, details, slideImages }: SlideFeedbackPr
 
   return (
     <div className="mb-8">
-      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
         Slide Feedback
       </h2>
 
-      {/* Compact overview list */}
-      <div className="space-y-2">
-        {summary.map((slide) => (
-          <div
-            key={slide.slide_number}
-            className="flex items-start gap-3 py-2"
+      {!isExpanded && (
+        <>
+          <p className="text-sm text-gray-500 mb-4">
+            Detailed investor feedback for each slide.
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(true)}
+            className="group flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
           >
-            <span className="text-sm text-gray-400 w-6 flex-shrink-0">
-              {slide.slide_number}
-            </span>
-            <span className="text-sm text-gray-500 w-24 flex-shrink-0">
-              {slide.type}
-            </span>
-            <div className="flex items-center gap-1.5 w-12 flex-shrink-0">
-              <GradeDot grade={slide.grade} />
-              <span className="text-sm text-gray-500">{slide.grade}</span>
-            </div>
-            <p className="text-sm text-gray-600 leading-relaxed flex-1">
-              {slide.key_takeaway}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Expand toggle */}
-      {details && details.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowDetails(!showDetails)}
-          className="mt-6 flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <span>{showDetails ? 'Hide' : 'Show'} detailed feedback</span>
-          <ChevronDown
-            className={`w-4 h-4 transition-transform ${showDetails ? 'rotate-180' : ''}`}
-          />
-        </button>
+            <span>Show detailed feedback per slide</span>
+            <ChevronDown className="w-4 h-4 transition-transform group-hover:translate-y-0.5" />
+          </button>
+        </>
       )}
 
-      {/* Detailed feedback */}
-      {showDetails && details && (
-        <div className="mt-6 space-y-6">
-          {details.map((slide) => {
-            const slideData = slideImages.find(s => s.slide_number === slide.slide_number)
-            const imageUrl = slideData?.image_url
-            const hasImprovement = slide.highest_impact_improvement && !isNoAction(slide.highest_impact_improvement)
+      {isExpanded && (
+        <>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(false)}
+            className="group flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 transition-colors mb-6"
+          >
+            <span>Hide detailed feedback</span>
+            <ChevronUp className="w-4 h-4 transition-transform group-hover:-translate-y-0.5" />
+          </button>
 
-            // Combine what_works and biggest_gap into assessment
-            const assessmentParts = []
-            if (slide.what_works && !slide.what_works.toLowerCase().includes('limited conviction')) {
-              assessmentParts.push(slide.what_works)
-            }
-            if (slide.biggest_gap && !isNoAction(slide.biggest_gap)) {
-              assessmentParts.push(slide.biggest_gap)
-            }
-            const assessment = assessmentParts.join(' ')
+          <div className="space-y-6">
+            {details.map((slide) => {
+              const slideData = slideImages.find(s => s.slide_number === slide.slide_number)
+              const imageUrl = slideData?.image_url
+              const hasImprovement = slide.highest_impact_improvement && !isNoAction(slide.highest_impact_improvement)
 
-            return (
-              <div key={slide.slide_number} className="pt-6 border-t border-gray-100 first:border-0 first:pt-0">
-                {/* Header */}
-                <div className="flex items-start gap-4 mb-3">
-                  {imageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSlideNumber(slide.slide_number)}
-                      className="flex-shrink-0 w-16 relative group"
-                    >
-                      <img
-                        src={imageUrl}
-                        alt={`Slide ${slide.slide_number}`}
-                        className="w-full h-auto rounded border border-gray-200"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors rounded flex items-center justify-center">
-                        <Expand className="w-3 h-3 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+              // Combine what_works and biggest_gap into assessment
+              const assessmentParts = []
+              if (slide.what_works && !slide.what_works.toLowerCase().includes('limited conviction')) {
+                assessmentParts.push(slide.what_works)
+              }
+              if (slide.biggest_gap && !isNoAction(slide.biggest_gap)) {
+                assessmentParts.push(slide.biggest_gap)
+              }
+              const assessment = assessmentParts.join(' ')
+
+              return (
+                <div key={slide.slide_number} className="pt-6 border-t border-gray-100 first:border-0 first:pt-0">
+                  {/* Header */}
+                  <div className="flex items-start gap-4 mb-3">
+                    {imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSlideNumber(slide.slide_number)}
+                        className="flex-shrink-0 w-16 relative group"
+                      >
+                        <img
+                          src={imageUrl}
+                          alt={`Slide ${slide.slide_number}`}
+                          className="w-full h-auto rounded border border-gray-200"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors rounded flex items-center justify-center">
+                          <Expand className="w-3 h-3 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </button>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <span className="font-medium text-gray-900">Slide {slide.slide_number}</span>
+                        <span className="text-gray-300">—</span>
+                        <span className="text-gray-500">{slide.type}</span>
+                        <span className="text-gray-300">—</span>
+                        <GradeDot grade={slide.grade} />
+                        <span className="font-medium text-gray-500">{slide.grade}</span>
                       </div>
-                    </button>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <span className="font-medium text-gray-900">Slide {slide.slide_number}</span>
-                      <span className="text-gray-300">—</span>
-                      <span className="text-gray-500">{slide.type}</span>
-                      <span className="text-gray-300">—</span>
-                      <GradeDot grade={slide.grade} />
-                      <span className="font-medium text-gray-500">{slide.grade}</span>
                     </div>
                   </div>
+
+                  {/* Assessment */}
+                  {assessment && (
+                    <p className="text-sm text-gray-600 leading-relaxed mb-3">
+                      {assessment}
+                    </p>
+                  )}
+
+                  {/* Improvement */}
+                  {hasImprovement && (
+                    <p className="text-sm text-gray-500 leading-relaxed">
+                      <span className="text-gray-400 font-medium">Fix: </span>
+                      {slide.highest_impact_improvement}
+                    </p>
+                  )}
                 </div>
-
-                {/* Assessment */}
-                {assessment && (
-                  <p className="text-sm text-gray-600 leading-relaxed mb-3">
-                    {assessment}
-                  </p>
-                )}
-
-                {/* Improvement */}
-                {hasImprovement && (
-                  <p className="text-sm text-gray-500 leading-relaxed">
-                    <span className="text-gray-400 font-medium">Fix: </span>
-                    {slide.highest_impact_improvement}
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       {/* Image preview modal */}
