@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef, useMemo } from 'react'
+import { BarChart3, Target, CheckCircle2, FileText, ShieldCheck } from 'lucide-react'
 
 type Status = 'idle' | 'uploading' | 'processing' | 'success' | 'error' | 'timeout'
 type AdminView = 'upload' | 'reports' | 'calibration'
@@ -1298,13 +1299,13 @@ export default function App() {
               </h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {[
-                  { icon: '📊', text: 'Overall deck quality score' },
-                  { icon: '🎯', text: 'Clarity, brevity, flow, and completeness breakdown' },
-                  { icon: '💪', text: 'Top strengths and improvement priorities' },
-                  { icon: '📝', text: 'Slide-by-slide feedback you can act on' },
+                  { Icon: BarChart3, text: 'Overall deck quality score' },
+                  { Icon: Target, text: 'Clarity, brevity, flow, and completeness breakdown' },
+                  { Icon: CheckCircle2, text: 'Top strengths and improvement priorities' },
+                  { Icon: FileText, text: 'Slide-by-slide feedback you can act on' },
                 ].map((item, idx) => (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ fontSize: '18px' }}>{item.icon}</span>
+                    <item.Icon size={20} color="#2563eb" strokeWidth={2} />
                     <span style={{ fontSize: '15px', color: '#374151' }}>{item.text}</span>
                   </div>
                 ))}
@@ -1324,15 +1325,19 @@ export default function App() {
             </p>
 
             {/* Trust/privacy */}
-            <p
+            <div
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
                 fontSize: '13px',
                 color: '#9ca3af',
-                margin: 0,
               }}
             >
-              🔒 Your deck is used only to generate your report.
-            </p>
+              <ShieldCheck size={14} strokeWidth={2} />
+              <span>Your deck is used only to generate your report.</span>
+            </div>
           </div>
         )}
 
