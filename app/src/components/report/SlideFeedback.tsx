@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Expand, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { GradeDot } from '../GradeBadge'
 import type { V1SlideDetail, SlideData } from '../../lib/types'
 
@@ -10,7 +10,6 @@ interface SlideFeedbackProps {
 
 export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const [selectedSlideNumber, setSelectedSlideNumber] = useState<number | null>(null)
 
   if (!details || details.length === 0) return null
 
@@ -26,16 +25,6 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
            lower === 'none' ||
            lower.includes('this slide does its job') ||
            lower.includes('no changes needed')
-  }
-
-  const handleCloseModal = () => {
-    setSelectedSlideNumber(null)
-  }
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      handleCloseModal()
-    }
   }
 
   return (
@@ -90,34 +79,23 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
               return (
                 <div key={slide.slide_number} className="pt-6 border-t border-gray-100 first:border-0 first:pt-0">
                   {/* Header */}
-                  <div className="flex items-start gap-4 mb-3">
-                    {imageUrl && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSlideNumber(slide.slide_number)}
-                        className="flex-shrink-0 w-16 relative group"
-                      >
-                        <img
-                          src={imageUrl}
-                          alt={`Slide ${slide.slide_number}`}
-                          className="w-full h-auto rounded border border-gray-200"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors rounded flex items-center justify-center">
-                          <Expand className="w-3 h-3 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      </button>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <span className="font-medium text-gray-900">Slide {slide.slide_number}</span>
-                        <span className="text-gray-300">—</span>
-                        <span className="text-gray-500">{slide.type}</span>
-                        <span className="text-gray-300">—</span>
-                        <GradeDot grade={slide.grade} />
-                        <span className="font-medium text-gray-500">{slide.grade}</span>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-1.5 text-sm mb-3">
+                    <span className="font-medium text-gray-900">Slide {slide.slide_number}</span>
+                    <span className="text-gray-300">—</span>
+                    <span className="text-gray-500">{slide.type}</span>
+                    <span className="text-gray-300">—</span>
+                    <GradeDot grade={slide.grade} />
+                    <span className="font-medium text-gray-500">{slide.grade}</span>
                   </div>
+
+                  {/* Full-width slide image */}
+                  {imageUrl && (
+                    <img
+                      src={imageUrl}
+                      alt={`Slide ${slide.slide_number}`}
+                      className="w-full h-auto rounded border border-gray-200 mb-3"
+                    />
+                  )}
 
                   {/* Assessment */}
                   {assessment && (
@@ -140,39 +118,6 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
         </>
       )}
 
-      {/* Image preview modal */}
-      {selectedSlideNumber !== null && (() => {
-        const slideData = slideImages.find(s => s.slide_number === selectedSlideNumber)
-        const imageUrl = slideData?.image_url
-        if (!imageUrl) return null
-
-        return (
-          <div
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
-            onClick={handleBackdropClick}
-          >
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors"
-              aria-label="Close preview"
-            >
-              <X className="w-6 h-6" />
-            </button>
-
-            <div className="w-[90vw] max-w-[500px] flex flex-col items-center">
-              <img
-                src={imageUrl}
-                alt={`Slide ${selectedSlideNumber} preview`}
-                className="w-full h-auto rounded-lg"
-              />
-              <p className="mt-3 text-sm text-white/80">
-                Slide {selectedSlideNumber}
-              </p>
-            </div>
-          </div>
-        )
-      })()}
     </div>
   )
 }
