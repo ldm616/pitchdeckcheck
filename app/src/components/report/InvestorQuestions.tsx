@@ -28,9 +28,11 @@ export function InvestorQuestions({ questions }: InvestorQuestionsProps) {
         {questions.map((q, idx) => (
           <div key={idx}>
             <div className="flex items-center gap-2 mb-1">
-              <StatusIndicator status={q.status} />
               <span className="text-sm font-medium text-gray-900">{q.question}</span>
-              <span className="text-xs text-gray-400">{q.status}</span>
+              <span className="flex items-center gap-[5px]">
+                <StatusIndicator status={q.status} />
+                <span className="text-xs text-gray-400">{q.status}</span>
+              </span>
             </div>
             <p className="text-sm text-gray-600 leading-relaxed">
               {q.explanation}

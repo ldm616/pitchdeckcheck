@@ -69,8 +69,10 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
                     <span className="text-gray-300">—</span>
                     <span className="font-medium text-gray-900">{slide.type}</span>
                     <span className="text-gray-300">—</span>
-                    <GradeDot grade={slide.grade} />
-                    <span className="font-medium text-gray-500">{slide.grade}</span>
+                    <span className="flex items-center gap-[5px]">
+                      <GradeDot grade={slide.grade} />
+                      <span className="font-medium text-gray-500">{slide.grade}</span>
+                    </span>
                   </div>
 
                   {/* Slide image */}

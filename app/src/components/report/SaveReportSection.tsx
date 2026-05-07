@@ -175,7 +175,7 @@ export function SaveReportSection({ deckId, accessToken }: SaveReportSectionProp
         <Toast message={toast.message} visible={toast.visible} />
         <div className="mb-8 pb-8 border-b border-gray-100">
           <p className="text-sm text-gray-500 flex items-center gap-1.5">
-            <Check className="w-4 h-4 text-gray-400" strokeWidth={2.5} />
+            <Check className="w-4 h-4 text-green-500" strokeWidth={2.5} />
             Private link sent.
           </p>
         </div>

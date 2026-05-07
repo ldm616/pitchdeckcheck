@@ -23,10 +23,12 @@ export function QualityBreakdown({ dimensions }: QualityBreakdownProps) {
                 <span className="text-sm font-medium text-gray-900 capitalize">
                   {dim}:
                 </span>
-                <span className="text-sm font-medium text-gray-600">
-                  {dimension.grade}
+                <span className="flex items-center gap-[5px]">
+                  <GradeDot grade={dimension.grade} />
+                  <span className="text-sm font-medium text-gray-600">
+                    {dimension.grade}
+                  </span>
                 </span>
-                <GradeDot grade={dimension.grade} />
               </div>
               <p className="text-sm text-gray-600 leading-relaxed">
                 {dimension.diagnostic}
