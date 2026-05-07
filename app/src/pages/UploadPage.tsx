@@ -55,7 +55,7 @@ export function UploadPage() {
                   Uploading...
                 </>
               ) : (
-                'Check My Deck'
+                'Check my deck'
               )}
             </button>
 
