@@ -65,9 +65,9 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
                 <div key={slide.slide_number} className="pt-6 border-t border-gray-100 first:border-0 first:pt-0">
                   {/* Header */}
                   <div className="flex items-center gap-1.5 text-sm mb-3">
-                    <span className="font-medium text-gray-900">Slide {slide.slide_number}</span>
+                    <span className="text-gray-500">Slide {slide.slide_number}</span>
                     <span className="text-gray-300">—</span>
-                    <span className="text-gray-500">{slide.type}</span>
+                    <span className="font-medium text-gray-900">{slide.type}</span>
                     <span className="text-gray-300">—</span>
                     <GradeDot grade={slide.grade} />
                     <span className="font-medium text-gray-500">{slide.grade}</span>
@@ -75,11 +75,13 @@ export function SlideFeedback({ details, slideImages }: SlideFeedbackProps) {
 
                   {/* Full-width slide image */}
                   {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt={`Slide ${slide.slide_number}`}
-                      className="w-full h-auto rounded border border-gray-200 mb-3"
-                    />
+                    <div className="bg-gray-50 rounded p-[30px] mb-3">
+                      <img
+                        src={imageUrl}
+                        alt={`Slide ${slide.slide_number}`}
+                        className="w-full h-auto"
+                      />
+                    </div>
                   )}
 
                   {/* Assessment */}
