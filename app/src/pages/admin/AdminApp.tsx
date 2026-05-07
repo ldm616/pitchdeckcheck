@@ -542,25 +542,6 @@ export function AdminApp() {
               {checkingPassword ? 'Checking...' : 'Enter'}
             </button>
 
-            <button
-              type="button"
-              onClick={() => navigate(ROUTES.HOME)}
-              style={{
-                width: '100%',
-                marginTop: '12px',
-                padding: '10px 16px',
-                fontSize: '15px',
-                fontWeight: 500,
-                fontFamily,
-                color: '#6b7280',
-                backgroundColor: 'transparent',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
           </form>
 
           {passwordError && (
