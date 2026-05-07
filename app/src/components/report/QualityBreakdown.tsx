@@ -1,4 +1,4 @@
-import { getGradeBorderClass } from '../GradeBadge'
+import { GradeDot } from '../GradeBadge'
 import type { V1QualityDimensions, DimensionKey } from '../../lib/types'
 
 interface QualityBreakdownProps {
@@ -20,15 +20,18 @@ export function QualityBreakdown({ dimensions }: QualityBreakdownProps) {
           return (
             <div
               key={dim}
-              className={`pl-4 py-3 border-l-2 ${getGradeBorderClass(dimension.grade)}`}
+              className="py-3 border-b border-gray-100 last:border-0"
             >
-              <div className="flex items-baseline justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-1.5">
                 <span className="text-sm font-medium text-gray-900 capitalize">
                   {dim}
                 </span>
-                <span className="text-sm font-medium text-gray-500">
-                  {dimension.grade}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <GradeDot grade={dimension.grade} />
+                  <span className="text-sm font-medium text-gray-500">
+                    {dimension.grade}
+                  </span>
+                </div>
               </div>
               <p className="text-sm text-gray-600 leading-relaxed">
                 {dimension.diagnostic}
