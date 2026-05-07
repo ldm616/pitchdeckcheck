@@ -96,6 +96,74 @@ interface V3DebugOutput {
   thesis_evaluation?: Record<string, unknown>
 }
 
+// V1 Founder-Facing Report Types
+interface V1QualityDimension {
+  grade: string
+  diagnostic: string
+  description: string
+}
+
+interface V1QualityDimensions {
+  clarity: V1QualityDimension
+  brevity: V1QualityDimension
+  flow: V1QualityDimension
+  completeness: V1QualityDimension
+}
+
+interface V1Strength {
+  strength: string
+  slide_type: string
+}
+
+interface V1Improvement {
+  improvement: string
+  context: string
+  slide_type: string
+}
+
+interface V1NarrativeSequence {
+  slides: string
+  description: string
+  investor_reaction: string
+}
+
+interface V1NarrativeFlow {
+  strongest_sequence: V1NarrativeSequence
+  weakest_sequence: V1NarrativeSequence
+}
+
+interface V1SlideSummary {
+  slide_number: number
+  type: string
+  grade: string
+  key_takeaway: string
+}
+
+interface V1SlideDetail {
+  slide_number: number
+  type: string
+  grade: string
+  what_works: string
+  biggest_gap: string
+  highest_impact_improvement: string
+}
+
+interface V1Report {
+  report_version: string
+  overall: {
+    grade: string
+    score: number
+    synthesis: string
+    positioning_note: string
+  }
+  quality_dimensions: V1QualityDimensions
+  top_strengths: V1Strength[]
+  top_improvements: V1Improvement[]
+  narrative_flow: V1NarrativeFlow
+  slide_summary: V1SlideSummary[]
+  slides: V1SlideDetail[]
+}
+
 interface ReportContent {
   // Common fields
   overall_grade: string
@@ -118,6 +186,9 @@ interface ReportContent {
     title: string
     bullets: string[]
   }
+
+  // V1 founder-facing report
+  v1_report?: V1Report
 
   // V3 debug output (admin only)
   debug?: V3DebugOutput
@@ -1343,84 +1414,501 @@ export default function App() {
 
         {status === 'success' && report && (
           <div style={{ marginTop: '24px' }}>
-            {/* Overall Grade */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                marginBottom: '16px',
-              }}
-            >
-              <div
-                style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '8px',
-                  backgroundColor:
-                    report.overall_grade === 'A'
-                      ? '#22c55e'
-                      : report.overall_grade === 'B'
-                        ? '#84cc16'
-                        : report.overall_grade === 'C'
-                          ? '#eab308'
-                          : report.overall_grade === 'D'
-                            ? '#f97316'
+            {/* V1 Report Display */}
+            {report.v1_report ? (
+              <>
+                {/* 1. Overall Deck Quality */}
+                <div style={{ marginBottom: '32px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '16px',
+                      marginBottom: '16px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '12px',
+                        backgroundColor:
+                          report.v1_report.overall.grade.startsWith('A') ? '#22c55e'
+                            : report.v1_report.overall.grade.startsWith('B') ? '#84cc16'
+                            : report.v1_report.overall.grade.startsWith('C') ? '#eab308'
+                            : report.v1_report.overall.grade.startsWith('D') ? '#f97316'
                             : '#ef4444',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '24px',
-                  fontWeight: 700,
-                  color: '#ffffff',
-                }}
-              >
-                {report.overall_grade}
-              </div>
-              <div>
-                <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
-                  Overall Grade
-                  {report.deck_score && (
-                    <span style={{ marginLeft: '8px', fontWeight: 500 }}>
-                      ({report.deck_score.toFixed(2)}/5.0)
-                    </span>
-                  )}
-                </p>
-                <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
-                  {slideCount || report.slides?.length || 0} slides analyzed
-                  {report.report_version && (
-                    <span style={{ marginLeft: '8px' }}>• {report.report_version}</span>
-                  )}
-                  {reportCreatedAt && (
-                    <span style={{ marginLeft: '8px' }}>
-                      • {new Date(reportCreatedAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}{' '}
-                      {new Date(reportCreatedAt).toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                      })}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '28px',
+                        fontWeight: 700,
+                        color: '#ffffff',
+                      }}
+                    >
+                      {report.v1_report.overall.grade}
+                    </div>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600, color: '#111827' }}>
+                        Deck Quality Score
+                      </h2>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280' }}>
+                        {slideCount || report.v1_report.slide_summary?.length || 0} slides analyzed
+                        {reportCreatedAt && (
+                          <span style={{ marginLeft: '8px' }}>
+                            • {new Date(reportCreatedAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
 
-            {/* Summary */}
-            <div
-              style={{
-                padding: '16px 20px',
-                backgroundColor: '#f9fafb',
-                borderRadius: '8px',
-                marginBottom: '24px',
-              }}
-            >
-              <p style={{ margin: 0, fontSize: '15px', color: '#374151', lineHeight: 1.7 }}>
-                {report.summary}
-              </p>
-            </div>
+                  {/* Synthesis */}
+                  <div
+                    style={{
+                      padding: '20px 24px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '12px',
+                      borderLeft: '4px solid #3b82f6',
+                    }}
+                  >
+                    <p style={{ margin: 0, fontSize: '15px', color: '#1e293b', lineHeight: 1.8 }}>
+                      {report.v1_report.overall.synthesis}
+                    </p>
+                  </div>
+
+                  {/* Positioning note */}
+                  <p style={{ margin: '12px 0 0 0', fontSize: '12px', color: '#9ca3af', fontStyle: 'italic' }}>
+                    {report.v1_report.overall.positioning_note}
+                  </p>
+                </div>
+
+                {/* 2. Quality Dimensions */}
+                <div style={{ marginBottom: '32px' }}>
+                  <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                    Quality Breakdown
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                    {(['clarity', 'brevity', 'flow', 'completeness'] as const).map((dim) => {
+                      const dimension = report.v1_report!.quality_dimensions[dim]
+                      return (
+                        <div
+                          key={dim}
+                          style={{
+                            padding: '16px',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '10px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#111827', textTransform: 'capitalize' }}>
+                              {dim}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '14px',
+                                fontWeight: 700,
+                                padding: '2px 10px',
+                                borderRadius: '6px',
+                                backgroundColor:
+                                  dimension.grade.startsWith('A') ? '#dcfce7'
+                                    : dimension.grade.startsWith('B') ? '#ecfccb'
+                                    : dimension.grade.startsWith('C') ? '#fef9c3'
+                                    : '#fee2e2',
+                                color:
+                                  dimension.grade.startsWith('A') ? '#166534'
+                                    : dimension.grade.startsWith('B') ? '#3f6212'
+                                    : dimension.grade.startsWith('C') ? '#854d0e'
+                                    : '#991b1b',
+                              }}
+                            >
+                              {dimension.grade}
+                            </span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '13px', color: '#4b5563', lineHeight: 1.5 }}>
+                            {dimension.diagnostic}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. Top Strengths */}
+                {report.v1_report.top_strengths && report.v1_report.top_strengths.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                      Top Strengths
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {report.v1_report.top_strengths.map((s, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '14px 16px',
+                            backgroundColor: '#f0fdf4',
+                            borderRadius: '8px',
+                            borderLeft: '3px solid #22c55e',
+                          }}
+                        >
+                          <p style={{ margin: 0, fontSize: '14px', color: '#166534', lineHeight: 1.6 }}>
+                            {s.strength}
+                          </p>
+                          <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#6b7280' }}>
+                            {s.slide_type}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Top Improvement Priorities */}
+                {report.v1_report.top_improvements && report.v1_report.top_improvements.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                      Top Improvement Priorities
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {report.v1_report.top_improvements.map((imp, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '14px 16px',
+                            backgroundColor: '#fffbeb',
+                            borderRadius: '8px',
+                            borderLeft: '3px solid #f59e0b',
+                          }}
+                        >
+                          <p style={{ margin: 0, fontSize: '14px', color: '#92400e', lineHeight: 1.6, fontWeight: 500 }}>
+                            {idx + 1}. {imp.improvement}
+                          </p>
+                          {imp.context && (
+                            <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#78716c', lineHeight: 1.5 }}>
+                              {imp.context}
+                            </p>
+                          )}
+                          <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: '#6b7280' }}>
+                            {imp.slide_type}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Narrative Flow */}
+                {report.v1_report.narrative_flow && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                      Narrative Flow
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                      {/* Strongest Sequence */}
+                      <div
+                        style={{
+                          padding: '16px',
+                          backgroundColor: '#f0fdf4',
+                          borderRadius: '10px',
+                          border: '1px solid #bbf7d0',
+                        }}
+                      >
+                        <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 600, color: '#166534', textTransform: 'uppercase' }}>
+                          Strongest Sequence
+                        </p>
+                        <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 600, color: '#14532d' }}>
+                          {report.v1_report.narrative_flow.strongest_sequence.slides}
+                        </p>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#166534', lineHeight: 1.5 }}>
+                          {report.v1_report.narrative_flow.strongest_sequence.description}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#4ade80', fontStyle: 'italic' }}>
+                          {report.v1_report.narrative_flow.strongest_sequence.investor_reaction}
+                        </p>
+                      </div>
+
+                      {/* Weakest Sequence */}
+                      <div
+                        style={{
+                          padding: '16px',
+                          backgroundColor: '#fef2f2',
+                          borderRadius: '10px',
+                          border: '1px solid #fecaca',
+                        }}
+                      >
+                        <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 600, color: '#991b1b', textTransform: 'uppercase' }}>
+                          Needs Work
+                        </p>
+                        <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 600, color: '#7f1d1d' }}>
+                          {report.v1_report.narrative_flow.weakest_sequence.slides}
+                        </p>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#991b1b', lineHeight: 1.5 }}>
+                          {report.v1_report.narrative_flow.weakest_sequence.description}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#f87171', fontStyle: 'italic' }}>
+                          {report.v1_report.narrative_flow.weakest_sequence.investor_reaction}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. Slide Summary Table */}
+                {report.v1_report.slide_summary && report.v1_report.slide_summary.length > 0 && (
+                  <div style={{ marginBottom: '32px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                      Slide Summary
+                    </h3>
+                    <div style={{ border: '1px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f9fafb' }}>
+                            <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Slide</th>
+                            <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Type</th>
+                            <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Grade</th>
+                            <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>Key Takeaway</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {report.v1_report.slide_summary.map((slide, idx) => (
+                            <tr key={slide.slide_number} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb', color: '#6b7280' }}>{slide.slide_number}</td>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb', color: '#374151' }}>{slide.type}</td>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb', textAlign: 'center' }}>
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    color:
+                                      slide.grade.startsWith('A') ? '#22c55e'
+                                        : slide.grade.startsWith('B') ? '#84cc16'
+                                        : slide.grade.startsWith('C') ? '#eab308'
+                                        : slide.grade.startsWith('D') ? '#f97316'
+                                        : '#ef4444',
+                                  }}
+                                >
+                                  {slide.grade}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', lineHeight: 1.4 }}>{slide.key_takeaway}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. Slide Details */}
+                {report.v1_report.slides && report.v1_report.slides.length > 0 && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600, color: '#111827' }}>
+                      Slide Details
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {report.v1_report.slides.map((slide) => {
+                        const slideData = slides.find(s => s.slide_number === slide.slide_number)
+                        const imageUrl = slideData?.image_url
+
+                        return (
+                          <div
+                            key={slide.slide_number}
+                            style={{
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '10px',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {/* Slide Header */}
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                padding: '12px 16px',
+                                backgroundColor: '#f9fafb',
+                                borderBottom: '1px solid #e5e7eb',
+                              }}
+                            >
+                              {/* Thumbnail */}
+                              {imageUrl && (
+                                <div
+                                  style={{ flexShrink: 0, width: '64px' }}
+                                  onMouseEnter={() => setHoveredSlideNumber(slide.slide_number)}
+                                  onMouseLeave={() => setHoveredSlideNumber(null)}
+                                >
+                                  <img
+                                    src={imageUrl}
+                                    alt={`Slide ${slide.slide_number}`}
+                                    style={{
+                                      width: '100%',
+                                      height: 'auto',
+                                      borderRadius: '4px',
+                                      border: '1px solid #e5e7eb',
+                                      cursor: 'pointer',
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ fontSize: '15px', fontWeight: 600, color: '#111827' }}>
+                                    Slide {slide.slide_number} — {slide.type}
+                                  </span>
+                                  <span
+                                    style={{
+                                      fontSize: '13px',
+                                      fontWeight: 600,
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      backgroundColor:
+                                        slide.grade.startsWith('A') ? '#dcfce7'
+                                          : slide.grade.startsWith('B') ? '#ecfccb'
+                                          : slide.grade.startsWith('C') ? '#fef9c3'
+                                          : '#fee2e2',
+                                      color:
+                                        slide.grade.startsWith('A') ? '#166534'
+                                          : slide.grade.startsWith('B') ? '#3f6212'
+                                          : slide.grade.startsWith('C') ? '#854d0e'
+                                          : '#991b1b',
+                                    }}
+                                  >
+                                    {slide.grade}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Slide Content */}
+                            <div style={{ padding: '16px' }}>
+                              {/* What Works */}
+                              <div style={{ marginBottom: '14px' }}>
+                                <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 600, color: '#166534', textTransform: 'uppercase' }}>
+                                  What Works
+                                </p>
+                                <p style={{ margin: 0, fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+                                  {slide.what_works}
+                                </p>
+                              </div>
+
+                              {/* Biggest Gap */}
+                              {slide.biggest_gap && slide.biggest_gap !== 'No significant gaps identified.' && (
+                                <div style={{ marginBottom: '14px' }}>
+                                  <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 600, color: '#dc2626', textTransform: 'uppercase' }}>
+                                    Biggest Gap
+                                  </p>
+                                  <p style={{ margin: 0, fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+                                    {slide.biggest_gap}
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Highest-Impact Improvement */}
+                              {slide.highest_impact_improvement && slide.highest_impact_improvement !== 'No specific improvements needed.' && (
+                                <div>
+                                  <p style={{ margin: '0 0 6px 0', fontSize: '12px', fontWeight: 600, color: '#d97706', textTransform: 'uppercase' }}>
+                                    Highest-Impact Improvement
+                                  </p>
+                                  <p style={{ margin: 0, fontSize: '13px', color: '#374151', lineHeight: 1.6 }}>
+                                    {slide.highest_impact_improvement}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              /* Fallback: Original Report Display */
+              <>
+                {/* Overall Grade */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '16px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '8px',
+                      backgroundColor:
+                        report.overall_grade === 'A'
+                          ? '#22c55e'
+                          : report.overall_grade === 'B'
+                            ? '#84cc16'
+                            : report.overall_grade === 'C'
+                              ? '#eab308'
+                              : report.overall_grade === 'D'
+                                ? '#f97316'
+                                : '#ef4444',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '24px',
+                      fontWeight: 700,
+                      color: '#ffffff',
+                    }}
+                  >
+                    {report.overall_grade}
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#6b7280' }}>
+                      Overall Grade
+                      {report.deck_score && (
+                        <span style={{ marginLeft: '8px', fontWeight: 500 }}>
+                          ({report.deck_score.toFixed(2)}/5.0)
+                        </span>
+                      )}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
+                      {slideCount || report.slides?.length || 0} slides analyzed
+                      {report.report_version && (
+                        <span style={{ marginLeft: '8px' }}>• {report.report_version}</span>
+                      )}
+                      {reportCreatedAt && (
+                        <span style={{ marginLeft: '8px' }}>
+                          • {new Date(reportCreatedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}{' '}
+                          {new Date(reportCreatedAt).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                          })}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    backgroundColor: '#f9fafb',
+                    borderRadius: '8px',
+                    marginBottom: '24px',
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: '15px', color: '#374151', lineHeight: 1.7 }}>
+                    {report.summary}
+                  </p>
+                </div>
+              </>
+            )}
 
             {/* Investment Thesis */}
             {report.investment_thesis && (
