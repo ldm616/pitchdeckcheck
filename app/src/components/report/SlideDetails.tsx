@@ -139,11 +139,11 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
               <X className="w-6 h-6" />
             </button>
 
-            <div className="max-w-[85vw] max-h-[85vh] flex flex-col items-center">
+            <div className="w-[90vw] max-w-[500px] flex flex-col items-center">
               <img
                 src={imageUrl}
                 alt={`Slide ${selectedSlideNumber} preview`}
-                className="max-w-full max-h-[calc(85vh-40px)] rounded-lg"
+                className="w-full h-auto rounded-lg"
               />
               <p className="mt-3 text-sm text-white/80">
                 Slide {selectedSlideNumber}
