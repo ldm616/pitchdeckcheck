@@ -53,10 +53,10 @@ export function UploadPage() {
               {isProcessing ? (
                 <>
                   <LoadingSpinner size="sm" className="text-white" />
-                  Uploading...
+                  Uploading deck...
                 </>
               ) : (
-                'Check my deck'
+                'Upload my deck'
               )}
             </button>
 

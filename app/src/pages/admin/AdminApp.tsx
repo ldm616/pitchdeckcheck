@@ -844,8 +844,8 @@ export function AdminApp() {
 
               {reportsList.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* Select all header - only show when at least one is selected */}
-                  {selectedDeckIds.size > 0 && (
+                  {/* Select all header - only show when at least 2 are selected */}
+                  {selectedDeckIds.size >= 2 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0' }}>
                       <input
                         type="checkbox"
