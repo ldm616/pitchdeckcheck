@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../lib/routes'
-import { FounderHeader } from '../components/FounderHeader'
 import { ContactModal } from '../components/ContactModal'
 
 export function HomePage() {
@@ -9,7 +8,20 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col flex-1">
-      <FounderHeader />
+      {/* Header with trust line */}
+      <header className="py-6 text-center">
+        <span className="text-sm font-medium text-gray-400 uppercase tracking-wide">
+          Pitch Deck Check
+        </span>
+        <a
+          href="https://pitchdeckcoach.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block mt-1 text-[11px] text-gray-400 hover:text-gray-500 transition-colors"
+        >
+          By Malcolm Lewis · Creator of the Sequoia pitch deck template
+        </a>
+      </header>
 
       <main className="flex-1 flex items-center justify-center px-6 pb-16">
         <div className="w-full max-w-lg">
