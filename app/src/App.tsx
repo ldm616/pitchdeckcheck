@@ -988,8 +988,8 @@ export default function App() {
     return 'Upload Deck'
   }
 
-  // Password gate
-  if (!isAuthenticated) {
+  // Password gate - only for admin mode
+  if (isAdmin && !isAuthenticated) {
     return (
       <div
         style={{
@@ -1021,7 +1021,7 @@ export default function App() {
                 margin: '0 0 8px 0',
               }}
             >
-              Pitch Deck Check
+              Admin Access
             </h1>
             <p
               style={{
@@ -1030,7 +1030,7 @@ export default function App() {
                 margin: 0,
               }}
             >
-              Enter password to continue
+              Enter admin password to continue
             </p>
           </div>
 
