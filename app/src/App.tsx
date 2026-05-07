@@ -310,14 +310,32 @@ const GRADES = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'E
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
 const SESSION_KEY = 'pdc_authenticated'
 const SESSION_PASSWORD_KEY = 'pdc_admin_pw'
+const ADMIN_MODE_KEY = 'pdc_admin_mode'
 const POLL_INTERVAL_MS = 2000
 const TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
+// Quality dimension definitions for founder-facing display
+const DIMENSION_DEFINITIONS = {
+  clarity: 'How clearly the deck explains what the company does, who it serves, why the problem matters, and why the solution is compelling.',
+  brevity: 'How efficiently the deck communicates the story without unnecessary density, repetition, or distracting detail.',
+  flow: 'How well the slides build logically from one idea to the next, creating a coherent investor narrative.',
+  completeness: 'How well the deck answers the key questions an investor needs answered at this stage.',
+}
+
 export default function App() {
-  // Check for admin mode via URL param (user must already be authenticated)
+  // Check for admin mode via URL param or localStorage
   const isAdmin = useMemo(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.has('admin')
+    const hasAdminParam = params.has('admin') || params.get('admin') === '1'
+
+    // If URL has admin param, store in localStorage
+    if (hasAdminParam) {
+      localStorage.setItem(ADMIN_MODE_KEY, 'true')
+      return true
+    }
+
+    // Check localStorage for existing admin mode
+    return localStorage.getItem(ADMIN_MODE_KEY) === 'true'
   }, [])
 
   const [adminView, setAdminView] = useState<AdminView>('reports')
@@ -364,6 +382,8 @@ export default function App() {
   const [slides, setSlides] = useState<SlideData[]>([])
   const [hoveredSlideNumber, setHoveredSlideNumber] = useState<number | null>(null)
   const [debugExpanded, setDebugExpanded] = useState(false)
+  const [expandedDimension, setExpandedDimension] = useState<string | null>(null)
+  const [showLanding, setShowLanding] = useState(true)
 
   // Store credentials for fetching report
   const deckCredentialsRef = useRef<{ deckId: string; accessToken: string } | null>(null)
@@ -961,7 +981,7 @@ export default function App() {
         return 'Analyzing slides...'
       }
       if (processingStatus === 'analyzed' || processingStatus === 'generating_free') {
-        return 'Generating your free report...'
+        return 'Generating your report...'
       }
       return 'Processing...'
     }
@@ -1207,6 +1227,27 @@ export default function App() {
         </div>
       )}
 
+      {/* Admin Mode Indicator */}
+      {isAdmin && !showingReport && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '16px',
+            right: '16px',
+            padding: '6px 12px',
+            backgroundColor: '#fef3c7',
+            border: '1px solid #fcd34d',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: 600,
+            color: '#92400e',
+            zIndex: 1000,
+          }}
+        >
+          Admin Mode
+        </div>
+      )}
+
       {/* Main Content */}
       <div
         style={{
@@ -1214,9 +1255,119 @@ export default function App() {
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'center',
-          padding: isAdmin ? '32px 24px 24px' : '50px 24px 24px',
+          padding: isAdmin ? '32px 24px 24px' : showLanding && status === 'idle' ? '80px 24px 24px' : '50px 24px 24px',
         }}
       >
+        {/* Founder Landing Page */}
+        {!isAdmin && showLanding && status === 'idle' && (
+          <div style={{ width: '100%', maxWidth: '640px', textAlign: 'center' }}>
+            {/* Hero */}
+            <h1
+              style={{
+                fontSize: '36px',
+                fontWeight: 700,
+                color: '#111827',
+                margin: '0 0 16px 0',
+                letterSpacing: '-0.025em',
+                lineHeight: 1.2,
+              }}
+            >
+              Is your pitch deck ready for investors?
+            </h1>
+            <p
+              style={{
+                fontSize: '18px',
+                color: '#6b7280',
+                margin: '0 0 32px 0',
+                lineHeight: 1.6,
+              }}
+            >
+              Get clear, non-generic feedback on your pitch deck in under 2 minutes.
+            </p>
+
+            {/* CTA Button */}
+            <button
+              onClick={() => setShowLanding(false)}
+              style={{
+                padding: '16px 32px',
+                fontSize: '16px',
+                fontWeight: 600,
+                fontFamily,
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                marginBottom: '48px',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+              }}
+            >
+              Upload your deck for free
+            </button>
+
+            {/* What you'll get */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                padding: '32px',
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                textAlign: 'left',
+                marginBottom: '32px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#111827',
+                  margin: '0 0 20px 0',
+                }}
+              >
+                What you'll get
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {[
+                  { icon: '📊', text: 'Overall deck quality score' },
+                  { icon: '🎯', text: 'Clarity, brevity, flow, and completeness breakdown' },
+                  { icon: '💪', text: 'Top strengths and improvement priorities' },
+                  { icon: '📝', text: 'Slide-by-slide feedback you can act on' },
+                ].map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '18px' }}>{item.icon}</span>
+                    <span style={{ fontSize: '15px', color: '#374151' }}>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Supporting copy */}
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#6b7280',
+                margin: '0 0 24px 0',
+                lineHeight: 1.6,
+              }}
+            >
+              See where your deck is clear, where investors may lose conviction, and which fixes would make the biggest difference.
+            </p>
+
+            {/* Trust/privacy */}
+            <p
+              style={{
+                fontSize: '13px',
+                color: '#9ca3af',
+                margin: 0,
+              }}
+            >
+              🔒 Your deck is used only to generate your report.
+            </p>
+          </div>
+        )}
+
+        {/* Upload Form & Report View */}
+        {(isAdmin || !showLanding || status !== 'idle') && (
         <div
           style={{
             width: '100%',
@@ -1235,16 +1386,36 @@ export default function App() {
               {!(isAdmin && showingReport) && (
                 <>
                   <div style={{ textAlign: isAdmin ? 'left' : 'center', marginBottom: '32px' }}>
+                    {/* Back link for founders */}
+                    {!isAdmin && (
+                      <button
+                        onClick={() => setShowLanding(true)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          fontSize: '13px',
+                          color: '#6b7280',
+                          cursor: 'pointer',
+                          marginBottom: '16px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        ← Back
+                      </button>
+                    )}
                     <h1
                       style={{
-                        fontSize: isAdmin ? '20px' : '28px',
+                        fontSize: isAdmin ? '20px' : '24px',
                         fontWeight: 600,
                         color: '#111827',
                         margin: isAdmin ? '0 0 8px 0' : '0 0 12px 0',
                         letterSpacing: '-0.025em',
                       }}
                     >
-                      {isAdmin ? 'Upload Deck' : 'Pitch Deck Check'}
+                      {isAdmin ? 'Upload Deck' : 'Upload Your Pitch Deck'}
                     </h1>
                     <p
                       style={{
@@ -1254,7 +1425,9 @@ export default function App() {
                         lineHeight: 1.5,
                       }}
                     >
-                      Upload your pitch deck to get an investor-readiness review.
+                      {isAdmin
+                        ? 'Upload a pitch deck to evaluate.'
+                        : 'Get your deck quality report in under 2 minutes.'}
                     </p>
                   </div>
 
@@ -1267,11 +1440,16 @@ export default function App() {
                 fontSize: '14px',
                 fontWeight: 500,
                 color: '#374151',
-                marginBottom: '6px',
+                marginBottom: '4px',
               }}
             >
-              Email address
+              Email
             </label>
+            {!isAdmin && (
+              <p style={{ fontSize: '12px', color: '#9ca3af', margin: '0 0 6px 0' }}>
+                We'll save your report link so you can come back to it.
+              </p>
+            )}
             <input
               id="email"
               type="email"
@@ -1494,6 +1672,7 @@ export default function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                     {(['clarity', 'brevity', 'flow', 'completeness'] as const).map((dim) => {
                       const dimension = report.v1_report!.quality_dimensions[dim]
+                      const isExpanded = expandedDimension === dim
                       return (
                         <div
                           key={dim}
@@ -1532,6 +1711,26 @@ export default function App() {
                           <p style={{ margin: 0, fontSize: '13px', color: '#4b5563', lineHeight: 1.5 }}>
                             {dimension.diagnostic}
                           </p>
+                          <button
+                            onClick={() => setExpandedDimension(isExpanded ? null : dim)}
+                            style={{
+                              marginTop: '8px',
+                              padding: 0,
+                              border: 'none',
+                              background: 'none',
+                              fontSize: '12px',
+                              color: '#6b7280',
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            {isExpanded ? 'Show less' : 'What does this mean?'}
+                          </button>
+                          {isExpanded && (
+                            <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#9ca3af', lineHeight: 1.5, fontStyle: 'italic' }}>
+                              {DIMENSION_DEFINITIONS[dim]}
+                            </p>
+                          )}
                         </div>
                       )
                     })}
@@ -1910,8 +2109,8 @@ export default function App() {
               </>
             )}
 
-            {/* Investment Thesis */}
-            {report.investment_thesis && (
+            {/* Investment Thesis (admin only) */}
+            {isAdmin && report.investment_thesis && (
               <div style={{ marginBottom: '32px' }}>
                 <h3
                   style={{
@@ -2023,8 +2222,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Full Report: Slide-by-Slide with Questions */}
-            {report.slides && report.slides.length > 0 && (
+            {/* Full Report: Slide-by-Slide with Questions (admin only) */}
+            {isAdmin && report.slides && report.slides.length > 0 && (
               <div style={{ marginBottom: '24px' }}>
                 <h3
                   style={{
@@ -2237,8 +2436,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Free Report: Strengths (legacy format) */}
-            {report.strengths && report.strengths.length > 0 && (
+            {/* Free Report: Strengths (legacy format, admin only) */}
+            {isAdmin && report.strengths && report.strengths.length > 0 && (
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
                   Strengths
@@ -2265,8 +2464,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Free Report: Biggest Issues (legacy format) */}
-            {report.biggest_issues && report.biggest_issues.length > 0 && (
+            {/* Free Report: Biggest Issues (legacy format, admin only) */}
+            {isAdmin && report.biggest_issues && report.biggest_issues.length > 0 && (
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
                   Biggest Issues
@@ -2310,8 +2509,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Free Report: Slide Notes (legacy format) */}
-            {report.slide_notes && report.slide_notes.length > 0 && !report.slides && (
+            {/* Free Report: Slide Notes (legacy format, admin only) */}
+            {isAdmin && report.slide_notes && report.slide_notes.length > 0 && !report.slides && (
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 600, color: '#111827' }}>
                   Slide-by-Slide Notes
@@ -2364,8 +2563,8 @@ export default function App() {
               </div>
             )}
 
-            {/* Upgrade Teaser (only for free reports) */}
-            {report.upgrade_teaser && (
+            {/* Upgrade Teaser (only for free reports, admin only) */}
+            {isAdmin && report.upgrade_teaser && (
               <div style={{ padding: '20px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
                 <p style={{ margin: '0 0 10px 0', fontSize: '15px', fontWeight: 600, color: '#1e40af' }}>
                   {report.upgrade_teaser.title}
@@ -2380,8 +2579,8 @@ export default function App() {
               </div>
             )}
 
-            {/* V3 Debug Output (admin only - show if admin password is set or ?admin mode) */}
-            {(isAdmin || sessionStorage.getItem(SESSION_PASSWORD_KEY)) && report.debug && (
+            {/* V3 Debug Output (admin only) */}
+            {isAdmin && report.debug && (
               <div style={{ marginTop: '32px', border: '1px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
                 <button
                   onClick={() => setDebugExpanded(!debugExpanded)}
@@ -3399,6 +3598,7 @@ export default function App() {
           )}
 
         </div>
+        )}
       </div>
 
       {/* Hover preview overlay */}
