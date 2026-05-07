@@ -26,25 +26,20 @@ function StageItem({
   state: 'pending' | 'active' | 'complete'
 }) {
   return (
-    <li className="flex items-center gap-3">
+    <li className={
+      state === 'active'
+        ? 'text-gray-900'
+        : state === 'complete'
+          ? 'text-gray-500'
+          : 'text-gray-300'
+    }>
       {state === 'complete' && (
-        <Check className="w-5 h-5 text-gray-900" strokeWidth={2} />
+        <Check className="w-4 h-4 inline mr-1.5 -mt-0.5" strokeWidth={2.5} />
       )}
       {state === 'active' && (
-        <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
+        <Loader2 className="w-4 h-4 inline mr-1.5 -mt-0.5 animate-spin" />
       )}
-      {state === 'pending' && (
-        <div className="w-5 h-5 rounded-full border-2 border-gray-200" />
-      )}
-      <span className={
-        state === 'active'
-          ? 'text-gray-900 font-medium'
-          : state === 'complete'
-            ? 'text-gray-600'
-            : 'text-gray-300'
-      }>
-        {label}
-      </span>
+      {label}
     </li>
   )
 }
@@ -180,18 +175,16 @@ export function ProcessingPage() {
             Analyzing your deck
           </h1>
 
-          <div className="flex justify-center mb-12">
-            <ul className="flex flex-col items-start gap-5 text-base">
-              <StageItem label="Extracting slides" state={getState('extracting')} />
-              <StageItem label="Analyzing slides" state={getState('analyzing')} />
-              <StageItem label="Generating report" state={getState('generating')} />
-            </ul>
-          </div>
+          <ul className="text-sm space-y-1.5 mb-12">
+            <StageItem label="Extracting slides" state={getState('extracting')} />
+            <StageItem label="Analyzing slides" state={getState('analyzing')} />
+            <StageItem label="Generating report" state={getState('generating')} />
+          </ul>
 
           <button
             type="button"
             onClick={handleCancel}
-            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs text-gray-400 hover:text-gray-500 transition-colors"
           >
             Cancel
           </button>
