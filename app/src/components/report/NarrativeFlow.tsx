@@ -8,7 +8,7 @@ export function NarrativeFlow({ narrativeFlow }: NarrativeFlowProps) {
   if (!narrativeFlow) return null
 
   return (
-    <div className="mb-12">
+    <div className="mb-14">
       <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
         Narrative Flow
       </h2>

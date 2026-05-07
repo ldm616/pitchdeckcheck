@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { GradeDot } from '../GradeBadge'
 import type { V1SlideDetail, SlideData } from '../../lib/types'
 
 interface SlideDetailsProps {
@@ -26,11 +27,11 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
   }
 
   return (
-    <div className="mb-8">
+    <div className="mb-10">
       <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
         Slide-by-Slide
       </h2>
-      <div className="space-y-8">
+      <div className="space-y-10">
         {slides.map((slide) => {
           const slideData = slideImages.find(s => s.slide_number === slide.slide_number)
           const imageUrl = slideData?.image_url
@@ -38,7 +39,7 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
           const hasImprovement = slide.highest_impact_improvement && !isNoAction(slide.highest_impact_improvement)
 
           return (
-            <div key={slide.slide_number} className="pb-8 border-b border-gray-100 last:border-0 last:pb-0">
+            <div key={slide.slide_number} className="pb-10 border-b border-gray-100 last:border-0 last:pb-0">
               {/* Header */}
               <div className="flex items-start gap-4 mb-4">
                 {imageUrl && (
@@ -55,18 +56,21 @@ export function SlideDetails({ slides, slideImages }: SlideDetailsProps) {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-medium text-gray-900">
                       Slide {slide.slide_number}
                     </span>
-                    <span className="text-sm text-gray-400">·</span>
+                    <span className="text-sm text-gray-300">·</span>
                     <span className="text-sm text-gray-500">
                       {slide.type}
                     </span>
-                    <span className="text-sm text-gray-400">·</span>
-                    <span className="text-sm font-medium text-gray-500">
-                      {slide.grade}
-                    </span>
+                    <span className="text-sm text-gray-300">·</span>
+                    <div className="flex items-center gap-1.5">
+                      <GradeDot grade={slide.grade} />
+                      <span className="text-sm font-medium text-gray-500">
+                        {slide.grade}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

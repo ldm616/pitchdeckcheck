@@ -8,7 +8,7 @@ export function TopStrengths({ strengths }: TopStrengthsProps) {
   if (!strengths || strengths.length === 0) return null
 
   return (
-    <div className="mb-12">
+    <div className="mb-14">
       <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
         What Works
       </h2>
@@ -36,7 +36,7 @@ export function TopImprovements({ improvements }: TopImprovementsProps) {
   if (!improvements || improvements.length === 0) return null
 
   return (
-    <div className="mb-12">
+    <div className="mb-14">
       <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
         Key Improvements
       </h2>

@@ -1,4 +1,4 @@
-import { GradeBadge } from '../GradeBadge'
+import { GradeWithAccent } from '../GradeBadge'
 import type { V1Report } from '../../lib/types'
 
 interface ReportHeaderProps {
@@ -9,16 +9,16 @@ interface ReportHeaderProps {
 
 export function ReportHeader({ report, slideCount, reportCreatedAt }: ReportHeaderProps) {
   return (
-    <div className="mb-12">
+    <div className="mb-14">
       {/* Title */}
-      <h1 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
+      <h1 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-3">
         Deck Quality Report
       </h1>
 
       {/* Grade and metadata */}
-      <div className="flex items-baseline gap-4 mb-8">
-        <GradeBadge grade={report.overall.grade} size="lg" />
-        <p className="text-sm text-gray-500">
+      <div className="flex items-center gap-5 mb-10">
+        <GradeWithAccent grade={report.overall.grade} size="lg" />
+        <p className="text-sm text-gray-400">
           {slideCount || report.slide_summary?.length || 0} slides
           {reportCreatedAt && (
             <span className="ml-1">

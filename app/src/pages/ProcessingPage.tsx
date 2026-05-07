@@ -27,15 +27,21 @@ function StageItem({
   return (
     <li className="flex items-center gap-3">
       {state === 'complete' && (
-        <Check className="w-4 h-4 text-gray-900" strokeWidth={2.5} />
+        <Check className="w-5 h-5 text-gray-900" strokeWidth={2} />
       )}
       {state === 'active' && (
-        <Loader2 className="w-4 h-4 text-gray-600 animate-spin" />
+        <Loader2 className="w-5 h-5 text-gray-600 animate-spin" />
       )}
       {state === 'pending' && (
-        <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
+        <div className="w-5 h-5 rounded-full border-2 border-gray-200" />
       )}
-      <span className={state === 'pending' ? 'text-gray-400' : 'text-gray-700'}>
+      <span className={
+        state === 'active'
+          ? 'text-gray-900 font-medium'
+          : state === 'complete'
+            ? 'text-gray-600'
+            : 'text-gray-300'
+      }>
         {label}
       </span>
     </li>
@@ -53,6 +59,7 @@ export function ProcessingPage() {
     processingStatus,
     errorMessage,
     startPolling,
+    stopPolling,
   } = useReportPolling({
     onReportReady: () => {
       // Navigate to report page when ready
@@ -68,6 +75,11 @@ export function ProcessingPage() {
     }
   }, [deckId, accessToken, startPolling])
 
+  const handleCancel = () => {
+    stopPolling()
+    navigate(ROUTES.UPLOAD)
+  }
+
   // Handle missing credentials
   if (!deckId || !accessToken) {
     return (
@@ -76,12 +88,12 @@ export function ProcessingPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
             Invalid Link
           </h1>
-          <p className="text-sm text-gray-500 mb-8">
+          <p className="text-base text-gray-500 mb-8">
             This link appears to be invalid or expired.
           </p>
           <button
             onClick={() => navigate(ROUTES.UPLOAD)}
-            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
           >
             Check a deck
           </button>
@@ -98,12 +110,12 @@ export function ProcessingPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
             Processing Failed
           </h1>
-          <p className="text-sm text-gray-500 mb-8">
+          <p className="text-base text-gray-500 mb-8">
             {errorMessage || 'Something went wrong while processing your deck.'}
           </p>
           <button
             onClick={() => navigate(ROUTES.UPLOAD)}
-            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
           >
             Try again
           </button>
@@ -120,12 +132,12 @@ export function ProcessingPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-4">
             Still Processing
           </h1>
-          <p className="text-sm text-gray-500 mb-8">
+          <p className="text-base text-gray-500 mb-8">
             Your deck is taking longer than expected. Please check back shortly.
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
+            className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
           >
             Check Status
           </button>
@@ -150,23 +162,26 @@ export function ProcessingPage() {
   return (
     <div className="flex-1 flex items-center justify-center px-6 py-16">
       <div className="w-full max-w-md text-center">
-        <p className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
+        <p className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-5">
           Pitch Deck Check
         </p>
 
-        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-8">
+        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-10">
           Analyzing your deck
         </h1>
 
-        <ul className="inline-flex flex-col items-start gap-4 text-sm mb-10">
+        <ul className="inline-flex flex-col items-start gap-5 text-base mb-12">
           <StageItem label="Extracting slides" state={getState('extracting')} />
           <StageItem label="Analyzing slides" state={getState('analyzing')} />
           <StageItem label="Generating report" state={getState('generating')} />
         </ul>
 
-        <p className="text-xs text-gray-400">
-          This page will update automatically when your report is ready.
-        </p>
+        <button
+          onClick={handleCancel}
+          className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   )
