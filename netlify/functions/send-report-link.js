@@ -123,53 +123,46 @@ exports.handler = async (event) => {
   try {
     const fromEmail = process.env.FROM_EMAIL || 'reports@pitchdeckcheck.com'
 
-    // TODO: Add feedback tracking endpoint, then wire feedback links here
     await resend.emails.send({
       from: `Pitch Deck Check <${fromEmail}>`,
       to: email,
-      subject: 'Your private pitch deck report is ready',
+      subject: 'Your pitch deck report',
       html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 48px 20px;">
-          <div style="margin: 0 0 40px 0;">
-            <p style="font-size: 14px; font-weight: 600; color: #111; margin: 0 0 4px 0;">Pitch Deck Check</p>
-            <p style="font-size: 13px; color: #888; margin: 0;">Investor-oriented pitch deck feedback for founders.</p>
-          </div>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+          <p style="font-size: 13px; font-weight: 600; color: #111; margin: 0 0 24px 0;">Pitch Deck Check</p>
 
-          <h1 style="font-size: 18px; font-weight: 600; color: #111; margin: 0 0 12px 0;">
-            Your private pitch deck report is ready
-          </h1>
-
-          <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 28px 0;">
-            Use the link below to reopen your report anytime.
+          <p style="font-size: 15px; color: #333; line-height: 1.6; margin: 0 0 20px 0;">
+            Your report is ready. Use this link to access it anytime.
           </p>
 
-          <a href="${reportLink}" style="display: inline-block; background: #111; color: #fff; padding: 14px 28px; font-size: 15px; font-weight: 500; text-decoration: none; border-radius: 8px;">
-            View my report
+          <a href="${reportLink}" style="display: inline-block; background: #111; color: #fff; padding: 12px 24px; font-size: 14px; font-weight: 500; text-decoration: none; border-radius: 6px;">
+            View report
           </a>
 
-          <p style="font-size: 13px; color: #888; line-height: 1.5; margin: 28px 0 0 0;">
-            Only people with this link can access your report.
+          <p style="font-size: 12px; color: #999; margin: 20px 0 0 0;">
+            Only you can access this link.
           </p>
 
-          <hr style="border: none; border-top: 1px solid #eee; margin: 40px 0 32px 0;" />
-
-          <p style="font-size: 13px; font-weight: 500; color: #666; margin: 0 0 4px 0;">Pitch Deck Check</p>
-          <p style="font-size: 12px; color: #999; margin: 0;">Investor-oriented pitch deck feedback for founders.</p>
+          <div style="margin: 32px 0 0 0;">
+            <p style="font-size: 12px; color: #888; margin: 0 0 8px 0;">Was this feedback useful?</p>
+            <p style="font-size: 12px; margin: 0;">
+              <a href="mailto:hello@pitchdeckcheck.com?subject=Feedback: Very useful" style="color: #666; text-decoration: none;">Very useful</a>
+              <span style="color: #ccc; margin: 0 8px;">·</span>
+              <a href="mailto:hello@pitchdeckcheck.com?subject=Feedback: Somewhat useful" style="color: #666; text-decoration: none;">Somewhat</a>
+              <span style="color: #ccc; margin: 0 8px;">·</span>
+              <a href="mailto:hello@pitchdeckcheck.com?subject=Feedback: Not useful" style="color: #666; text-decoration: none;">Not useful</a>
+            </p>
+          </div>
         </div>
       `,
       text: `Pitch Deck Check
-Investor-oriented pitch deck feedback for founders.
 
-Your private pitch deck report is ready.
-
-Use this link to reopen your report anytime:
+Your report is ready. Use this link to access it anytime:
 ${reportLink}
 
-Only people with this link can access your report.
+Only you can access this link.
 
-—
-Pitch Deck Check
-Investor-oriented pitch deck feedback for founders.`,
+Was this feedback useful? Reply to let us know.`,
     })
 
     // Always update the deck with the email so admin can see it

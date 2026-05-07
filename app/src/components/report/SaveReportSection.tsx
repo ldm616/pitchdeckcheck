@@ -114,9 +114,22 @@ interface SaveReportSectionProps {
 
 type SendStatus = 'idle' | 'sending' | 'sent' | 'error'
 
+// localStorage key for tracking sent status per deck
+const getSentKey = (deckId: string) => `report_email_sent_${deckId}`
+
 export function SaveReportSection({ deckId, accessToken }: SaveReportSectionProps) {
   const [email, setEmail] = useState('')
-  const [status, setStatus] = useState<SendStatus>('idle')
+  const [status, setStatus] = useState<SendStatus>(() => {
+    // Check if email was already sent for this deck
+    try {
+      if (localStorage.getItem(getSentKey(deckId))) {
+        return 'sent'
+      }
+    } catch {
+      // localStorage not available
+    }
+    return 'idle'
+  })
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({
     message: '',
@@ -157,6 +170,12 @@ export function SaveReportSection({ deckId, accessToken }: SaveReportSectionProp
       if (result.ok) {
         setStatus('sent')
         setEmail('')
+        // Persist sent state to localStorage
+        try {
+          localStorage.setItem(getSentKey(deckId), '1')
+        } catch {
+          // localStorage not available
+        }
         showToast('Email sent.')
       } else {
         setStatus('error')
