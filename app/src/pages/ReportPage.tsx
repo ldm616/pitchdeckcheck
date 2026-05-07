@@ -135,7 +135,7 @@ export function ReportPage() {
               onClick={() => navigate(ROUTES.UPLOAD)}
               className="px-6 py-2.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
             >
-              Check my deck
+              Check another deck
             </button>
             <p className="mt-5 text-xs text-gray-400">
               Reports are private and accessible only through valid links.
