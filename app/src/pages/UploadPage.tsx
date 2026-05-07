@@ -15,6 +15,7 @@ export function UploadPage() {
     handleFileChange,
     handleFileDrop,
     handleSubmit,
+    clearFile,
   } = useDeckUpload()
 
   return (
@@ -48,6 +49,7 @@ export function UploadPage() {
                 </label>
                 <UploadDropzone
                   onFileSelect={handleFileDrop}
+                  onClearFile={clearFile}
                   selectedFileName={fileName}
                   disabled={isProcessing}
                   error={errorMessage}

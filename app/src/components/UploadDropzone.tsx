@@ -3,6 +3,7 @@ import { Upload, FileText, X } from 'lucide-react'
 
 interface UploadDropzoneProps {
   onFileSelect: (file: File) => void
+  onClearFile?: () => void
   selectedFileName?: string | null
   disabled?: boolean
   error?: string | null
@@ -10,6 +11,7 @@ interface UploadDropzoneProps {
 
 export function UploadDropzone({
   onFileSelect,
+  onClearFile,
   selectedFileName,
   disabled = false,
   error,
@@ -68,8 +70,13 @@ export function UploadDropzone({
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
-    // Reset by passing an empty action - parent will handle
-  }, [])
+    // Clear parent state
+    onClearFile?.()
+    // Open file picker for new selection
+    setTimeout(() => {
+      fileInputRef.current?.click()
+    }, 0)
+  }, [onClearFile])
 
   return (
     <div>

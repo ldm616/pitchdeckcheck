@@ -14,6 +14,7 @@ interface UseDeckUploadReturn {
   handleFileChange: (e: ChangeEvent<HTMLInputElement>) => void
   handleFileDrop: (file: File) => void
   handleSubmit: (e: FormEvent) => Promise<void>
+  clearFile: () => void
   reset: () => void
 }
 
@@ -78,6 +79,11 @@ export function useDeckUpload(): UseDeckUploadReturn {
     }
   }, [file, navigate])
 
+  const clearFile = useCallback(() => {
+    setFile(null)
+    setErrorMessage(null)
+  }, [])
+
   const reset = useCallback(() => {
     setFile(null)
     setStatus('idle')
@@ -94,6 +100,7 @@ export function useDeckUpload(): UseDeckUploadReturn {
     handleFileChange,
     handleFileDrop,
     handleSubmit,
+    clearFile,
     reset,
   }
 }
