@@ -27,9 +27,11 @@ export async function verifyPassword(password: string): Promise<{ ok: boolean; e
 }
 
 // Upload a deck
-export async function uploadDeck(email: string, file: File): Promise<UploadResult> {
+export async function uploadDeck(file: File, email?: string): Promise<UploadResult> {
   const formData = new FormData()
-  formData.append('email', email)
+  if (email) {
+    formData.append('email', email)
+  }
   formData.append('file', file)
 
   const response = await fetch('/.netlify/functions/upload-deck', {
@@ -78,11 +80,11 @@ export async function getDeckStatus(
   }
 }
 
-// Get full report
+// Get full report by deck_id + access_token (legacy)
 export async function getReport(
   deckId: string,
   accessToken: string
-): Promise<{ content: ReportContent; slides: SlideData[]; report_created_at?: string } | null> {
+): Promise<{ content: ReportContent; slides: SlideData[]; report_created_at?: string; report_code?: string } | null> {
   try {
     const response = await fetch('/.netlify/functions/get-report', {
       method: 'POST',
@@ -100,6 +102,37 @@ export async function getReport(
         content: data.content,
         slides: data.slides || [],
         report_created_at: data.report_created_at,
+        report_code: data.report_code,
+      }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+// Get full report by report code
+export async function getReportByCode(
+  reportCode: string
+): Promise<{ content: ReportContent; slides: SlideData[]; report_created_at?: string; report_code?: string } | null> {
+  try {
+    const response = await fetch('/.netlify/functions/get-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report_code: reportCode }),
+    })
+
+    if (!response.ok) {
+      return null
+    }
+
+    const data: GetReportResult = await response.json()
+    if (data.status === 'ready' && data.content) {
+      return {
+        content: data.content,
+        slides: data.slides || [],
+        report_created_at: data.report_created_at,
+        report_code: data.report_code,
       }
     }
     return null

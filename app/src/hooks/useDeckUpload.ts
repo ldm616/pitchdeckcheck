@@ -5,8 +5,6 @@ import { getProcessingPath } from '../lib/routes'
 import type { Status } from '../lib/types'
 
 interface UseDeckUploadReturn {
-  email: string
-  setEmail: (email: string) => void
   file: File | null
   fileName: string | null
   status: Status
@@ -22,13 +20,12 @@ interface UseDeckUploadReturn {
 export function useDeckUpload(): UseDeckUploadReturn {
   const navigate = useNavigate()
 
-  const [email, setEmail] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const isProcessing = status === 'uploading' || status === 'processing'
-  const isDisabled = isProcessing || !file || !email
+  const isDisabled = isProcessing || !file
 
   const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
@@ -54,14 +51,14 @@ export function useDeckUpload(): UseDeckUploadReturn {
 
   const handleSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault()
-    if (!file || !email) return
+    if (!file) return
 
     setStatus('uploading')
     setErrorMessage(null)
 
     try {
-      // Upload the deck
-      const uploadResult = await uploadDeck(email, file)
+      // Upload the deck (no email required)
+      const uploadResult = await uploadDeck(file)
 
       // Switch to processing state
       setStatus('processing')
@@ -79,18 +76,15 @@ export function useDeckUpload(): UseDeckUploadReturn {
       setStatus('error')
       setErrorMessage('Upload failed. Please try again.')
     }
-  }, [file, email, navigate])
+  }, [file, navigate])
 
   const reset = useCallback(() => {
-    setEmail('')
     setFile(null)
     setStatus('idle')
     setErrorMessage(null)
   }, [])
 
   return {
-    email,
-    setEmail,
     file,
     fileName: file?.name || null,
     status,

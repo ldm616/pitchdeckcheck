@@ -5,6 +5,17 @@ import { randomUUID } from 'crypto'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 
+// Character set avoiding ambiguous: O, 0, I, 1, L
+const REPORT_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+
+function generateReportCode(length = 6): string {
+  let code = ''
+  for (let i = 0; i < length; i++) {
+    code += REPORT_CODE_CHARS[Math.floor(Math.random() * REPORT_CODE_CHARS.length)]
+  }
+  return code
+}
+
 interface ParsedForm {
   email: string | null
   file: {
@@ -130,12 +141,12 @@ export const handler: Handler = async (event) => {
     }
   }
 
-  // Validate email
-  if (!parsed.email || !validateEmail(parsed.email)) {
+  // Validate email only if provided
+  if (parsed.email && !validateEmail(parsed.email)) {
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Valid email is required' }),
+      body: JSON.stringify({ error: 'Invalid email format' }),
     }
   }
 
@@ -167,6 +178,7 @@ export const handler: Handler = async (event) => {
   // Generate IDs
   const deckId = randomUUID()
   const accessToken = randomUUID()
+  const reportCode = generateReportCode()
   const filePath = `${deckId}/original.pdf`
 
   // Initialize Supabase client
@@ -194,8 +206,9 @@ export const handler: Handler = async (event) => {
     .from('decks')
     .insert({
       id: deckId,
-      email: parsed.email,
+      email: parsed.email || null,
       access_token: accessToken,
+      report_code: reportCode,
       file_path: filePath,
       original_filename: parsed.file.filename,
       file_size_bytes: parsed.file.buffer.length,
@@ -228,6 +241,7 @@ export const handler: Handler = async (event) => {
     body: JSON.stringify({
       deck_id: deckId,
       access_token: accessToken,
+      report_code: reportCode,
     }),
   }
 }

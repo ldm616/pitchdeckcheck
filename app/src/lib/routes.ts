@@ -14,6 +14,10 @@ export function getReportPath(deckId: string, accessToken: string): string {
   return `/report/${deckId}?token=${accessToken}`
 }
 
+export function getReportPathByCode(reportCode: string): string {
+  return `/report/${reportCode}`
+}
+
 // Legacy routes (for backwards compatibility)
 export function getFreeReportPath(deckId: string): string {
   return `/report/free/${deckId}`

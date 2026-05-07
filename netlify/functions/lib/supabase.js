@@ -40,8 +40,23 @@ async function verifyDeckAccess(supabase, deckId, accessToken) {
   return { valid: true, error: null, deck }
 }
 
+async function verifyReportCode(supabase, reportCode) {
+  const { data: deck, error: deckError } = await supabase
+    .from('decks')
+    .select('id, file_path, report_code')
+    .eq('report_code', reportCode)
+    .single()
+
+  if (deckError || !deck) {
+    return { valid: false, error: 'Report not found', deck: null }
+  }
+
+  return { valid: true, error: null, deck }
+}
+
 module.exports = {
   getSupabaseClient,
   setDeckStatus,
   verifyDeckAccess,
+  verifyReportCode,
 }

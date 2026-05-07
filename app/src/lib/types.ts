@@ -6,6 +6,7 @@ export type AdminView = 'upload' | 'reports' | 'calibration'
 export interface UploadResult {
   deck_id: string
   access_token: string
+  report_code: string
 }
 
 export interface DeckStatusResult {
@@ -204,6 +205,7 @@ export interface SlideData {
 
 export interface GetReportResult {
   deck_id: string
+  report_code?: string
   report_type: string
   status: string
   overall_grade?: string
@@ -311,10 +313,10 @@ export const ERAS = [
 export const GRADES = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'E'] as const
 
 export const DIMENSION_DEFINITIONS = {
-  clarity: 'How clearly the deck explains what the company does, who it serves, why the problem matters, and why the solution is compelling.',
-  brevity: 'How efficiently the deck communicates the story without unnecessary density, repetition, or distracting detail.',
-  flow: 'How well the slides build logically from one idea to the next, creating a coherent investor narrative.',
-  completeness: 'How well the deck answers the key questions an investor needs answered at this stage.',
+  clarity: 'Does the investor understand what this company does and why it matters within 30 seconds?',
+  brevity: 'Does the deck move efficiently with strong information density, or does it drag?',
+  flow: 'Does conviction build naturally through the narrative, or does momentum reset?',
+  completeness: 'Does the deck answer the key investor questions needed at this stage?',
 } as const
 
 export type DimensionKey = keyof typeof DIMENSION_DEFINITIONS

@@ -1,4 +1,4 @@
-const { getSupabaseClient, verifyDeckAccess } = require('./lib/supabase')
+const { getSupabaseClient, verifyDeckAccess, verifyReportCode } = require('./lib/supabase')
 
 // Signed URL expiration: 1 hour
 const SIGNED_URL_EXPIRATION_SECONDS = 3600
@@ -23,13 +23,16 @@ exports.handler = async (event) => {
     }
   }
 
-  const { deck_id, access_token } = body
+  const { deck_id, access_token, report_code } = body
 
-  if (!deck_id || !access_token) {
+  // Support both lookup methods:
+  // 1. report_code (new, simpler)
+  // 2. deck_id + access_token (legacy, backward compatible)
+  if (!report_code && (!deck_id || !access_token)) {
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'deck_id and access_token are required' }),
+      body: JSON.stringify({ error: 'report_code or deck_id+access_token required' }),
     }
   }
 
@@ -45,22 +48,47 @@ exports.handler = async (event) => {
     }
   }
 
-  const { valid, error: accessError } = await verifyDeckAccess(supabase, deck_id, access_token)
-
-  if (!valid) {
-    const statusCode = accessError === 'Deck not found' ? 404 : 403
-    return {
-      statusCode,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: accessError }),
+  // Verify access and get deck_id
+  let deckId
+  let deckReportCode
+  if (report_code) {
+    // Lookup by report code
+    const { valid, error: codeError, deck } = await verifyReportCode(supabase, report_code)
+    if (!valid) {
+      return {
+        statusCode: 404,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: codeError }),
+      }
     }
+    deckId = deck.id
+    deckReportCode = deck.report_code
+  } else {
+    // Legacy lookup by deck_id + access_token
+    const { valid, error: accessError } = await verifyDeckAccess(supabase, deck_id, access_token)
+    if (!valid) {
+      const statusCode = accessError === 'Deck not found' ? 404 : 403
+      return {
+        statusCode,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: accessError }),
+      }
+    }
+    deckId = deck_id
+    // Fetch report_code for legacy lookups
+    const { data: deckData } = await supabase
+      .from('decks')
+      .select('report_code')
+      .eq('id', deck_id)
+      .single()
+    deckReportCode = deckData?.report_code
   }
 
   // Fetch latest free report for this deck
   const { data: report, error: reportError } = await supabase
     .from('reports')
     .select('id, report_type, status, overall_grade, content, generation_error, created_at')
-    .eq('deck_id', deck_id)
+    .eq('deck_id', deckId)
     .eq('report_type', 'free')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -89,7 +117,8 @@ exports.handler = async (event) => {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        deck_id,
+        deck_id: deckId,
+        report_code: deckReportCode,
         report_type: report.report_type,
         status: report.status,
         generation_error: report.generation_error,
@@ -101,7 +130,7 @@ exports.handler = async (event) => {
   const { data: slides, error: slidesError } = await supabase
     .from('slides')
     .select('slide_number, image_path, inferred_type')
-    .eq('deck_id', deck_id)
+    .eq('deck_id', deckId)
     .order('slide_number', { ascending: true })
 
   if (slidesError) {
@@ -155,7 +184,8 @@ exports.handler = async (event) => {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      deck_id,
+      deck_id: deckId,
+      report_code: deckReportCode,
       report_type: report.report_type,
       status: report.status,
       overall_grade: report.overall_grade,

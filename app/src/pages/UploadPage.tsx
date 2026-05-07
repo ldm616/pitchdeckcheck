@@ -7,8 +7,6 @@ import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function UploadPage() {
   const {
-    email,
-    setEmail,
     fileName,
     status,
     errorMessage,
@@ -38,35 +36,11 @@ export function UploadPage() {
                 Upload Your Pitch Deck
               </h1>
               <p className="text-sm text-gray-500 leading-relaxed">
-                Get your deck quality report in under 2 minutes.
+                Upload your pitch deck PDF and get a deck quality report in under 2 minutes.
               </p>
             </div>
 
             <form onSubmit={handleSubmit}>
-              {/* Email field */}
-              <div className="mb-5">
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Email
-                </label>
-                <p className="text-xs text-gray-400 mb-1.5">
-                  We'll use this to save your private report link so you can return to it later.
-                </p>
-                <input
-                  id="email"
-                  type="email"
-                  name="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  disabled={isProcessing}
-                  className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
-              </div>
-
               {/* File upload */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -99,16 +73,9 @@ export function UploadPage() {
                     {status === 'uploading' ? 'Uploading...' : 'Processing...'}
                   </>
                 ) : (
-                  'Upload Deck'
+                  'Analyze My Pitch Deck'
                 )}
               </button>
-
-              {/* Secondary reassurance */}
-              {status === 'idle' && (
-                <p className="mt-4 text-xs text-gray-400 text-center">
-                  Your report is saved privately and linked to your email so you can come back later.
-                </p>
-              )}
             </form>
 
             {/* Error state */}
