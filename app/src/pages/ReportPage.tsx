@@ -7,9 +7,7 @@ import { FounderHeader } from '../components/FounderHeader'
 import {
   ReportHeader,
   QualityBreakdown,
-  TopStrengths,
   TopImprovements,
-  NarrativeFlow,
   SlideSummaryTable,
   SlideDetails,
   SaveReportCard,
@@ -180,11 +178,7 @@ export function ReportPage() {
 
             <QualityBreakdown dimensions={v1Report.quality_dimensions} />
 
-            <TopStrengths strengths={v1Report.top_strengths} />
-
             <TopImprovements improvements={v1Report.top_improvements} />
-
-            <NarrativeFlow narrativeFlow={v1Report.narrative_flow} />
 
             <SlideSummaryTable slides={v1Report.slide_summary} />
 

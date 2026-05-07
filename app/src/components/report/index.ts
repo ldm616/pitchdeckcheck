@@ -1,7 +1,6 @@
 export { ReportHeader } from './ReportHeader'
 export { QualityBreakdown } from './QualityBreakdown'
-export { TopStrengths, TopImprovements } from './StrengthsImprovements'
-export { NarrativeFlow } from './NarrativeFlow'
+export { TopImprovements } from './StrengthsImprovements'
 export { SlideSummaryTable } from './SlideSummaryTable'
 export { SlideDetails } from './SlideDetails'
 export { SaveReportCard } from './SaveReportCard'

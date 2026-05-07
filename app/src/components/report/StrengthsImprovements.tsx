@@ -36,24 +36,21 @@ export function TopImprovements({ improvements }: TopImprovementsProps) {
   if (!improvements || improvements.length === 0) return null
 
   return (
-    <div className="mb-14">
-      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
-        Key Improvements
+    <div className="mb-10">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">
+        Priority Fixes
       </h2>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {improvements.map((imp, idx) => (
-          <div key={idx} className="pb-6 border-b border-gray-100 last:border-0 last:pb-0">
+          <div key={idx} className="pb-4 border-b border-gray-100 last:border-0 last:pb-0">
             <p className="text-sm text-gray-700 leading-relaxed">
               {imp.improvement}
             </p>
             {imp.context && (
-              <p className="mt-2 text-sm text-gray-500 leading-relaxed">
+              <p className="mt-1.5 text-sm text-gray-500 leading-relaxed">
                 {imp.context}
               </p>
             )}
-            <p className="mt-2 text-xs text-gray-400">
-              {imp.slide_type}
-            </p>
           </div>
         ))}
       </div>

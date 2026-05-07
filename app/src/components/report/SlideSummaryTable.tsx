@@ -9,8 +9,8 @@ export function SlideSummaryTable({ slides }: SlideSummaryTableProps) {
   if (!slides || slides.length === 0) return null
 
   return (
-    <div className="mb-14">
-      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
+    <div className="mb-10">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">
         Slide Overview
       </h2>
       <div className="overflow-x-auto -mx-2">

@@ -9,20 +9,20 @@ export function QualityBreakdown({ dimensions }: QualityBreakdownProps) {
   const dimensionKeys: DimensionKey[] = ['clarity', 'brevity', 'flow', 'completeness']
 
   return (
-    <div className="mb-14">
-      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-6">
+    <div className="mb-10">
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-4">
         Quality Breakdown
       </h2>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {dimensionKeys.map((dim) => {
           const dimension = dimensions[dim]
 
           return (
             <div
               key={dim}
-              className="py-3 border-b border-gray-100 last:border-0"
+              className="py-2 border-b border-gray-100 last:border-0"
             >
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-medium text-gray-900 capitalize">
                   {dim}
                 </span>
