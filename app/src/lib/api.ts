@@ -237,3 +237,26 @@ export async function deleteCalibrationDeck(deckId: string): Promise<{ ok: boole
 
   return response.json()
 }
+
+// Send private report link via email
+export async function sendReportLink(
+  deckId: string,
+  accessToken: string,
+  email: string
+): Promise<{ ok: boolean; error?: string; fallback_url?: string }> {
+  try {
+    const response = await fetch('/.netlify/functions/send-report-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deck_id: deckId,
+        access_token: accessToken,
+        email,
+      }),
+    })
+
+    return response.json()
+  } catch {
+    return { ok: false, error: 'Network error' }
+  }
+}

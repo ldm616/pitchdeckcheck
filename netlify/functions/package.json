@@ -6,7 +6,8 @@
     "@supabase/supabase-js": "^2.50.0",
     "busboy": "^1.6.0",
     "openai": "^4.67.0",
-    "pdfjs-dist": "^4.4.168"
+    "pdfjs-dist": "^4.4.168",
+    "resend": "^6.12.3"
   },
   "devDependencies": {
     "@netlify/functions": "^2.6.0",

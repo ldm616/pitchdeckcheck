@@ -38,7 +38,7 @@ function StageItem({
           <Check className="w-4 h-4 inline -mt-0.5" strokeWidth={2.5} />
         )}
         {state === 'active' && (
-          <Loader2 className="w-4 h-4 inline -mt-0.5 animate-spin" />
+          <Loader2 className="w-4 h-4 inline -mt-0.5 animate-spin" strokeWidth={2.5} />
         )}
       </span>
       {label}

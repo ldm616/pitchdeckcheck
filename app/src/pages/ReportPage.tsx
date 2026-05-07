@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { getReport, getReportByCode } from '../lib/api'
-import { ROUTES, getReportPathByCode } from '../lib/routes'
+import { ROUTES } from '../lib/routes'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { FounderHeader } from '../components/FounderHeader'
 import {
@@ -10,7 +10,7 @@ import {
   TopImprovements,
   SlideSummaryTable,
   SlideDetails,
-  SaveReportCard,
+  SaveReportSection,
 } from '../components/report'
 import type { ReportContent, SlideData } from '../lib/types'
 
@@ -20,6 +20,10 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9
 function isUUID(str: string): boolean {
   return UUID_REGEX.test(str)
 }
+
+// TODO: Before founder launch, remove short-code (report_code) access entirely.
+// Reports should ONLY be accessible via the secure deck_id + access_token URL.
+// Short codes are guessable and pose a security risk for confidential pitch decks.
 
 export function ReportPage() {
   const { deckId } = useParams<{ deckId: string }>()
@@ -32,7 +36,11 @@ export function ReportPage() {
   const [report, setReport] = useState<ReportContent | null>(null)
   const [slides, setSlides] = useState<SlideData[]>([])
   const [reportCreatedAt, setReportCreatedAt] = useState<string | null>(null)
-  const [reportCode, setReportCode] = useState<string | null>(null)
+  // Track secure credentials for email save flow
+  const [secureCredentials, setSecureCredentials] = useState<{
+    deckId: string
+    accessToken: string
+  } | null>(null)
 
   useEffect(() => {
     async function fetchReportData() {
@@ -45,13 +53,19 @@ export function ReportPage() {
       try {
         let data
 
-        // Smart detection: UUID with token = legacy lookup, short code = new lookup
+        // Smart detection: UUID with token = secure lookup, short code = insecure lookup
         if (isUUID(deckId) && accessToken) {
-          // Legacy: deck_id + access_token
+          // Secure: deck_id + access_token (long unguessable token)
           data = await getReport(deckId, accessToken)
+          // Store secure credentials for email save flow
+          if (data) {
+            setSecureCredentials({ deckId, accessToken })
+          }
         } else if (!isUUID(deckId)) {
-          // New: report_code lookup
+          // Insecure: report_code lookup (short guessable code)
+          // TODO: Remove this access method before founder launch
           data = await getReportByCode(deckId)
+          // No secure credentials available via this path
         } else {
           // UUID without token - invalid
           setError('Invalid link')
@@ -63,7 +77,6 @@ export function ReportPage() {
           setReport(data.content)
           setSlides(data.slides)
           setReportCreatedAt(data.report_created_at || null)
-          setReportCode(data.report_code || null)
         } else {
           setError('Report not found')
         }
@@ -104,7 +117,7 @@ export function ReportPage() {
               Report not found
             </h1>
             <p className="text-gray-500 mb-6">
-              Check the code or upload your deck again.
+              This link may have expired or the report doesn't exist.
             </p>
             <button
               onClick={() => navigate(ROUTES.UPLOAD)}
@@ -119,11 +132,6 @@ export function ReportPage() {
   }
 
   const v1Report = report.v1_report
-
-  // Generate report URL for sharing
-  const reportUrl = reportCode
-    ? `${window.location.origin}${getReportPathByCode(reportCode)}`
-    : window.location.href
 
   // No V1 report - show basic info
   if (!v1Report) {
@@ -169,10 +177,10 @@ export function ReportPage() {
               reportCreatedAt={reportCreatedAt}
             />
 
-            {reportCode && (
-              <SaveReportCard
-                reportCode={reportCode}
-                reportUrl={reportUrl}
+            {secureCredentials && (
+              <SaveReportSection
+                deckId={secureCredentials.deckId}
+                accessToken={secureCredentials.accessToken}
               />
             )}
 
