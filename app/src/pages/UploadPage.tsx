@@ -23,12 +23,9 @@ export function UploadPage() {
 
       <main className="flex-1 flex items-center justify-center px-6 pb-16">
         <div className="w-full max-w-md text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-2">
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-8">
             Upload your pitch deck
           </h1>
-          <p className="text-sm text-gray-400 mb-8">
-            PDF up to 50MB
-          </p>
 
           <form onSubmit={handleSubmit}>
             <div className="mb-6">

@@ -135,7 +135,7 @@ export function UploadDropzone({
           <div className="flex flex-col items-center gap-3">
             <Upload className="w-8 h-8 text-gray-300" strokeWidth={1.5} />
             <p className="text-sm text-gray-400">
-              {isDragging ? 'Drop here' : 'Drop PDF or click to browse'}
+              {isDragging ? 'Drop here' : 'Drop file or browse. 50MB max.'}
             </p>
           </div>
         )}
