@@ -123,9 +123,12 @@ export interface V1SlideDetail {
   slide_number: number
   type: string
   grade: string
-  what_works: string
-  biggest_gap: string
-  highest_impact_improvement: string
+  investor_insight: string
+  missing_investor_proof: string | null
+  // Legacy fields for backwards compatibility
+  what_works?: string
+  biggest_gap?: string
+  highest_impact_improvement?: string
 }
 
 export interface V1Report {
@@ -133,16 +136,22 @@ export interface V1Report {
   overall: {
     grade: string
     score: number
-    synthesis: string
+    investor_readout: string
     positioning_note: string
+    // Legacy field for backwards compatibility
+    synthesis?: string
   }
-  quality_dimensions: V1QualityDimensions
-  top_strengths: V1Strength[]
+  // New investor reasoning sections
+  what_investors_believe: string[]
+  what_still_feels_unproven: string[]
   investor_questions: V1InvestorQuestion[]
-  top_improvements?: V1Improvement[] // deprecated, kept for backwards compatibility
-  narrative_flow: V1NarrativeFlow
-  slide_summary: V1SlideSummary[]
+  quality_dimensions: V1QualityDimensions
   slides: V1SlideDetail[]
+  // Legacy fields for backwards compatibility
+  top_strengths?: V1Strength[]
+  top_improvements?: V1Improvement[]
+  narrative_flow?: V1NarrativeFlow
+  slide_summary?: V1SlideSummary[]
 }
 
 // Legacy report types (for backwards compatibility)

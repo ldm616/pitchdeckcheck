@@ -1,5 +1,7 @@
 export { ReportHeader } from './ReportHeader'
-export { QualityBreakdown } from './QualityBreakdown'
+export { WhatInvestorsBelieve } from './WhatInvestorsBelieve'
+export { WhatStillFeelsUnproven } from './WhatStillFeelsUnproven'
 export { InvestorQuestions } from './InvestorQuestions'
+export { QualityBreakdown } from './QualityBreakdown'
 export { SlideFeedback } from './SlideFeedback'
 export { SaveReportSection } from './SaveReportSection'

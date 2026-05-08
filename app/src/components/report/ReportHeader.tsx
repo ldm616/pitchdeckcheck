@@ -8,13 +8,16 @@ interface ReportHeaderProps {
 }
 
 export function ReportHeader({ report, slideCount, reportCreatedAt }: ReportHeaderProps) {
+  // Support both new (investor_readout) and legacy (synthesis) field names
+  const readout = report.overall.investor_readout || report.overall.synthesis || ''
+
   return (
     <div className="mb-8">
       {/* Grade and metadata */}
       <div className="flex items-center gap-5 mb-5">
         <GradeWithAccent grade={report.overall.grade} size="lg" />
         <p className="text-sm text-gray-400">
-          {slideCount || report.slide_summary?.length || 0} slides
+          {slideCount || report.slides?.length || 0} slides
           {reportCreatedAt && (
             <span className="ml-1">
               · {new Date(reportCreatedAt).toLocaleDateString('en-US', {
@@ -26,13 +29,13 @@ export function ReportHeader({ report, slideCount, reportCreatedAt }: ReportHead
         </p>
       </div>
 
-      {/* Overall Assessment */}
+      {/* Overall Investor Readout */}
       <div>
         <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mb-2">
-          Overall Assessment
+          Overall Investor Readout
         </h2>
         <p className="text-sm text-gray-700 leading-relaxed">
-          {report.overall.synthesis}
+          {readout}
         </p>
       </div>
 

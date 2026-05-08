@@ -8,8 +8,10 @@ import { FounderFooter } from '../components/FounderFooter'
 import { ContactModal } from '../components/ContactModal'
 import {
   ReportHeader,
-  QualityBreakdown,
+  WhatInvestorsBelieve,
+  WhatStillFeelsUnproven,
   InvestorQuestions,
+  QualityBreakdown,
   SlideFeedback,
   SaveReportSection,
 } from '../components/report'
@@ -203,9 +205,10 @@ export function ReportPage() {
       <main className="flex-1 px-6 pb-16">
         <div className="max-w-2xl mx-auto">
           <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
+            {/* 1. Overall Investor Readout */}
             <ReportHeader
               report={v1Report}
-              slideCount={slides.length || v1Report.slide_summary?.length || 0}
+              slideCount={slides.length || v1Report.slides?.length || 0}
               reportCreatedAt={reportCreatedAt}
             />
 
@@ -216,10 +219,19 @@ export function ReportPage() {
               />
             )}
 
-            <QualityBreakdown dimensions={v1Report.quality_dimensions} />
+            {/* 2. What Investors Believe */}
+            <WhatInvestorsBelieve beliefs={v1Report.what_investors_believe || []} />
 
+            {/* 3. What Still Feels Unproven */}
+            <WhatStillFeelsUnproven concerns={v1Report.what_still_feels_unproven || []} />
+
+            {/* 4. Investor Questions */}
             <InvestorQuestions questions={v1Report.investor_questions} />
 
+            {/* 5. Quality Dimensions (secondary) */}
+            <QualityBreakdown dimensions={v1Report.quality_dimensions} />
+
+            {/* 6. Slide Feedback (collapsed by default) */}
             <SlideFeedback
               details={v1Report.slides}
               slideImages={slides}

@@ -2,23 +2,23 @@
  * V1 Founder-Facing Report Synthesis
  *
  * Single-pass GPT-4 synthesis that transforms evaluation data into a coherent,
- * founder-facing report. This replaces the previous 3-call + mechanical extraction
- * approach with one unified call that generates all V1 content together.
+ * founder-facing report with investor-oriented reasoning.
  *
- * Key principles:
- * - Deck quality focus (not fundability prediction)
- * - Stage-calibrated recommendations (seed sparse ≠ Series A SaaS)
- * - Prioritized, non-repetitive feedback
- * - Honest criticism for weak decks
- * - Explains where investor understanding builds or breaks
+ * V2.0 - Investor pressure-testing philosophy
+ * - Overall Investor Readout
+ * - What Investors Believe
+ * - What Still Feels Unproven
+ * - Investor Questions
+ * - Quality Dimensions (secondary)
+ * - Slide Feedback (reduced verbosity)
  */
 
 const OpenAI = require('openai')
 
 // V1 Report Version
-const V1_REPORT_VERSION = 'v1.3.0'
+const V1_REPORT_VERSION = 'v2.0.0'
 
-// Quality dimension definitions (for fallback and UI display)
+// Quality dimension definitions
 const QUALITY_DIMENSIONS = {
   clarity: {
     name: 'Clarity',
@@ -60,443 +60,288 @@ const SLIDE_TYPE_NAMES = {
 }
 
 /**
- * Unified V1 Synthesis Prompt
- *
- * Generates the complete founder-facing report in one coherent pass.
- * V1.3.0 - Restored investor psychology, causal reasoning, and leverage-oriented feedback.
+ * V2 Unified Synthesis Prompt - Investor Pressure-Testing Philosophy
  */
-const V1_UNIFIED_PROMPT = `You are an experienced seed-stage investor writing feedback for a founder. Your job is to explain how investors actually process this deck—where conviction builds, where doubt appears, and what remains unresolved in the investor's mind.
+const V1_UNIFIED_PROMPT = `You are an experienced early-stage investor pressure-testing a company while reviewing their pitch deck.
 
 You will receive evaluation data for a pitch deck and must generate a founder-facing quality report as JSON.
 
 ═══════════════════════════════════════════════════════════════════
-CORE STANDARD: INVESTOR CONVICTION FLOW
+CORE EVALUATION PHILOSOPHY
 ═══════════════════════════════════════════════════════════════════
 
-The report must consistently feel MORE insightful and actionable than generic ChatGPT feedback.
+You are simulating:
+- A sophisticated seed-stage investor
+- Evaluating asymmetric venture outcomes
+- Deciding whether conviction increases or decreases
+- Identifying unresolved investment risks
+- Pressure-testing proof and defensibility
 
-The core differentiator is NOT grading, rubric coverage, or completeness.
+Think in terms of:
+- conviction, proof, risk, timing
+- venture-scale potential, founder credibility
+- differentiation, inevitability, market pull, defensibility
 
-The differentiator IS: understanding investor conviction.
-
-Track the investor's mental state as they read:
-- Where does investor BELIEF strengthen?
-- Where does MOMENTUM stall?
-- What UNRESOLVED QUESTIONS remain?
-- What specific EVIDENCE would restore confidence?
-- Which improvements matter MOST (highest leverage)?
-
-Use investor-native phrases:
-- "Investors begin wondering..."
-- "Conviction weakens when..."
-- "The narrative loses momentum because..."
-- "By this point investors understand X, but not Y."
-- "Investors cannot yet tell whether..."
+Actively search for:
+- unresolved investment risks
+- missing proof
+- weak differentiation
+- unclear timing
+- weak founder credibility
+- weak moat
+- unclear GTM scalability
+- insufficient evidence of demand
+- unclear venture-scale potential
 
 ═══════════════════════════════════════════════════════════════════
-BANNED GENERIC PATTERNS (CRITICAL)
+FORBIDDEN OUTPUT BEHAVIORS (CRITICAL)
 ═══════════════════════════════════════════════════════════════════
 
-NEVER use these low-value observations alone:
-- "lacks differentiation"
-- "needs more metrics"
-- "market size is unclear"
-- "add traction data"
+NEVER produce:
+- school rubric language
+- obvious visual descriptions
+- repeated critiques
+- generic startup advice
+- over-commentary on every slide
+- "add more metrics"
+- "improve clarity"
 - "needs more detail"
-- "competition is not clearly addressed"
-- "clarify the value proposition"
-- "provide more examples"
-- "consider adding"
-- "would benefit from"
+- "lacks differentiation" without explaining WHY it matters
+- descriptions of what is already visible
+- filler observations
 
-UNLESS immediately followed by:
-1. Why it matters to investors
-2. What investor doubt it creates
-3. What evidence would resolve that doubt
-
-BAD: "The deck lacks differentiation."
-
-GOOD: "By the competition slide, investors understand what the product does but still do not understand why users would choose it over existing alternatives. Without a clear behavioral or product advantage, the company risks feeling interchangeable with existing platforms."
-
-BAD: "The deck needs traction metrics."
-
-GOOD: "The traction slide signals momentum, but investors still lack enough evidence to judge whether adoption is accelerating or merely early experimentation. One specific number—weekly active users, retention rate, or revenue growth—would shift this from assertion to proof."
-
-BAD: "Market size is unclear."
-
-GOOD: "Without a quantified market, investors cannot tell whether this is a niche workflow improvement or a venture-scale opportunity."
+FORBIDDEN EXAMPLES:
+- "The company name is clearly visible."
+- "The slide is concise."
+- "Add more data."
+- "Improve clarity."
+- "The team has relevant experience."
 
 ═══════════════════════════════════════════════════════════════════
-CAUSAL REASONING (REQUIRED)
+REQUIRED REASONING STYLE
 ═══════════════════════════════════════════════════════════════════
 
-Every criticism MUST connect: problem → investor consequence
+You MUST:
+- synthesize across the entire deck
+- model investor psychology
+- explain where conviction increases
+- explain where conviction weakens
+- explain what still feels unproven
+- explain unresolved investment risks
+- explain why an investor may hesitate
+- explain what evidence is still missing
 
-NOT problem alone.
-
-WEAK: "No differentiation."
-
-STRONG: "Without a clear behavioral or product advantage, the company risks feeling interchangeable with existing platforms—investors have no reason to believe users will switch."
-
-WEAK: "Missing team slide."
-
-STRONG: "Investors reach the end without understanding who is building this. For an unproven product, founder credibility often determines whether investors engage further."
-
-═══════════════════════════════════════════════════════════════════
-HIGHEST-LEVERAGE IMPROVEMENTS
-═══════════════════════════════════════════════════════════════════
-
-Every improvement should answer: "What change would MOST improve investor perception?"
-
-NOT: "What else could be added?"
-
-Prioritize by:
-- Strategic importance to investor conviction
-- Leverage (single change, large impact)
-- Stage-appropriateness
-
-NOT by:
-- Completeness checklists
-- Exhaustive suggestions
-- Generic best practices
-
-Each improvement should contain:
-1. The unresolved investor concern
-2. Why it matters (investor consequence)
-3. The strongest single fix
-
-EXAMPLE:
-
-"Investors still do not understand why users would choose this over existing platforms.
-
-Without a clear behavioral or product advantage, the company risks feeling interchangeable with competitors.
-
-Strongest fix: Explain what becomes dramatically easier, faster, or more engaging on this platform versus alternatives."
+Sound: sharp, concise, skeptical but fair, experienced, thoughtful, high-signal
 
 ═══════════════════════════════════════════════════════════════════
-STRONGER "WHAT WORKS"
+RECOMMENDATION STYLE
 ═══════════════════════════════════════════════════════════════════
 
-Do NOT merely restate slide contents. Explain WHY the strength matters to investors.
+NEVER use "Fix:" or generic recommendations.
 
-BAD: "The team has PayPal experience."
+For slide feedback, if there is an unresolved issue, explain what investors still need to believe.
 
-GOOD: "The PayPal background materially increases credibility because it signals experience building and scaling consumer internet infrastructure—investors will take the execution risk more seriously."
+GOOD: "Investors still cannot determine whether this market is large enough to support a venture-scale outcome."
+BAD: "Fix: Add market size data."
 
-BAD: "The problem is clearly stated."
-
-GOOD: "The problem framing immediately establishes urgency—investors understand within seconds why this matters and who feels the pain."
-
-BAD: "Good traction numbers."
-
-GOOD: "The retention curve demonstrates that users who try the product keep using it—this shifts investor perception from 'interesting idea' to 'proven demand.'"
+GOOD: "Investors still lack evidence that competitors will struggle to replicate this product."
+BAD: "Fix: Clarify differentiation."
 
 ═══════════════════════════════════════════════════════════════════
-SPARSE DECK INTELLIGENCE
+SECTION 1 — OVERALL INVESTOR READOUT
 ═══════════════════════════════════════════════════════════════════
 
-Do NOT evaluate sparse seed decks like late-stage fundraising decks.
+Purpose: Summarize the investor's overall reaction to the deck.
 
-A sparse deck (6-10 slides) with:
-- Clear problem
-- Obvious behavior shift or timing
-- Elegant product concept
-- Credible founders
+This section should:
+- describe where conviction rises
+- describe where conviction weakens
+- explain what investors ultimately believe
+- explain what remains unresolved
+- explain likely investor hesitation
 
-Can be EXCELLENT even without:
-- CAC/LTV metrics
-- Detailed cohort analysis
-- TAM/SAM/SOM spreadsheet
-- Retention curves
-- GTM playbook
+Tone: synthesized, psychologically realistic, investment-oriented
 
-For concise early decks, evaluate:
-- Clarity of core insight
-- Strength of narrative
-- Whether key investor questions are answered FOR THAT STAGE
+GOOD: "Investors likely leave this deck believing the founders understand the transition toward user-generated video, but may still question whether YouTube has a durable advantage over larger incumbents."
 
-Do NOT over-penalize missing mature metrics UNLESS the deck itself claims scale/maturity.
-
-CRITICAL DISTINCTION:
-- Sparse but strategically sharp = "concise," "focused," "early-stage"
-- Genuinely weak construction = "fails to establish basic understanding"
-
-These are NOT the same.
+BAD: "The deck is clear but lacks metrics."
 
 ═══════════════════════════════════════════════════════════════════
-SLIDE DETAILS STRUCTURE
+SECTION 2 — WHAT INVESTORS BELIEVE
 ═══════════════════════════════════════════════════════════════════
 
-Each slide should contain:
-- Concise strength (what builds conviction, and WHY it matters)
-- Core unresolved investor question (or "No significant gap")
-- Highest-leverage improvement (or "No changes needed")
+Purpose: Identify the strongest validated investment signals.
 
-Write in flowing prose. Avoid robotic labels in the content itself.
+Examples:
+- founder credibility
+- compelling market shift
+- strong user behavior change
+- credible wedge
+- strong timing
+- strong product intuition
+- obvious pain point
 
-EXAMPLE (strong slide):
+Rules:
+- 2–5 bullets maximum
+- only HIGH-SIGNAL observations
+- no filler
+- no generic praise
 
-Slide 3 — Problem
-A
+GOOD: "The PayPal background gives investors confidence the team can solve difficult infrastructure and scaling problems."
 
-The problem framing immediately makes the pain tangible—investors understand who suffers and why within seconds. The before/after contrast creates urgency without overstatement.
-
-No significant gap.
-
-EXAMPLE (weak slide):
-
-Slide 6 — Competition
-D
-
-Investors understand the competitive landscape exists, but the deck never explains why this product wins despite similar functionality from established players.
-
-Highest-leverage improvement: Explain what becomes materially easier, faster, or more engaging for users on this platform versus alternatives—give investors a reason to believe in switching behavior.
+BAD: "The team has relevant experience."
 
 ═══════════════════════════════════════════════════════════════════
-STRONG SLIDES SHOULD FEEL STRONG
+SECTION 3 — WHAT STILL FEELS UNPROVEN
 ═══════════════════════════════════════════════════════════════════
 
-Do NOT force criticism onto every slide. If a slide genuinely works:
+Purpose: Identify unresolved investment risks.
 
-- biggest_gap: "No significant gap" or "No major gap"
-- highest_impact_improvement: "No changes needed"
+Examples:
+- moat risk
+- adoption risk
+- GTM risk
+- scalability risk
+- timing risk
+- differentiation risk
+- venture-scale uncertainty
+- monetization risk
 
-Do NOT invent weak criticism for strong slides. Empty criticism undermines trust in the report.
+IMPORTANT: Frame these as unresolved investor concerns.
 
-═══════════════════════════════════════════════════════════════════
-REPORT TONE
-═══════════════════════════════════════════════════════════════════
+GOOD: "Investors still cannot determine why competitors will struggle to replicate this product."
 
-Target tone:
-- Intelligent
-- Investor-native
-- Concise
-- Analytical
-- Thoughtful
-- Calm
+BAD: "The deck needs stronger differentiation."
 
-Avoid:
-- Consultant fluff
-- Startup clichés
-- MBA jargon
-- Checklist language
-- Rubric repetition
-- Generic AI phrasing
+GOOD: "Investors still lack proof that this behavior occurs frequently enough to create a venture-scale business."
 
-We want HIGHER DENSITY OF INSIGHT, not more words.
-
-The ideal output is concise, sharp, causally intelligent, and strategically useful.
-
-A founder should think: "This explains what investors will actually struggle with."
-
-NOT: "This is a polished checklist."
+BAD: "Add more user data."
 
 ═══════════════════════════════════════════════════════════════════
-DEDUPLICATION (CRITICAL)
+SECTION 4 — INVESTOR QUESTIONS
 ═══════════════════════════════════════════════════════════════════
 
-Each issue appears ONCE, in its most relevant location:
-- Do NOT repeat the same point across synthesis, improvements, and slide details
-- Do NOT repeat the same gap in multiple slide details
-- If differentiation is in synthesis, omit from improvements
-- If market size is in dimensions, omit from improvements
-
-BEFORE WRITING EACH SECTION: Have I already said this?
-
-The report should feel compressed and high-signal, not redundant.
-
-═══════════════════════════════════════════════════════════════════
-INVESTOR QUESTIONS SECTION
-═══════════════════════════════════════════════════════════════════
-
-Generate an "investor_questions" section.
-
-Purpose:
-Evaluate whether the deck successfully answers the core questions investors use to evaluate an opportunity.
-
-This section is NOT a prediction of fundraising success.
-Do NOT predict whether investors would invest.
-Do NOT use the words:
-- fundable
-- investable
-- likely to raise
-- unlikely to raise
-
-Instead, evaluate whether the deck gives investors enough information and conviction to answer the following questions:
-
+Evaluate whether the deck answers:
 1. Why this market?
 2. Why this product?
 3. Why this team?
 4. Why now?
 
-For each question:
-- assign one status:
-  - Strong
-  - Partial
-  - Weak
-- provide a concise explanation (1–2 sentences)
-- optionally provide one unresolved investor question if important ambiguity remains
+Statuses: Strong, Partial, Weak
 
-Definitions:
+Each should contain:
+- concise investor reasoning
+- optional unresolved investor concern
 
-Strong:
-The deck gives investors a clear, credible answer with enough evidence or logic to create conviction.
+This section evaluates market conviction, product conviction, founder credibility, timing logic.
 
-Partial:
-The deck points investors in the right direction but leaves important gaps, ambiguity, or unanswered questions.
+NOT presentation quality.
 
-Weak:
-The deck does not provide enough evidence, specificity, or reasoning for investors to understand or believe the answer.
+═══════════════════════════════════════════════════════════════════
+SECTION 5 — QUALITY DIMENSIONS
+═══════════════════════════════════════════════════════════════════
 
-Style requirements:
-- Write like an experienced investor giving direct feedback to a founder.
-- Be specific to the actual company and narrative.
-- Reference actual themes from the deck.
-- Explain where investor conviction strengthens or weakens.
-- Avoid generic startup advice.
-- Avoid checklist language.
-- Avoid repeating the same issue across multiple questions unless truly necessary.
+Grade these dimensions (A/B/C/D):
+- clarity: Does the core idea land quickly?
+- brevity: Does the deck move efficiently?
+- flow: Does conviction compound through the narrative?
+- completeness: Are key investor questions answered for this stage?
 
-Good example:
-"Investors understand that broadband adoption and cheaper digital cameras created a timely opening for online video, but the deck never quantifies how large this shift could become."
+═══════════════════════════════════════════════════════════════════
+SECTION 6 — SLIDE FEEDBACK
+═══════════════════════════════════════════════════════════════════
 
-Bad example:
-"The market slide needs more metrics."
+Reduce slide verbosity substantially.
 
-Good example:
-"The PayPal background gives the team real credibility for building a consumer internet platform with difficult technical infrastructure requirements."
+Rules:
+- NOT every slide needs detailed commentary
+- avoid visual description
+- avoid low-signal observations
+- avoid repetitive critiques
 
-Bad example:
-"The team has relevant experience."
+Each slide should contain:
+- 1 strong investor insight (what this slide makes investors believe or question)
+OPTIONALLY:
+- 1 missing_investor_proof (what investors still need to believe)
 
-The section should feel distinct from the Quality Breakdown section.
-
-Quality Breakdown evaluates:
-- clarity
-- brevity
-- flow
-- completeness
-
-Investor Questions evaluates:
-- market conviction
-- product conviction
-- team credibility
-- timing logic
+If the slide is strong, missing_investor_proof should be null.
 
 ═══════════════════════════════════════════════════════════════════
 OUTPUT STRUCTURE (return as JSON)
 ═══════════════════════════════════════════════════════════════════
 
 {
-  "synthesis": "2-4 sentences. What does this deck make investors believe? Where does conviction peak? Where does doubt appear? What remains unresolved? Reference the actual product/market. NO GENERIC PHRASES. Explain investor psychology.",
+  "overall_investor_readout": "2-4 sentences. Summarize investor's overall reaction. Where does conviction rise? Where does it weaken? What do investors ultimately believe? What remains unresolved? What likely hesitation exists?",
 
-  "quality_dimensions": {
-    "clarity": { "grade": "A/B/C/D", "diagnostic": "Does the core idea land? Reference actual content. Explain what investors understand or don't." },
-    "brevity": { "grade": "A/B/C/D", "diagnostic": "Does the deck move efficiently? Is information density strong or diluted?" },
-    "flow": { "grade": "A/B/C/D", "diagnostic": "Does conviction compound through the narrative, or does momentum reset? Where?" },
-    "completeness": { "grade": "A/B/C/D", "diagnostic": "Are key investor questions answered for this stage? (Not: are all sections present?)" }
-  },
+  "what_investors_believe": [
+    "Strongest validated investment signal #1 with WHY it matters",
+    "Strongest validated investment signal #2 with WHY it matters"
+  ],
+
+  "what_still_feels_unproven": [
+    "Unresolved investment risk #1 framed as investor concern",
+    "Unresolved investment risk #2 framed as investor concern"
+  ],
 
   "investor_questions": [
     {
       "question": "Why this market?",
       "status": "Strong | Partial | Weak",
-      "explanation": "1-2 sentence explanation specific to this deck",
-      "unresolved_question": "Optional: one specific investor question that remains unanswered, or null"
+      "explanation": "1-2 sentence explanation of market conviction",
+      "unresolved_question": "Optional specific investor question or null"
     },
     {
       "question": "Why this product?",
       "status": "Strong | Partial | Weak",
-      "explanation": "1-2 sentence explanation specific to this deck",
+      "explanation": "1-2 sentence explanation of product conviction",
       "unresolved_question": "Optional or null"
     },
     {
       "question": "Why this team?",
       "status": "Strong | Partial | Weak",
-      "explanation": "1-2 sentence explanation specific to this deck",
+      "explanation": "1-2 sentence explanation of team credibility",
       "unresolved_question": "Optional or null"
     },
     {
       "question": "Why now?",
       "status": "Strong | Partial | Weak",
-      "explanation": "1-2 sentence explanation specific to this deck",
+      "explanation": "1-2 sentence explanation of timing logic",
       "unresolved_question": "Optional or null"
     }
   ],
 
-  "top_strengths": [
-    { "strength": "What specific element builds investor conviction, and WHY it matters to investors (not just what it is)", "slide_type": "Problem" },
-    { "strength": "Another specific conviction-building element with investor consequence", "slide_type": "..." }
-  ],
-
-  "narrative_flow": {
-    "strongest_sequence": {
-      "slides": "Slides X-Y",
-      "description": "How conviction compounds—what each slide adds to the investor's belief state",
-      "investor_reaction": "What an investor believes by the end of this sequence"
-    },
-    "weakest_sequence": {
-      "slides": "Slides X-Y",
-      "description": "Where momentum stalls—what logical gap or unearned conclusion appears",
-      "investor_reaction": "What doubt or confusion investors experience here"
-    }
+  "quality_dimensions": {
+    "clarity": { "grade": "A/B/C/D", "diagnostic": "Does the core idea land? What do investors understand or not?" },
+    "brevity": { "grade": "A/B/C/D", "diagnostic": "Does the deck move efficiently? Is information density strong?" },
+    "flow": { "grade": "A/B/C/D", "diagnostic": "Does conviction compound? Where does momentum reset?" },
+    "completeness": { "grade": "A/B/C/D", "diagnostic": "Are key investor questions answered for this stage?" }
   },
 
-  "slide_summary": [
-    { "slide_number": 1, "type": "Cover", "grade": "B", "key_takeaway": "What does an investor now believe after this slide? (10-15 words, investor perspective)" }
-  ],
-
-  "slide_details": [
+  "slides": [
     {
       "slide_number": 1,
       "type": "Cover",
       "grade": "B",
-      "what_works": "What builds conviction here and WHY it matters to investors (or 'Limited conviction-building elements' if weak)",
-      "biggest_gap": "What unresolved investor question or doubt remains (or 'No significant gap' if strong)",
-      "highest_impact_improvement": "Single highest-leverage change to increase conviction (or 'No changes needed' if strong)"
+      "investor_insight": "1 strong investor insight about what this slide establishes or fails to establish",
+      "missing_investor_proof": "What investors still need to believe after this slide, or null if strong"
     }
   ]
 }
 
 ═══════════════════════════════════════════════════════════════════
-EXAMPLES OF STRONG ANALYSIS
+CRITICAL REMINDER
 ═══════════════════════════════════════════════════════════════════
 
-SYNTHESIS:
+The core question is NOT "Is this deck well-formatted?"
 
-"This deck establishes a clear behavior shift—video consumption moving from TV to online—and positions YouTube as the obvious destination. Conviction peaks at the growth metrics showing viral adoption. However, by the end investors still wonder how YouTube monetizes at scale and whether the content library creates defensibility against Google or Vimeo entering the space."
+The core question IS: "Would sophisticated investors develop conviction while reading this deck?"
 
-"The problem framing is immediately visceral: enterprise teams wasting hours on manual reporting. But the solution section jumps to feature lists before establishing why users would abandon their current spreadsheet workflows. Investors understand what Airbnb hosts can do, but not why they would trust strangers in their homes—the behavioral shift remains unexplained."
-
-FLOW:
-
-"Slides 1-4 build strong momentum: the problem is immediately relatable, the timing feels inevitable, and the product demo is elegant. But slide 5 introduces a $50B market claim without grounding—the narrative shifts from 'obvious opportunity I can see' to 'unverified assertion I'm asked to trust.'"
-
-TOP IMPROVEMENT:
-
-"Investors do not yet understand why users would choose this over established alternatives.
-
-Without a clear behavioral or product advantage, the company feels interchangeable with existing platforms—there's no reason to believe switching will happen.
-
-Strongest fix: Articulate the one thing that becomes dramatically easier, faster, or more engaging on this platform—give investors a concrete reason to believe in user migration."
-
-SLIDE DETAILS:
-
-what_works: "The retention cohort chart shifts investor perception from 'interesting concept' to 'proven demand'—users who try the product demonstrably keep using it, which de-risks the product hypothesis."
-
-biggest_gap: "The slide asserts '10x better' but investors have no evidence to evaluate this claim. The comparison to competitors is asserted rather than demonstrated."
-
-highest_impact_improvement: "Show a concrete before/after: what takes 2 hours with the old approach takes 5 minutes here. Make the 10x tangible."
+That is the lens. Apply it consistently.
 
 Return ONLY valid JSON. No markdown, no explanation outside the JSON.`
 
 /**
  * Generate V1 founder-facing report from evaluation data.
- *
- * @param {Object} evaluationData - Full evaluation results from existing pipeline (fullReport)
- * @param {Array} slides - Slide data with extracted text
- * @param {Object} options - Generation options (may include debugInfo for context)
- * @returns {Object} V1 report structure
  */
 async function generateV1Report(evaluationData, slides, options = {}) {
   const openaiKey = process.env.OPENAI_API_KEY
@@ -543,32 +388,21 @@ async function generateV1Report(evaluationData, slides, options = {}) {
 function buildSynthesisContext(evaluationData, slides, options = {}) {
   const parts = []
 
-  // 1. Deck metadata with investor-relevant framing
+  // 1. Deck metadata
   const slideCount = slides.length
   const isSparse = slideCount <= 10
-  const deckStage = isSparse ? 'EARLY-STAGE/SEED' : 'LATER-STAGE'
 
   parts.push(`=== DECK OVERVIEW ===
-Slide Count: ${slideCount} (${deckStage} deck)
+Slide Count: ${slideCount}
 Overall Grade: ${evaluationData.overall_grade}
 Score: ${(evaluationData.deck_score * 100).toFixed(0)}%`)
 
-  // Add detected context if available (from v3 debug)
-  if (options.deckContext) {
-    const ctx = options.deckContext
-    if (ctx.is_sparse) {
-      parts.push(`\nNOTE: This is a SPARSE deck. Evaluate by whether the core story lands and conviction builds—NOT by checklist completeness.`)
-    }
-    if (ctx.inferred_contexts?.length > 0) {
-      parts.push(`Business Type: ${ctx.inferred_contexts.join(', ')}`)
-    }
-  } else if (isSparse) {
-    parts.push(`\nNOTE: This is a ${slideCount}-slide deck. For sparse early-stage decks, evaluate whether the core story lands—don't penalize for missing Series A elements.`)
+  if (isSparse) {
+    parts.push(`\nNOTE: This is a ${slideCount}-slide deck. For sparse early-stage decks, evaluate whether the core investment thesis lands—don't penalize for missing late-stage elements.`)
   }
 
-  // 2. Slide content with evaluations - framed for conviction flow analysis
-  parts.push(`\n=== SLIDES (in order investor sees them) ===`)
-  parts.push(`Analyze how conviction builds or breaks as an investor reads through:\n`)
+  // 2. Slide content with evaluations
+  parts.push(`\n=== SLIDES ===\n`)
 
   for (const slide of slides) {
     const evalSlide = evaluationData.slides?.find(s => s.slide_number === slide.slide_number)
@@ -579,7 +413,6 @@ Score: ${(evaluationData.deck_score * 100).toFixed(0)}%`)
     slideSection += `\nGrade: ${evalSlide?.grade || 'N/A'}`
     slideSection += `\nContent: "${text}${slide.extracted_text?.length > 600 ? '...' : ''}"`
 
-    // Add evaluation insights (condensed)
     if (evalSlide?.questions?.length > 0) {
       const strongPoints = evalSlide.questions.filter(q => q.score >= 4).map(q => q.assessment).filter(Boolean)
       const gaps = evalSlide.questions.filter(q => q.score <= 2 && q.gap && q.gap !== 'None - fully addressed').map(q => q.gap)
@@ -595,14 +428,14 @@ Score: ${(evaluationData.deck_score * 100).toFixed(0)}%`)
     parts.push(slideSection + '\n')
   }
 
-  // 3. Investment thesis evaluation - framed as investor belief state
+  // 3. Investment thesis evaluation
   if (evaluationData.investment_thesis) {
-    parts.push(`=== INVESTOR BELIEF STATE (after full deck) ===`)
+    parts.push(`=== INVESTMENT THESIS SIGNALS ===`)
     const thesis = evaluationData.investment_thesis
 
     const thesisLabels = {
       why_this_market: 'Why This Market',
-      why_this_product: 'Why This Product Wins',
+      why_this_product: 'Why This Product',
       why_this_team: 'Why This Team',
       why_now: 'Why Now',
     }
@@ -614,29 +447,22 @@ Score: ${(evaluationData.deck_score * 100).toFixed(0)}%`)
         parts.push(`\n${thesisLabels[key]}: ${conviction} conviction (${score}/5)`)
         if (value.assessment) parts.push(`  → ${value.assessment}`)
         if (value.gaps && value.gaps !== 'None - thesis is well-supported') {
-          parts.push(`  → Doubt: ${value.gaps}`)
+          parts.push(`  → Gap: ${value.gaps}`)
         }
       }
     }
   }
 
-  // 4. Instructions - reinforcing investor-native analysis
+  // 4. Task instruction
   parts.push(`\n=== YOUR TASK ===
-Generate the V1 founder-facing report JSON.
+Generate the founder-facing report JSON.
 
-CRITICAL REQUIREMENTS:
-1. INVESTOR CONVICTION TRACKING: Track where belief strengthens, where momentum stalls, what remains unresolved
-2. CAUSAL REASONING: Every criticism must connect problem → investor consequence (not problem alone)
-3. HIGHEST-LEVERAGE IMPROVEMENTS: What single change would MOST increase conviction? (Not completeness checklists)
-4. STRONGER "WHAT WORKS": Explain WHY the strength matters to investors (not just what it is)
-5. SPARSE DECK INTELLIGENCE: Don't penalize early decks for missing Series A elements
-6. NO GENERIC CLICHÉS: Never say "lacks differentiation" or "needs more metrics" without explaining investor consequence
-7. STRONG SLIDES FEEL STRONG: Don't force criticism—use "No significant gap" when appropriate
-8. NO REPETITION: Each issue appears ONCE in its most relevant location
-9. HIGHER DENSITY OF INSIGHT: Concise, sharp, causally intelligent—not more words
-
-The founder should think: "This explains what investors will actually struggle with."
-NOT: "This is a polished checklist."`)
+Remember:
+- You are pressure-testing as an investor, not grading as a teacher
+- Explain where conviction rises and where it weakens
+- Frame gaps as unresolved investor concerns, not generic advice
+- Be sharp, concise, and high-signal
+- Strong slides should feel strong (no forced criticism)`)
 
   return parts.join('\n')
 }
@@ -645,21 +471,13 @@ NOT: "This is a polished checklist."`)
  * Build the final V1 report structure from GPT response.
  */
 function buildV1Report(parsed, evaluationData) {
-  // Ensure slide_summary and slide_details have correct structure
-  const slideSummary = (parsed.slide_summary || []).map(s => ({
+  // Ensure slides have correct structure
+  const slideDetails = (parsed.slides || []).map(s => ({
     slide_number: s.slide_number,
     type: s.type || SLIDE_TYPE_NAMES[s.type] || 'Unknown',
     grade: s.grade || 'C',
-    key_takeaway: s.key_takeaway || 'No summary available',
-  }))
-
-  const slideDetails = (parsed.slide_details || []).map(s => ({
-    slide_number: s.slide_number,
-    type: s.type || SLIDE_TYPE_NAMES[s.type] || 'Unknown',
-    grade: s.grade || 'C',
-    what_works: s.what_works || 'Assessment not available',
-    biggest_gap: s.biggest_gap || 'No significant gaps identified',
-    highest_impact_improvement: s.highest_impact_improvement || 'No changes needed',
+    investor_insight: s.investor_insight || 'Assessment not available',
+    missing_investor_proof: s.missing_investor_proof || null,
   }))
 
   // Ensure quality dimensions have required structure
@@ -689,22 +507,19 @@ function buildV1Report(parsed, evaluationData) {
   return {
     report_version: V1_REPORT_VERSION,
 
-    // 1. Overall Deck Quality
+    // 1. Overall
     overall: {
       grade: evaluationData.overall_grade,
       score: evaluationData.deck_score,
-      synthesis: parsed.synthesis || 'Synthesis not available',
-      positioning_note: 'This score reflects deck quality and clarity—not a prediction of fundraising success.',
+      investor_readout: parsed.overall_investor_readout || 'Assessment not available',
+      positioning_note: 'This report evaluates deck quality and clarity, not whether investors will fund the company.',
     },
 
-    // 2. Quality Dimensions
-    quality_dimensions: dimensions,
+    // 2. What Investors Believe (2-5 items)
+    what_investors_believe: (parsed.what_investors_believe || []).slice(0, 5),
 
-    // 3. Top Strengths (limit to 4)
-    top_strengths: (parsed.top_strengths || []).slice(0, 4).map(s => ({
-      strength: s.strength || 'Strength not specified',
-      slide_type: s.slide_type || 'General',
-    })),
+    // 3. What Still Feels Unproven (2-5 items)
+    what_still_feels_unproven: (parsed.what_still_feels_unproven || []).slice(0, 5),
 
     // 4. Investor Questions
     investor_questions: (parsed.investor_questions || []).map(q => ({
@@ -714,46 +529,27 @@ function buildV1Report(parsed, evaluationData) {
       unresolved_question: q.unresolved_question || null,
     })),
 
-    // 5. Narrative Flow
-    narrative_flow: parsed.narrative_flow || {
-      strongest_sequence: {
-        slides: 'Not identified',
-        description: 'Unable to assess narrative flow',
-        investor_reaction: 'N/A',
-      },
-      weakest_sequence: {
-        slides: 'Not identified',
-        description: 'Unable to assess narrative flow',
-        investor_reaction: 'N/A',
-      },
-    },
+    // 5. Quality Dimensions
+    quality_dimensions: dimensions,
 
-    // 6. Slide Summary Table
-    slide_summary: slideSummary,
-
-    // 7. Slide Details
+    // 6. Slide Feedback
     slides: slideDetails,
   }
 }
 
 /**
  * Generate fallback report when API call fails.
- * Uses deterministic extraction from evaluation data.
  */
 function generateFallbackReport(evaluationData, slides) {
   console.log(`[v1-synthesis] Using fallback deterministic generation`)
 
   const slideEvals = evaluationData.slides || []
 
-  // Fallback synthesis
-  const strongestSlide = [...slideEvals].sort((a, b) => (b.normalized_score || 0) - (a.normalized_score || 0))[0]
-  const weakestSlide = [...slideEvals].sort((a, b) => (a.normalized_score || 0) - (b.normalized_score || 0))[0]
+  // Fallback investor readout
+  const investorReadout = `This ${slides.length}-slide deck received an overall grade of ${evaluationData.overall_grade}. ` +
+    `Detailed investor analysis is not available in fallback mode.`
 
-  const synthesis = `This ${slides.length}-slide deck received an overall grade of ${evaluationData.overall_grade}. ` +
-    (strongestSlide ? `The strongest content appears in the ${SLIDE_TYPE_NAMES[strongestSlide.type] || strongestSlide.type} section. ` : '') +
-    (weakestSlide ? `The ${SLIDE_TYPE_NAMES[weakestSlide.type] || weakestSlide.type} section has the most room for improvement.` : '')
-
-  // Fallback dimensions based on overall grade
+  // Fallback dimensions
   const baseGrade = evaluationData.overall_grade?.charAt(0) || 'C'
   const dimensions = {
     clarity: { grade: baseGrade, diagnostic: 'Detailed assessment not available', description: QUALITY_DIMENSIONS.clarity.description },
@@ -762,62 +558,42 @@ function generateFallbackReport(evaluationData, slides) {
     completeness: { grade: baseGrade, diagnostic: 'Detailed assessment not available', description: QUALITY_DIMENSIONS.completeness.description },
   }
 
-  // Extract strengths from high-scoring questions
-  const strengths = []
+  // Extract what investors believe from high-scoring questions
+  const whatInvestorsBelieve = []
   for (const slide of slideEvals) {
     for (const q of slide.questions || []) {
       if (q.score >= 4 && q.assessment?.length > 20) {
-        strengths.push({ strength: q.assessment, slide_type: SLIDE_TYPE_NAMES[slide.type] || slide.type })
+        whatInvestorsBelieve.push(q.assessment)
+        if (whatInvestorsBelieve.length >= 3) break
       }
     }
+    if (whatInvestorsBelieve.length >= 3) break
   }
 
-  // Extract improvements from low-scoring questions
-  const improvements = []
-  const typeImportance = { traction: 5, market: 4, team: 4, problem: 3, solution: 3 }
+  // Extract what still feels unproven from low-scoring questions
+  const whatStillFeelsUnproven = []
   for (const slide of slideEvals) {
     for (const q of slide.questions || []) {
-      if (q.score <= 2 && q.fix && q.fix !== 'None needed' && q.fix.length > 20) {
-        improvements.push({
-          improvement: q.fix,
-          context: q.gap || '',
-          slide_type: SLIDE_TYPE_NAMES[slide.type] || slide.type,
-          importance: typeImportance[slide.type] || 1,
-        })
+      if (q.score <= 2 && q.gap && q.gap !== 'None - fully addressed' && q.gap.length > 20) {
+        whatStillFeelsUnproven.push(q.gap)
+        if (whatStillFeelsUnproven.length >= 3) break
       }
     }
+    if (whatStillFeelsUnproven.length >= 3) break
   }
-  improvements.sort((a, b) => b.importance - a.importance)
-
-  // Build slide summary
-  const slideSummary = slideEvals.map(s => {
-    const bestQ = s.questions?.find(q => q.score >= 4)
-    const worstQ = s.questions?.reduce((min, q) => (!min || q.score < min.score) ? q : min, null)
-    const takeaway = s.grade?.startsWith('A') || s.grade?.startsWith('B')
-      ? (bestQ?.assessment?.substring(0, 80) || 'Solid slide')
-      : (worstQ?.gap?.substring(0, 80) || 'Needs improvement')
-    return {
-      slide_number: s.slide_number,
-      type: SLIDE_TYPE_NAMES[s.type] || s.type,
-      grade: s.grade,
-      key_takeaway: takeaway,
-    }
-  })
 
   // Build slide details
   const slideDetails = slideEvals.map(s => {
     const questions = s.questions || []
     const bestQ = questions.find(q => q.score >= 4)
     const worstQ = questions.reduce((min, q) => (!min || q.score < min.score) ? q : min, null)
-    const fixQ = questions.filter(q => q.score <= 3 && q.fix && q.fix !== 'None needed').sort((a, b) => a.score - b.score)[0]
 
     return {
       slide_number: s.slide_number,
       type: SLIDE_TYPE_NAMES[s.type] || s.type,
       grade: s.grade,
-      what_works: bestQ?.assessment || (questions[0]?.score >= 3 ? questions[0].assessment : 'Limited strong elements'),
-      biggest_gap: worstQ?.score <= 3 ? worstQ.gap : 'No significant gaps',
-      highest_impact_improvement: fixQ?.fix || 'No specific changes needed',
+      investor_insight: bestQ?.assessment || (questions[0]?.assessment || 'Assessment not available'),
+      missing_investor_proof: worstQ?.score <= 2 ? worstQ.gap : null,
     }
   })
 
@@ -826,30 +602,18 @@ function generateFallbackReport(evaluationData, slides) {
     overall: {
       grade: evaluationData.overall_grade,
       score: evaluationData.deck_score,
-      synthesis,
-      positioning_note: 'This score reflects deck quality and clarity—not a prediction of fundraising success.',
+      investor_readout: investorReadout,
+      positioning_note: 'This report evaluates deck quality and clarity, not whether investors will fund the company.',
     },
-    quality_dimensions: dimensions,
-    top_strengths: strengths.slice(0, 4),
+    what_investors_believe: whatInvestorsBelieve.slice(0, 5),
+    what_still_feels_unproven: whatStillFeelsUnproven.slice(0, 5),
     investor_questions: [
       { question: 'Why this market?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
       { question: 'Why this product?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
       { question: 'Why this team?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
       { question: 'Why now?', status: 'Partial', explanation: 'Detailed assessment not available in fallback mode.', unresolved_question: null },
     ],
-    narrative_flow: {
-      strongest_sequence: {
-        slides: strongestSlide ? `Slide ${strongestSlide.slide_number}` : 'Not identified',
-        description: strongestSlide ? `The ${SLIDE_TYPE_NAMES[strongestSlide.type] || strongestSlide.type} section shows the strongest content.` : 'Unable to identify',
-        investor_reaction: 'This section builds the most conviction.',
-      },
-      weakest_sequence: {
-        slides: weakestSlide ? `Slide ${weakestSlide.slide_number}` : 'Not identified',
-        description: weakestSlide ? `The ${SLIDE_TYPE_NAMES[weakestSlide.type] || weakestSlide.type} section needs the most work.` : 'Unable to identify',
-        investor_reaction: 'This section may raise questions.',
-      },
-    },
-    slide_summary: slideSummary,
+    quality_dimensions: dimensions,
     slides: slideDetails,
   }
 }
