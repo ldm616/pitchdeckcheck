@@ -1,5 +1,5 @@
 import { useCallback, useState, useRef, DragEvent, ChangeEvent } from 'react'
-import { Upload, FileText } from 'lucide-react'
+import { Upload, FileText, RefreshCw, Trash2 } from 'lucide-react'
 
 interface UploadDropzoneProps {
   onFileSelect: (file: File) => void
@@ -112,21 +112,28 @@ export function UploadDropzone({
             <FileText className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
             <p className="text-gray-900 font-medium">{selectedFileName}</p>
             {!disabled && (
-              <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleChooseDifferent}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="relative group p-1.5 text-gray-400 hover:text-gray-900 transition-colors"
+                  aria-label="Change file"
                 >
-                  Change
+                  <RefreshCw className="w-4 h-4" strokeWidth={2} />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[11px] text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                    Change
+                  </span>
                 </button>
-                <span className="text-gray-300">·</span>
                 <button
                   type="button"
                   onClick={handleRemove}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="relative group p-1.5 text-gray-400 hover:text-gray-900 transition-colors"
+                  aria-label="Remove file"
                 >
-                  Cancel
+                  <Trash2 className="w-4 h-4" strokeWidth={2} />
+                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[11px] text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                    Remove
+                  </span>
                 </button>
               </div>
             )}
