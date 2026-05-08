@@ -56,14 +56,14 @@ export function UploadPage() {
                   Uploading deck...
                 </>
               ) : (
-                'Upload my deck'
+                'Upload your deck'
               )}
             </button>
 
-            {status === 'uploading' && (
+            {(fileName || status === 'uploading') && (
               <button
                 type="button"
-                onClick={cancelUpload}
+                onClick={status === 'uploading' ? cancelUpload : clearFile}
                 className="w-full mt-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Cancel

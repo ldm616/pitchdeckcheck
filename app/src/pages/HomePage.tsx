@@ -41,7 +41,7 @@ export function HomePage() {
               to={ROUTES.UPLOAD}
               className="inline-flex items-center justify-center px-8 py-3.5 text-base font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors"
             >
-              Check my deck for free
+              Check your deck for free
             </Link>
           </div>
 
