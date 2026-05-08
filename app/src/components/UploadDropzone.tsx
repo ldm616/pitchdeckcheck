@@ -111,32 +111,44 @@ export function UploadDropzone({
           <div className="flex flex-col items-center gap-4">
             <FileText className="w-8 h-8 text-gray-400" strokeWidth={1.5} />
             <p className="text-gray-900 font-medium">{selectedFileName}</p>
-            {!disabled && (
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleChooseDifferent}
-                  className="relative group p-1.5 text-gray-400 hover:text-gray-900 transition-colors"
-                  aria-label="Change file"
-                >
-                  <RefreshCw className="w-4 h-4" strokeWidth={2} />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={disabled ? undefined : handleChooseDifferent}
+                disabled={disabled}
+                className={`relative group p-1.5 transition-colors ${
+                  disabled
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-400 hover:text-gray-900'
+                }`}
+                aria-label="Change file"
+              >
+                <RefreshCw className="w-4 h-4" strokeWidth={2} />
+                {!disabled && (
                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[11px] text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                     Change
                   </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRemove}
-                  className="relative group p-1.5 text-gray-400 hover:text-gray-900 transition-colors"
-                  aria-label="Remove file"
-                >
-                  <Trash2 className="w-4 h-4" strokeWidth={2} />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={disabled ? undefined : handleRemove}
+                disabled={disabled}
+                className={`relative group p-1.5 transition-colors ${
+                  disabled
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-400 hover:text-gray-900'
+                }`}
+                aria-label="Remove file"
+              >
+                <Trash2 className="w-4 h-4" strokeWidth={2} />
+                {!disabled && (
                   <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[11px] text-white bg-gray-900 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                     Remove
                   </span>
-                </button>
-              </div>
-            )}
+                )}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
