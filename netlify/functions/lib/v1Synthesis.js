@@ -61,9 +61,28 @@ const SLIDE_TYPE_NAMES = {
   other: 'Other',
 }
 
+// Maximum patterns to inject (5-7 range, using 6 as middle ground)
+const MAX_PATTERNS = 6
+
+// High-value patterns that should be prioritized when relevant
+// These represent the most powerful investor reasoning frameworks
+const HIGH_PRIORITY_PATTERNS = [
+  'simplicity_wins_adoption',
+  'infrastructure_unlock',
+  'distribution_built_into_product',
+  'ecosystems_compound_value',
+  'founder_market_fit_through_relevant_experience',
+  'incumbent_misalignment_creates_opening',
+]
+
 /**
  * Get relevant investor patterns based on slide types present in deck.
- * Returns patterns that have rubric mappings to any of the detected slide types.
+ * Returns top patterns ranked by deck fit, capped to avoid overfitting.
+ *
+ * Ranking factors:
+ * 1. High-priority patterns (proven high-value frameworks)
+ * 2. Number of slide type matches (more matches = more relevant)
+ * 3. Rubric mapping strength (higher strength = more impactful)
  *
  * @param {string[]} slideTypes - Array of slide types present in the deck
  * @returns {Object} - { patterns: Array, debug: Object }
@@ -72,30 +91,59 @@ function getRelevantPatterns(slideTypes) {
   try {
     const slideTypeSet = new Set(slideTypes)
 
-    // Filter patterns that have rubric mappings to present slide types
-    const relevantPatterns = CANONICAL_PATTERNS.filter(pattern => {
+    // Score each pattern by deck fit
+    const scoredPatterns = CANONICAL_PATTERNS.map(pattern => {
       if (!pattern.rubric_mappings || pattern.rubric_mappings.length === 0) {
-        return false
+        return { pattern, score: 0, matchCount: 0, maxStrength: 0 }
       }
-      // Include pattern if any of its mappings match a present slide type
-      return pattern.rubric_mappings.some(mapping =>
+
+      // Count how many slide types this pattern maps to
+      const matchingMappings = pattern.rubric_mappings.filter(mapping =>
         slideTypeSet.has(mapping.slide_type)
       )
+
+      if (matchingMappings.length === 0) {
+        return { pattern, score: 0, matchCount: 0, maxStrength: 0 }
+      }
+
+      const matchCount = matchingMappings.length
+      const maxStrength = Math.max(...matchingMappings.map(m => m.strength || 1))
+      const isHighPriority = HIGH_PRIORITY_PATTERNS.includes(pattern.pattern_key)
+
+      // Score: high-priority bonus (10) + match count (1-5) + max strength (1-3)
+      const score = (isHighPriority ? 10 : 0) + matchCount + maxStrength
+
+      return { pattern, score, matchCount, maxStrength, isHighPriority }
     })
+
+    // Filter to patterns with matches, sort by score descending, cap at MAX_PATTERNS
+    const rankedPatterns = scoredPatterns
+      .filter(sp => sp.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MAX_PATTERNS)
+
+    const selectedPatterns = rankedPatterns.map(sp => sp.pattern)
 
     // Build category counts for debug
     const categoryCounts = {}
-    for (const p of relevantPatterns) {
+    for (const p of selectedPatterns) {
       categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1
     }
 
     return {
-      patterns: relevantPatterns,
+      patterns: selectedPatterns,
       debug: {
         total_canonical_patterns: CANONICAL_PATTERNS.length,
-        patterns_matched: relevantPatterns.length,
-        slide_types_checked: slideTypes,
-        pattern_keys: relevantPatterns.map(p => p.pattern_key),
+        patterns_matched_before_cap: scoredPatterns.filter(sp => sp.score > 0).length,
+        patterns_injected: selectedPatterns.length,
+        max_patterns_cap: MAX_PATTERNS,
+        slide_types_checked: [...new Set(slideTypes)],
+        pattern_keys: selectedPatterns.map(p => p.pattern_key),
+        pattern_scores: rankedPatterns.map(sp => ({
+          key: sp.pattern.pattern_key,
+          score: sp.score,
+          high_priority: sp.isHighPriority || false,
+        })),
         categories: categoryCounts,
       },
     }
@@ -570,7 +618,7 @@ async function generateV1Report(evaluationData, slides, options = {}) {
   // Get relevant investor patterns
   const { patterns, debug: patternDebug } = getRelevantPatterns(slideTypes)
 
-  console.log(`[v1-synthesis] Patterns: ${patterns.length} of ${CANONICAL_PATTERNS.length} matched for slide types: ${[...new Set(slideTypes)].join(', ')}`)
+  console.log(`[v1-synthesis] Patterns: ${patterns.length} injected (${patternDebug.patterns_matched_before_cap || patterns.length} matched, cap=${MAX_PATTERNS}) for slide types: ${[...new Set(slideTypes)].join(', ')}`)
 
   // Build comprehensive context for the unified synthesis (with patterns)
   const synthesisContext = buildSynthesisContext(evaluationData, slides, {
