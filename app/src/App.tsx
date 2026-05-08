@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import { ROUTES } from './lib/routes'
 import { Layout } from './components/Layout'
+import { PageMeta } from './components/PageMeta'
 import { HomePage } from './pages/HomePage'
 import { UploadPage } from './pages/UploadPage'
 import { ProcessingPage } from './pages/ProcessingPage'
@@ -9,7 +10,9 @@ import { AdminApp } from './pages/admin/AdminApp'
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <PageMeta />
+      <Routes>
       {/* Founder-facing routes with persistent header */}
       <Route element={<Layout />}>
         <Route path={ROUTES.HOME} element={<HomePage />} />
@@ -23,5 +26,6 @@ export default function App() {
       {/* Admin route without shared header */}
       <Route path={ROUTES.ADMIN} element={<AdminApp />} />
     </Routes>
+    </>
   )
 }
