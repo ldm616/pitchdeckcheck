@@ -4,19 +4,21 @@
  * Single-pass GPT-4 synthesis that transforms evaluation data into a coherent,
  * founder-facing report with investor-oriented reasoning.
  *
- * V2.1 - Venture-scale investment reasoning
+ * V2.2 - Pattern-informed venture-scale reasoning
+ * - Injects relevant investor patterns from canonicalPatterns.js
+ * - Patterns sharpen reasoning about defensibility, timing, wedges, compounding
+ * - Patterns are internal context only - never exposed to founders
  * - Prioritizes venture-scale potential and defensibility evolution
  * - Anti-redundancy: critiques appear once at summary level
  * - Prioritization: only highest-leverage observations
- * - Venture dynamics: network effects, market power, compounding
- * - Quality dimensions demoted to secondary
- * - Slide feedback further reduced
+ * - patterns_used debug metadata for internal tracking
  */
 
 const OpenAI = require('openai')
+const { CANONICAL_PATTERNS } = require('./canonicalPatterns')
 
 // V1 Report Version
-const V1_REPORT_VERSION = 'v2.1.0'
+const V1_REPORT_VERSION = 'v2.2.0'
 
 // Quality dimension definitions
 const QUALITY_DIMENSIONS = {
@@ -60,7 +62,81 @@ const SLIDE_TYPE_NAMES = {
 }
 
 /**
- * V2.1 Unified Synthesis Prompt - Venture-Scale Investment Reasoning
+ * Get relevant investor patterns based on slide types present in deck.
+ * Returns patterns that have rubric mappings to any of the detected slide types.
+ *
+ * @param {string[]} slideTypes - Array of slide types present in the deck
+ * @returns {Object} - { patterns: Array, debug: Object }
+ */
+function getRelevantPatterns(slideTypes) {
+  try {
+    const slideTypeSet = new Set(slideTypes)
+
+    // Filter patterns that have rubric mappings to present slide types
+    const relevantPatterns = CANONICAL_PATTERNS.filter(pattern => {
+      if (!pattern.rubric_mappings || pattern.rubric_mappings.length === 0) {
+        return false
+      }
+      // Include pattern if any of its mappings match a present slide type
+      return pattern.rubric_mappings.some(mapping =>
+        slideTypeSet.has(mapping.slide_type)
+      )
+    })
+
+    // Build category counts for debug
+    const categoryCounts = {}
+    for (const p of relevantPatterns) {
+      categoryCounts[p.category] = (categoryCounts[p.category] || 0) + 1
+    }
+
+    return {
+      patterns: relevantPatterns,
+      debug: {
+        total_canonical_patterns: CANONICAL_PATTERNS.length,
+        patterns_matched: relevantPatterns.length,
+        slide_types_checked: slideTypes,
+        pattern_keys: relevantPatterns.map(p => p.pattern_key),
+        categories: categoryCounts,
+      },
+    }
+  } catch (err) {
+    console.error('[v1-synthesis] Pattern retrieval failed:', err.message)
+    return {
+      patterns: [],
+      debug: {
+        error: true,
+        error_message: err.message,
+      },
+    }
+  }
+}
+
+/**
+ * Format patterns as concise context for synthesis prompt.
+ * Outputs only the description - no names, sources, or keys exposed.
+ *
+ * @param {Array} patterns - Array of pattern objects
+ * @returns {string} - Formatted pattern context string
+ */
+function formatPatternsForPrompt(patterns) {
+  if (!patterns || patterns.length === 0) {
+    return ''
+  }
+
+  const patternDescriptions = patterns.map(p => `- ${p.description}`)
+
+  return `
+=== INVESTOR REASONING PATTERNS ===
+
+Use these internal investor reasoning patterns to sharpen judgment. Do not mention pattern names or sources in the report.
+
+${patternDescriptions.join('\n')}
+
+Apply these patterns only when they naturally fit the deck. Do not force pattern reasoning.`
+}
+
+/**
+ * V2.2 Unified Synthesis Prompt - Venture-Scale Investment Reasoning with Pattern Support
  */
 const V1_UNIFIED_PROMPT = `You are an experienced early-stage investor pressure-testing a company while reviewing their pitch deck.
 
@@ -218,6 +294,39 @@ FORBIDDEN EXAMPLES (LOW-SIGNAL STATEMENTS):
 - "Add more data."
 - "Improve clarity."
 - "The team has relevant experience."
+
+═══════════════════════════════════════════════════════════════════
+INVESTOR REASONING PATTERNS (INTERNAL USE ONLY)
+═══════════════════════════════════════════════════════════════════
+
+You may receive internal investor reasoning patterns.
+
+Use them only to sharpen your judgment.
+
+Do NOT mention:
+- pattern names
+- memo sources
+- investors
+- Bessemer
+- Sequoia
+- "canonical pattern"
+- "investor pattern"
+
+Translate the reasoning into plain founder-facing analysis.
+
+Use these patterns to identify:
+- why the strongest signals matter
+- what unresolved proof investors still need
+- whether the company could develop compounding advantages
+- whether the market timing creates a real opening
+- whether the product has a wedge others missed
+- whether defensibility could strengthen over time
+
+The patterns are not citations.
+They are internal judgment aids.
+
+If a pattern does not apply, ignore it.
+Do not force pattern language into the report.
 
 ═══════════════════════════════════════════════════════════════════
 SECTION 1 — OVERALL INVESTOR READOUT
@@ -438,6 +547,11 @@ Return ONLY valid JSON. No markdown, no explanation outside the JSON.`
 
 /**
  * Generate V1 founder-facing report from evaluation data.
+ *
+ * @param {Object} evaluationData - Full report evaluation data
+ * @param {Array} slides - Array of slide objects
+ * @param {Object} options - Optional settings
+ * @returns {Object} - V1 report structure with patterns_used debug metadata
  */
 async function generateV1Report(evaluationData, slides, options = {}) {
   const openaiKey = process.env.OPENAI_API_KEY
@@ -447,8 +561,22 @@ async function generateV1Report(evaluationData, slides, options = {}) {
 
   const openai = new OpenAI({ apiKey: openaiKey })
 
-  // Build comprehensive context for the unified synthesis
-  const synthesisContext = buildSynthesisContext(evaluationData, slides, options)
+  // Extract slide types for pattern matching
+  const slideTypes = slides
+    .map(s => s.inferred_type)
+    .filter(Boolean)
+    .filter(t => t !== 'other' && t !== 'cover' && t !== 'contact')
+
+  // Get relevant investor patterns
+  const { patterns, debug: patternDebug } = getRelevantPatterns(slideTypes)
+
+  console.log(`[v1-synthesis] Patterns: ${patterns.length} of ${CANONICAL_PATTERNS.length} matched for slide types: ${[...new Set(slideTypes)].join(', ')}`)
+
+  // Build comprehensive context for the unified synthesis (with patterns)
+  const synthesisContext = buildSynthesisContext(evaluationData, slides, {
+    ...options,
+    patterns,
+  })
 
   console.log(`[v1-synthesis] Starting unified V1 generation for ${slides.length} slides...`)
 
@@ -469,19 +597,25 @@ async function generateV1Report(evaluationData, slides, options = {}) {
 
     console.log(`[v1-synthesis] Unified generation complete`)
 
-    // Validate and structure the response
-    return buildV1Report(parsed, evaluationData)
+    // Validate and structure the response (with pattern debug info)
+    return buildV1Report(parsed, evaluationData, patternDebug)
   } catch (err) {
     console.error(`[v1-synthesis] Unified generation failed:`, err.message)
     // Fall back to deterministic generation
-    return generateFallbackReport(evaluationData, slides)
+    return generateFallbackReport(evaluationData, slides, patternDebug)
   }
 }
 
 /**
  * Build comprehensive context string for the unified synthesis prompt.
+ *
+ * @param {Object} evaluationData - Full report evaluation data
+ * @param {Array} slides - Array of slide objects
+ * @param {Object} options - Options including patterns
+ * @param {Array} options.patterns - Relevant investor patterns (optional)
  */
 function buildSynthesisContext(evaluationData, slides, options = {}) {
+  const { patterns = [] } = options
   const parts = []
 
   // 1. Deck metadata
@@ -549,7 +683,15 @@ Score: ${(evaluationData.deck_score * 100).toFixed(0)}%`)
     }
   }
 
-  // 4. Task instruction
+  // 4. Investor reasoning patterns (if available)
+  if (patterns && patterns.length > 0) {
+    const patternContext = formatPatternsForPrompt(patterns)
+    if (patternContext) {
+      parts.push(patternContext)
+    }
+  }
+
+  // 5. Task instruction
   parts.push(`\n=== YOUR TASK ===
 Generate the founder-facing report JSON.
 
@@ -565,8 +707,12 @@ Remember:
 
 /**
  * Build the final V1 report structure from GPT response.
+ *
+ * @param {Object} parsed - Parsed GPT response
+ * @param {Object} evaluationData - Full report evaluation data
+ * @param {Object} patternDebug - Pattern debug metadata (optional)
  */
-function buildV1Report(parsed, evaluationData) {
+function buildV1Report(parsed, evaluationData, patternDebug = null) {
   // Ensure slides have correct structure
   const slideDetails = (parsed.slides || []).map(s => ({
     slide_number: s.slide_number,
@@ -600,7 +746,7 @@ function buildV1Report(parsed, evaluationData) {
     },
   }
 
-  return {
+  const report = {
     report_version: V1_REPORT_VERSION,
 
     // 1. Overall
@@ -631,12 +777,23 @@ function buildV1Report(parsed, evaluationData) {
     // 6. Slide Feedback
     slides: slideDetails,
   }
+
+  // Add pattern debug metadata (internal only, not shown to founders)
+  if (patternDebug) {
+    report.patterns_used = patternDebug
+  }
+
+  return report
 }
 
 /**
  * Generate fallback report when API call fails.
+ *
+ * @param {Object} evaluationData - Full report evaluation data
+ * @param {Array} slides - Array of slide objects
+ * @param {Object} patternDebug - Pattern debug metadata (optional)
  */
-function generateFallbackReport(evaluationData, slides) {
+function generateFallbackReport(evaluationData, slides, patternDebug = null) {
   console.log(`[v1-synthesis] Using fallback deterministic generation`)
 
   const slideEvals = evaluationData.slides || []
@@ -693,7 +850,7 @@ function generateFallbackReport(evaluationData, slides) {
     }
   })
 
-  return {
+  const report = {
     report_version: V1_REPORT_VERSION,
     overall: {
       grade: evaluationData.overall_grade,
@@ -712,6 +869,13 @@ function generateFallbackReport(evaluationData, slides) {
     quality_dimensions: dimensions,
     slides: slideDetails,
   }
+
+  // Add pattern debug metadata (internal only, not shown to founders)
+  if (patternDebug) {
+    report.patterns_used = patternDebug
+  }
+
+  return report
 }
 
 module.exports = {
