@@ -20,9 +20,13 @@ export function ReportHeader({ report, slideCount, reportCreatedAt }: ReportHead
           {slideCount || report.slides?.length || 0} slides
           {reportCreatedAt && (
             <span className="ml-1">
-              · {new Date(reportCreatedAt).toLocaleDateString('en-US', {
+              · {new Date(reportCreatedAt).toLocaleString('en-US', {
+                weekday: 'short',
                 month: 'short',
                 day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
               })}
             </span>
           )}
