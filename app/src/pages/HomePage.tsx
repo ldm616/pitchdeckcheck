@@ -60,11 +60,6 @@ export function HomePage() {
               Private report link sent to your email
             </li>
           </ul>
-
-          {/* Trust line */}
-          <p className="text-xs text-gray-400 text-center">
-            Your deck is private and used only to generate your report.
-          </p>
         </div>
       </main>
 
