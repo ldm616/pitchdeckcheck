@@ -14,7 +14,6 @@ export function UploadPage() {
     handleFileChange,
     handleFileDrop,
     handleSubmit,
-    cancelUpload,
     clearFile,
   } = useDeckUpload()
 
