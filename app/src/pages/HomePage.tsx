@@ -57,7 +57,7 @@ export function HomePage() {
             </li>
             <li className="flex items-center gap-2">
               <span className="text-gray-400">✓</span>
-              Private report link sent to your email
+              Private and secure
             </li>
           </ul>
         </div>
