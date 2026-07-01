@@ -1021,6 +1021,230 @@ If investor audience is unknown, Investor Fit should influence the report more c
 
 ---
 
+## Letter Grade Cut Point Guidance
+
+Letter grades should reflect the combined evaluation of:
+
+- Deck Communication Scores
+- Investment Case as Presented
+- Company Context
+- Investor Fit, when known
+- gates and binding constraints
+
+Letter grades should not be assigned by simple averaging alone.
+
+The grade should represent the deck's investor readiness as presented.
+
+The grade should not imply a prediction of fundraising success.
+
+---
+
+## A-Range Grades
+
+A-range grades should be rare.
+
+A-range grades indicate that the deck communicates a compelling, stage-appropriate investment case with strong communication and no major unresolved investor concerns.
+
+### A
+
+Use A when the deck is exceptional for its stage.
+
+Expected pattern:
+
+- Deck Communication Scores are mostly 5s, with no score below 4.
+- Opportunity Strength is Strong.
+- Execution Credibility is Strong.
+- Investor Fit is Strong or clearly appropriate when known.
+- No major gate is active.
+- Any remaining concerns are minor.
+
+An A does not mean the company is guaranteed to raise capital.
+
+It means the deck presents an unusually strong investor-ready case for its stage.
+
+### A-
+
+Use A- when the deck is very strong but has a small number of meaningful refinements remaining.
+
+Expected pattern:
+
+- Deck Communication Scores are mostly 4s and 5s.
+- Investment Case as Presented is mostly Strong, with no central Weak labels.
+- No major gate is active.
+- Remaining issues are unlikely to prevent serious investor interest.
+
+---
+
+## B-Range Grades
+
+B-range grades indicate that the deck is promising and potentially investor-ready, but meaningful weaknesses remain.
+
+A B-range deck should usually be good enough for a serious founder to improve from, and in some cases may already be good enough to begin investor conversations depending on stage and audience.
+
+### B+
+
+Use B+ when the deck communicates a strong investment case but has at least one important weakness to address.
+
+Expected pattern:
+
+- Deck Communication Scores are generally 4 or better, with no severe communication weakness.
+- Investment Case as Presented is Strong or Mixed, or Promising but Under-Supported in one important area.
+- No hard gate meaningfully caps the grade.
+- Investors can understand the opportunity and may want to learn more.
+
+### B
+
+Use B when the deck communicates a good or promising investment case but leaves meaningful investor questions unresolved.
+
+Expected pattern:
+
+- Deck Communication Scores are generally 3s and 4s.
+- Investment Case as Presented may include Mixed or Promising but Under-Supported labels.
+- Some evidence or communication gaps remain.
+- No central Weak issue dominates the case.
+- Investors can evaluate the opportunity, but the deck is not yet consistently strong.
+
+### B-
+
+Use B- when the deck has a credible foundation but is not yet reliably investor-ready.
+
+Expected pattern:
+
+- Deck Communication Scores may include multiple 3s or one 2.
+- Investment Case as Presented may be Mixed or Promising but Under-Supported in important areas.
+- Investors can understand the basic opportunity, but the case needs clearer evidence, sharper communication or stronger fit.
+- A gate may be lightly constraining the grade, but not because the entire thesis is unevaluable.
+
+---
+
+## C-Range Grades
+
+C-range grades indicate that the deck contains useful material but has significant investor-readiness issues.
+
+A C-range deck may describe a real company or promising idea, but investors are likely to have major concerns before continuing.
+
+### C+
+
+Use C+ when the deck has recognizable strengths but the investment case is only partially convincing.
+
+Expected pattern:
+
+- Deck Communication Scores are mixed, often including 2s and 3s.
+- Important investor questions are under-supported.
+- Investment Case as Presented may include Mixed, Promising but Under-Supported or one Weak label.
+- Investors may understand parts of the opportunity but lack confidence in the full thesis.
+
+### C
+
+Use C when the deck is materially underdeveloped.
+
+Expected pattern:
+
+- Deck Communication Scores are mostly 2s and 3s.
+- Important Framework Slides or stage-required questions are weakly answered.
+- Investment Case as Presented is under-supported, Mixed or Weak in important areas.
+- One or more gates may limit the grade.
+- Investors would need substantial clarification or evidence.
+
+### C-
+
+Use C- when the deck has serious investor-readiness issues but still contains enough information to identify the main problems.
+
+Expected pattern:
+
+- Deck Communication Scores include significant weaknesses.
+- Major investor questions are missing, unclear or unsupported.
+- Investment Case as Presented may include Weak or Not Enough Information labels in central areas.
+- A gate is likely active.
+- Investors cannot confidently evaluate the opportunity without major revisions.
+
+---
+
+## D and F Grades
+
+D and F grades indicate that the deck is not investor-ready in its current form.
+
+These grades should be used when investors cannot meaningfully evaluate the opportunity or when the investment case as presented is severely weak.
+
+### D
+
+Use D when the deck leaves major parts of the investment thesis unresolved.
+
+Expected pattern:
+
+- Deck Communication Scores are mostly 1s and 2s, or one critical dimension is very weak.
+- Required investor questions are missing or effectively unanswered.
+- Investment Case as Presented is Not Enough Information or Weak in central areas.
+- One or more gates strongly limits the grade.
+- Investors would need substantial additional explanation before they could evaluate the pitch.
+
+### F
+
+Use F when the deck does not provide enough coherent information to evaluate the opportunity or clearly presents a thesis that is not fundable for the intended investor audience.
+
+Expected pattern:
+
+- Deck Communication Scores are very weak across multiple dimensions.
+- The deck is incoherent, severely incomplete or unsupported.
+- Investment Case as Presented cannot be responsibly evaluated or is clearly incompatible with the intended investor audience.
+- Multiple gates are active, or one gate is severe enough to dominate the evaluation.
+
+An F should be used carefully.
+
+It evaluates the deck and pitch as presented, not the founder's worth or the company's ultimate potential outside the deck.
+
+---
+
+## Gate Effects on Letter Grades
+
+Gates should prevent misleadingly high letter grades.
+
+A deck with an active Completeness Gate should usually not receive an A-range grade.
+
+A deck with a severe Completeness Gate should usually not receive a B-range grade.
+
+A deck with an active Clarity Gate should usually not receive an A-range grade.
+
+A deck with a severe Clarity Gate should usually not receive a B-range grade.
+
+A deck with an active Stage Gate should usually not receive an A-range grade.
+
+A deck with a severe Stage Gate should usually not receive a B-range grade.
+
+A deck with an active Evidence Gate should usually not receive an A-range grade.
+
+A deck with a severe Evidence Gate should usually not receive a B-range grade.
+
+A deck with an active Investment-Case Gate should usually not receive an A-range grade.
+
+A deck with a severe Investment-Case Gate should usually not receive a B-range grade unless the gate is narrow, clearly explainable and not central to the intended investor audience.
+
+Brevity should rarely cap the grade by itself.
+
+However, severe Brevity issues may limit the grade when the deck is so overloaded, repetitive or unfocused that investors cannot efficiently understand the thesis.
+
+---
+
+## Letter Grade Calibration Principles
+
+Letter grades should be calibrated to investor readiness, not academic perfection.
+
+A deck does not need to be flawless to receive a strong grade.
+
+A deck does need to resolve the major investor questions reasonably expected for its stage.
+
+The grade should be lower when the report's primary diagnosis is central to fundability.
+
+The grade may be higher when the primary diagnosis is a fixable communication issue and the underlying investment case appears strong.
+
+The grade should avoid false precision.
+
+When a deck sits near a boundary, the explanation should matter more than the exact plus or minus.
+
+The report should make clear what most limits the grade.
+
+---
+
 ## Stage-Aware Weighting
 
 The meaning of each dimension should remain stable across Company Contexts.
