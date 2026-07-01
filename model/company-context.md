@@ -55,8 +55,10 @@ Investors primarily want evidence that:
 - the founders are credible
 - the proposed solution is compelling
 - the opportunity is attractive
+- there is a credible path to reaching initial customers
+- there is a credible sequence for turning the product concept into something customers can use
 
-The absence of traction or financial metrics should not reduce completeness.
+Absence of traction, validated acquisition channels, detailed roadmap proof or financial metrics should not reduce completeness.
 
 ---
 
@@ -75,6 +77,8 @@ Investors primarily want evidence that:
 - early validation exists
 - adoption is increasing
 - there is a credible path to monetization
+- the company can reach and engage the right early customers or buyers
+- the product roadmap is shaped by early user learning or product gaps
 
 Revenue metrics should not be expected.
 
@@ -95,6 +99,7 @@ Investors primarily want evidence that:
 - traction is increasing
 - customer acquisition is becoming repeatable
 - early unit economics are encouraging
+- the roadmap is shaped by customer usage, willingness to pay or expansion opportunities
 
 Perfect metrics should not be expected.
 
@@ -115,6 +120,7 @@ Investors primarily want evidence that:
 - retention is strong
 - economics improve with scale
 - competitive advantage strengthens over time
+- the product roadmap supports expansion, retention, differentiation or defensibility at scale
 
 ---
 
