@@ -18,11 +18,13 @@ Help founders determine whether their pitch deck makes a compelling investment c
 
 ## Product Promise
 
-Pitch Deck Check helps founders understand whether their deck answers the questions investors need answered before taking a meeting.
+Pitch Deck Check helps founders understand whether their deck supports a compelling investment thesis for the company's current stage.
 
 It does not predict whether a startup will succeed.
 
-It evaluates how effectively the deck communicates the investment case.
+It does not decide whether a specific investor will invest.
+
+It evaluates how effectively the deck communicates the company's fundability based on the promise and proof reasonably expected at its current stage.
 
 ---
 
@@ -50,9 +52,19 @@ Missing or weak communication should never be interpreted as evidence that the b
 
 Likewise, a well-written deck should never be interpreted as evidence that the business itself is strong.
 
+The product evaluates fundability as communicated by the deck.
+
+Fundability is the overall outcome.
+
+Completeness, Clarity, Brevity and Flow are the four dimensions used to evaluate how well the deck communicates that fundability.
+
+Fundability should not be treated as a fifth independent score unless a future product-design decision explicitly changes this model.
+
 ---
 
 ## Four Evaluation Dimensions
+
+Pitch Deck Check uses four dimensions to assess how effectively the deck communicates fundability.
 
 Every report evaluates four independent dimensions.
 
@@ -71,6 +83,26 @@ Does the deck communicate maximum information with minimum cognitive effort?
 ### Flow
 
 Does the story unfold in the logical sequence investors naturally expect?
+
+---
+
+## Founder-Facing Language
+
+Founders should see familiar pitch deck language.
+
+Internal concepts such as value gaps, promise, proof and fundability should guide evaluation.
+
+They should not make the report feel abstract or academic.
+
+Use conventional slide language when it helps founders act.
+
+Use deeper investment reasoning when it helps explain why a slide is weak or how to improve it.
+
+For example:
+
+- "Problem" is founder-facing language.
+- "Value gap" is internal evaluation language.
+- The report may explain that the Problem slide does not yet make the value gap clear, but it should not require founders to learn a new framework before improving their deck.
 
 ---
 

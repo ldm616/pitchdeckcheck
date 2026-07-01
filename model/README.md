@@ -15,6 +15,7 @@ See `CLAUDE.md` at the repo root for the working agreement governing how these a
 
 | File | Purpose |
 |------|---------|
+| `foundation.md` | Defines the foundational investment principles that guide Pitch Deck Check. |
 | `product-philosophy.md` | Articulates the product philosophy of Pitch Deck Check. |
 | `company-context.md` | Captures the company context for a deck. |
 | `investor-framework.md` | Defines the slide-level investor evaluation framework. |
@@ -26,9 +27,11 @@ Each artifact carries `Version`, `Status`, `Owner`, `Implementation Owner`, and 
 
 ## Dependency Hierarchy
 
-The artifacts form a strict top-down dependency chain. `Product Philosophy` is the root; every other artifact derives from the ones above it.
+The artifacts form a strict top-down dependency chain. `Foundation` is the root; every other artifact derives from the ones above it.
 
 ```
+Foundation
+        ↓
 Product Philosophy
         ↓
 Company Context
@@ -44,7 +47,7 @@ Improvement Framework
 
 ## Artifact Dependency Principles
 
-- Product Philosophy is the root artifact.
+- Foundation is the root artifact.
 - Lower artifacts may depend on higher artifacts.
 - Higher artifacts must never depend on lower artifacts.
 - Product behavior should be defined once.

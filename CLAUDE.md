@@ -28,6 +28,7 @@ If a request would require Claude to author product content, respond:
 
 The following files are product-owned. Claude must not author or modify their content unless explicitly instructed. Claude may add or update surrounding scaffolding (loaders, schema validators, tests, calibration wiring) as long as the artifact content itself is preserved verbatim.
 
+- `model/foundation.md`
 - `model/product-philosophy.md`
 - `model/company-context.md`
 - `model/investor-framework.md`
