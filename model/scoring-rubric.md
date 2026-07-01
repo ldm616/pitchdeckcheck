@@ -41,6 +41,24 @@ The four scoring dimensions are:
 3. Brevity
 4. Flow
 
+These four dimensions are Deck Communication Scores.
+
+They evaluate how effectively the deck communicates the pitch.
+
+They do not fully capture whether the investment case itself is compelling.
+
+Pitch Deck Check should also assess the Investment Case as Presented.
+
+The Investment Case as Presented should evaluate:
+
+1. Opportunity Strength
+2. Execution Credibility
+3. Investor Fit
+
+These are not additional peer scores within the four-dimension communication model.
+
+They are a separate assessment layer used to explain whether the pitch itself appears compelling, credible and appropriate for the intended investor audience.
+
 Together, these dimensions evaluate how effectively the deck communicates a compelling investment thesis for the company's current stage.
 
 The four dimensions evaluate communication of the investment case, but communication quality is not the same as investment quality.
@@ -56,6 +74,54 @@ Pitch Deck Check cannot make an inherently weak investment thesis fundable.
 In some cases, clearer communication may make a weak investment case easier for investors and founders to recognize.
 
 That is still a useful outcome.
+
+---
+
+## Evaluation Architecture
+
+Pitch Deck Check has three evaluation layers.
+
+### 1. Deck Communication Scores
+
+Deck Communication Scores evaluate how well the deck communicates the pitch.
+
+The four Deck Communication Scores are:
+
+1. Completeness
+2. Clarity
+3. Brevity
+4. Flow
+
+These scores diagnose whether the deck is missing information, unclear, inefficient or poorly sequenced.
+
+### 2. Investment Case as Presented
+
+Investment Case as Presented evaluates the substance of the pitch communicated by the deck.
+
+It asks whether the answers in the deck support a compelling investment thesis.
+
+The three Investment-Case Assessment areas are:
+
+1. Opportunity Strength
+2. Execution Credibility
+3. Investor Fit
+
+These areas should not be treated as the same type of score as Completeness, Clarity, Brevity and Flow.
+
+They should be used to explain whether the pitch itself appears compelling, weak, mismatched or under-supported.
+
+### 3. Overall Grade
+
+The Overall Grade should reflect both:
+
+- how well the deck communicates the pitch
+- how compelling the investment case appears as presented
+
+A strong Overall Grade requires both effective communication and a compelling stage-appropriate investment case.
+
+A deck can communicate a weak investment case clearly.
+
+A deck can also contain a promising investment case but fail to communicate it well.
 
 ---
 
@@ -240,6 +306,10 @@ The overall grade should not be a separate fundability score.
 
 The overall grade should reflect both communication effectiveness and the strength of the investment case as presented by the deck.
 
+The overall grade should also account for Investor Fit when the founder has provided a target raise amount or intended investor audience.
+
+If investor audience is unknown, the report should avoid over-specific claims about fundability for a particular investor type.
+
 A deck should not receive a high overall grade merely because it is polished, concise or well organized.
 
 If the deck clearly communicates a weak market, weak differentiation, implausible go-to-market motion, insufficient team advantage, unrealistic financials or other substantive investment weakness, the overall grade should reflect that weakness.
@@ -293,8 +363,16 @@ The report should help founders understand whether the primary issue is:
 - weak sequencing
 - unsupported claims
 - a substantive weakness in the investment case presented by the deck
+- a mismatch between the pitch and the intended investor audience
 
 When the issue is substantive, the report should say so clearly without implying that better wording alone will fix it.
+
+The report should help founders distinguish among:
+
+- a deck that needs better communication
+- a pitch that needs stronger evidence
+- a pitch that may be better suited to a different investor audience
+- a company that may be promising but not venture-scale as presented
 
 ---
 
@@ -305,7 +383,7 @@ This artifact defines the conceptual scoring model only.
 Future versions may define:
 
 - weighting rules
-- display formats
+- additional display refinements
 - slide-level scoring behavior
 - confidence handling
 - calibration examples
@@ -324,7 +402,7 @@ These bands are internal evaluation guidance.
 
 They do not determine how scores must be displayed to founders.
 
-Future report versions may display numeric scores, letter grades, labels or a combination.
+Founder-facing reports may display numeric scores, letter grades, labels or a combination, as defined in the Founder-Facing Score Display section.
 
 The internal bands are:
 
@@ -656,6 +734,293 @@ Likewise, a deck may have a strong underlying thesis but score poorly because th
 
 ---
 
+## Investment Case as Presented
+
+Investment Case as Presented evaluates whether the pitch communicated by the deck appears compelling for the company's context and intended investor audience.
+
+It should not judge the company's ultimate potential outside the deck.
+
+It should not infer that the company is weak merely because the deck communicates poorly.
+
+It should evaluate the pitch as presented.
+
+The Investment Case as Presented has three assessment areas:
+
+1. Opportunity Strength
+2. Execution Credibility
+3. Investor Fit
+
+These assessments should help founders understand whether the primary issue is:
+
+- the opportunity does not yet look compelling enough
+- the company has not shown enough ability to execute
+- the pitch may be better matched to a different type of investor
+- the deck simply has not communicated enough to evaluate the case
+
+---
+
+## Opportunity Strength
+
+Opportunity Strength evaluates whether the opportunity described by the deck appears capable of supporting a venture-scale or otherwise attractive investment outcome.
+
+Opportunity Strength considers:
+
+- significance of the value gap
+- urgency of customer need
+- size and reachability of the market
+- timing
+- differentiation
+- value creation potential
+- value capture potential
+- defensibility
+- scale of possible outcome
+
+A strong Opportunity Strength assessment means the deck presents a large, meaningful and attractive opportunity.
+
+A weak Opportunity Strength assessment means the deck presents an opportunity that may be too small, insufficiently urgent, poorly differentiated, weakly defended or unlikely to support the investor outcome being implied.
+
+---
+
+## Execution Credibility
+
+Execution Credibility evaluates whether the deck gives investors reason to believe the team can execute on the opportunity.
+
+Execution Credibility considers:
+
+- founder insight
+- team-market fit
+- relevant experience
+- product-building ability
+- evidence of execution so far
+- traction quality
+- go-to-market credibility
+- operating plan
+- ability to use capital effectively
+
+A strong Execution Credibility assessment means the deck gives investors reason to believe this team can turn the opportunity into a valuable company.
+
+A weak Execution Credibility assessment means the deck may describe an interesting opportunity but does not yet show why this team can execute on it.
+
+---
+
+## Investor Fit
+
+Investor Fit evaluates whether the pitch appears appropriate for the investor audience and financing goal.
+
+Investor Fit is context-dependent.
+
+A company may be fundable for one investor type while not being fundable for another.
+
+Investor Fit should consider:
+
+- company stage
+- amount being raised
+- investor type being targeted
+- market size expectations
+- likely exit potential
+- sector fit
+- traction expectations
+- founder profile expectations
+- check size
+- risk tolerance
+- return expectations
+
+Examples:
+
+A company with a strong niche opportunity and credible team may be fundable for angels or sector specialists while not being a fit for top-tier venture capital.
+
+A company with a very large opportunity but limited proof may be a fit for high-risk pre-seed investors but not later-stage funds.
+
+A company with modest growth potential may be a good business but not a venture-scale investment.
+
+Investor Fit should help founders understand who the current pitch is most likely to appeal to.
+
+Investor Fit should not imply that a company is bad merely because it is not a fit for a specific investor category.
+
+---
+
+## Investment-Case Influence on Overall Grade
+
+Opportunity Strength, Execution Credibility and Investor Fit should influence the Overall Grade through assessment and gating, not through separate 1–5 peer scores.
+
+They should help explain whether the pitch communicated by the deck appears fundable for the company's context and intended investor audience.
+
+The Overall Grade should reflect both:
+
+- Deck Communication Scores
+- Investment Case as Presented
+
+A deck with strong Deck Communication Scores may still receive a limited Overall Grade if the Investment Case as Presented is weak.
+
+A deck with a strong Investment Case as Presented may still receive a limited Overall Grade if the deck fails to communicate the case clearly, completely, efficiently or logically.
+
+The Investment-Case Assessment should inform the Investment-Case Gate.
+
+The Investment-Case Gate may limit the Overall Grade when the deck clearly presents one or more substantive weaknesses that materially reduce fundability.
+
+Examples include:
+
+- Opportunity Strength is weak because the market appears too small, the value gap appears unimportant or differentiation appears limited.
+- Execution Credibility is weak because the deck does not show why this team can execute, build, sell or scale.
+- Investor Fit is weak because the pitch does not appear appropriate for the intended investor audience or raise amount.
+
+The Investment-Case Gate should not fire merely because the deck lacks information.
+
+Missing information is primarily a Completeness issue.
+
+The Investment-Case Gate should apply when the deck provides enough information to evaluate the thesis and the thesis itself appears substantively weak or mismatched.
+
+If the deck does not provide enough information to evaluate Opportunity Strength, Execution Credibility or Investor Fit, the report should say the investment case is under-supported rather than weak.
+
+---
+
+## Investment-Case Assessment Display
+
+Opportunity Strength, Execution Credibility and Investor Fit should be displayed qualitatively, not as 1–5 numeric peer scores.
+
+Recommended qualitative labels are:
+
+- Strong
+- Promising but Under-Supported
+- Mixed
+- Weak
+- Not Enough Information
+
+Label meanings:
+
+Strong means the deck presents a compelling case in this assessment area for the company's stage and investor context.
+
+Promising but Under-Supported means the assessment area could be compelling, but the deck does not yet provide enough evidence to support it fully.
+
+Mixed means the deck presents both credible strengths and meaningful concerns in this assessment area.
+
+Weak means the deck provides enough information to evaluate the area and the substance appears materially weak.
+
+Not Enough Information means the deck does not provide enough information to evaluate the area responsibly.
+
+These labels should be used to explain the Investment Case as Presented.
+
+They should not be averaged into the Deck Communication Scores.
+
+They should not create a separate Fundability Score.
+
+Opportunity Strength should indicate whether the opportunity appears attractive enough for the implied investor outcome.
+
+Execution Credibility should indicate whether the deck shows credible ability to execute on the opportunity.
+
+Investor Fit should indicate whether the pitch appears matched to the intended investor audience and financing goal.
+
+If the founder has not provided a target investor audience or raise amount, Investor Fit should be described cautiously.
+
+When investor audience is unknown, the report may describe likely investor fit in broad terms but should avoid precise claims about fundability for a specific investor category.
+
+---
+
+## Investment-Case Labels and Gates
+
+Investment-Case labels should inform the Investment-Case Gate.
+
+They should not be converted into numeric peer scores.
+
+A Strong label should not trigger the Investment-Case Gate.
+
+A Promising but Under-Supported label should usually indicate an evidence or completeness issue rather than a substantive weakness.
+
+A Mixed label should usually reduce the Overall Grade but should not automatically trigger a hard gate unless the concern is central to the investment thesis.
+
+A Weak label may trigger the Investment-Case Gate when the weakness is central to fundability.
+
+A Not Enough Information label should usually indicate that the deck is under-supported, not that the investment case is substantively weak.
+
+The Investment-Case Gate should fire only when the deck provides enough information to evaluate the thesis and the thesis appears materially weak or mismatched.
+
+The Investment-Case Gate should not fire solely because the deck is incomplete.
+
+Examples:
+
+- Weak Opportunity Strength may trigger the gate if the market appears too small, the value gap appears unimportant or differentiation appears insufficient for the implied investor outcome.
+- Weak Execution Credibility may trigger the gate if the deck shows an ambitious opportunity but does not provide a credible reason to believe this team can execute.
+- Weak Investor Fit may trigger the gate if the deck is aimed at an investor audience whose return expectations, stage expectations or check-size logic do not match the pitch.
+- Not Enough Information for Opportunity Strength should usually be explained as under-supported market or problem evidence, not as proof that the opportunity is weak.
+- Promising but Under-Supported Execution Credibility should usually lead to a recommendation to add evidence, not a conclusion that the team cannot execute.
+
+The report should surface the binding issue clearly.
+
+If the Overall Grade is limited by the Investment-Case Gate, the report should explain that the issue is substantive rather than merely cosmetic or structural.
+
+---
+
+## Central Investment-Case Weaknesses
+
+An Investment-Case weakness is central when it materially affects whether the pitch appears fundable for the company's stage and intended investor audience.
+
+A weakness is central when it undermines one of the core reasons an investor would take the next meeting, continue diligence or consider investing.
+
+Central weaknesses are not minor imperfections.
+
+They are issues that make the investment thesis meaningfully less believable, less attractive or less matched to the intended investor.
+
+A weakness may be central when it affects:
+
+- the significance of the value gap
+- the size or reachability of the market
+- the credibility of the solution vision
+- the product's ability to deliver promised customer value
+- the company's differentiation versus alternatives
+- the durability of the company's advantage
+- the business model's ability to capture value
+- the quality or relevance of traction
+- the credibility of the go-to-market motion
+- the team's ability to execute
+- the realism of the financial plan
+- the appropriateness of the financing ask
+- the fit between the pitch and the intended investor audience
+
+A weakness should usually be considered less central when:
+
+- it affects a secondary detail rather than the main investment thesis
+- it is explainable by company stage
+- it can be addressed with a small clarification
+- it does not materially change the investor's ability to evaluate the opportunity
+- it does not materially change the likely investor audience
+
+The Investment-Case Gate should usually trigger only when a central weakness is both:
+
+1. clear enough to evaluate from the deck
+2. material enough to limit fundability
+
+If a weakness may be central but the deck does not provide enough information to evaluate it, the report should describe the issue as under-supported rather than substantively weak.
+
+The report should explain central weaknesses in practical founder-facing language.
+
+It should avoid implying that better wording alone will fix a central investment-case weakness.
+
+---
+
+## Overall Grade Impact of Investment-Case Labels
+
+Investment-Case labels should influence the Overall Grade based on severity and centrality.
+
+Strong labels should support a higher Overall Grade when Deck Communication Scores are also strong.
+
+Promising but Under-Supported labels should limit confidence but should usually point to missing proof, weak evidence or incomplete communication rather than a substantive flaw.
+
+Mixed labels should reduce the Overall Grade when concerns are meaningful but not thesis-breaking.
+
+Weak labels should materially limit the Overall Grade when the weakness is central to fundability.
+
+Not Enough Information labels should usually limit the Overall Grade through Completeness or Evidence concerns rather than through the Investment-Case Gate.
+
+A single central Weak label may be enough to limit the Overall Grade significantly.
+
+Multiple Mixed labels may collectively limit the Overall Grade even if no single issue triggers a hard gate.
+
+A weak Investor Fit assessment may limit the Overall Grade when the intended investor audience is known and the pitch appears mismatched to that audience.
+
+If investor audience is unknown, Investor Fit should influence the report more cautiously and should not overstate fundability or lack of fundability for a specific investor category.
+
+---
+
 ## Stage-Aware Weighting
 
 The meaning of each dimension should remain stable across Company Contexts.
@@ -676,19 +1041,44 @@ The overall grade should reflect the promise and proof reasonably expected at th
 
 ## Founder-Facing Score Display
 
-Internal 1–5 bands do not determine founder-facing display.
-
 Founder-facing reports should emphasize diagnosis over judgment.
 
-Scores should help founders understand what to improve.
+The report should show:
 
-Possible future display formats include:
+- one Overall Grade
+- four Deck Communication Scores
+- one Investment Case as Presented assessment
+- a concise explanation of why the grade and assessments were assigned
 
-- numeric scores
-- letter grades
-- descriptive labels
-- traffic-light indicators
-- prioritized issue severity
-- a combined overall grade plus dimension-level explanations
+The Overall Grade should be displayed as a letter grade.
 
-No founder-facing display format is finalized in this version.
+The four Deck Communication Scores should be displayed using the internal 1–5 score bands.
+
+Each Deck Communication Score should include both the numeric band and the descriptive label.
+
+For example:
+
+- Completeness: 3/5 — Adequate
+- Clarity: 4/5 — Strong
+- Brevity: 3/5 — Adequate
+- Flow: 4/5 — Strong
+
+The Investment Case as Presented should be displayed qualitatively.
+
+It should include:
+
+- Opportunity Strength
+- Execution Credibility
+- Investor Fit
+
+These should not be displayed as 1–5 peer scores.
+
+The report should not display a separate Fundability Score.
+
+Fundability is communicated through the Overall Grade, the Deck Communication Scores, the Investment Case as Presented and the narrative explanation.
+
+The Overall Grade should reflect the deck's communicated fundability for the company's current stage and investor context when known.
+
+The Deck Communication Scores should explain what type of communication improvement is needed.
+
+The Investment Case as Presented should explain whether the pitch itself appears compelling, credible and appropriately matched to the intended investor audience.
