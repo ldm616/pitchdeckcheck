@@ -21,6 +21,7 @@ See `CLAUDE.md` at the repo root for the working agreement governing how these a
 | `investor-framework.md` | Defines the slide-level investor evaluation framework. |
 | `scoring-rubric.md` | Defines the scoring rubric used to evaluate decks. |
 | `report-spec.md` | Defines the structure and content of the generated report. |
+| `calibration-examples.md` | Provides worked examples for calibrating scoring and report interpretation. |
 | `improvement-framework.md` | Defines how founder-facing improvements are generated. |
 
 Each artifact carries `Version`, `Status`, `Owner`, `Implementation Owner`, and `Purpose` fields at the top. Bump the version when content changes; treat `Status: Draft` as not yet wired into production behavior.
@@ -41,6 +42,8 @@ Investor Framework
 Scoring Rubric
         ↓
 Report Specification
+        ↓
+Calibration Examples
         ↓
 Improvement Framework
 ```

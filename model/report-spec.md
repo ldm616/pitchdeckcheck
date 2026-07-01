@@ -175,6 +175,12 @@ Each assessment should use qualitative labels from the Scoring Rubric:
 
 The report should explain the reason for each label.
 
+When relevant, the report should identify whether Market Validation supports or weakens the assessment.
+
+Market Validation should be described as evidence, not as a separate score.
+
+Market Validation may include direct evidence from the company or proxy evidence from adjacent behaviors, substitutes, competitors or comparable markets.
+
 The report should not display these areas as 1–5 peer scores.
 
 The report should not average them into the Deck Communication Scores.
@@ -243,6 +249,8 @@ It should focus on the questions most likely to affect investor willingness to c
 It should not list every possible objection.
 
 It should prioritize concerns that are central to fundability.
+
+The section should highlight missing or weak Market Validation when customer demand, willingness to switch, willingness to pay, adjacent behavior or market reachability is central to the investment case.
 
 ---
 
@@ -433,6 +441,8 @@ The highest-priority improvements should usually come from:
 3. missing required or stage-required investor questions
 4. lowest Deck Communication Scores
 5. investor concerns that affect the next meeting or financing decision
+
+Weak or missing Market Validation should be prioritized when it is central to investor confidence in the opportunity, execution plan or go-to-market motion.
 
 Priority Improvements should avoid overwhelming the founder.
 

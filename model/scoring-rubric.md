@@ -774,6 +774,7 @@ Opportunity Strength considers:
 - value capture potential
 - defensibility
 - scale of possible outcome
+- market validation and evidence that customers actually want the promised future state
 
 A strong Opportunity Strength assessment means the deck presents a large, meaningful and attractive opportunity.
 
@@ -796,6 +797,7 @@ Execution Credibility considers:
 - go-to-market credibility
 - operating plan
 - ability to use capital effectively
+- ability to generate and learn from market validation
 
 A strong Execution Credibility assessment means the deck gives investors reason to believe this team can turn the opportunity into a valuable company.
 
@@ -836,6 +838,54 @@ A company with modest growth potential may be a good business but not a venture-
 Investor Fit should help founders understand who the current pitch is most likely to appeal to.
 
 Investor Fit should not imply that a company is bad merely because it is not a fit for a specific investor category.
+
+---
+
+## Market Validation
+
+Market Validation is evidence that customers, buyers or market participants behave in ways that support the investment thesis.
+
+Market Validation is not a separate score.
+
+It is an evidence category that may support Opportunity Strength, Execution Credibility, Traction, Market Opportunity, Go-to-Market and stage-appropriate proof.
+
+Market Validation helps investors determine whether the market opportunity, value gap and customer urgency are real, substantial and worth pursuing.
+
+Market Validation may include:
+
+- customer discovery
+- waitlists
+- design partners
+- pilots
+- letters of intent
+- usage data
+- paid customers
+- retention
+- repeat usage
+- marketplace supply and demand signals
+- willingness to switch from current alternatives
+- willingness to pay
+- evidence of urgency
+- evidence that the target segment is reachable
+- evidence that customers already use imperfect substitutes
+- competitor, substitute or adjacent-market metrics
+- evidence that customers are already engaging in adjacent behaviors that support the thesis
+
+Proxy or adjacent-behavior validation may be especially useful before the company has extensive direct traction.
+
+For example, competitor metrics, substitute usage, Craigslist-style listing behavior, marketplace activity or adjacent community participation may support Market Validation when they show customers already want the underlying outcome, even if they are not yet using this company's product.
+
+Market Validation should be evaluated relative to Company Context.
+
+At Idea / Pre-Product stage, Market Validation may be qualitative, indirect or based on proxy behavior.
+
+At Product / Pre-Revenue stage, Market Validation should begin to show that customers recognize the value and engage with the product, concept or adjacent behavior.
+
+At Early Revenue stage, Market Validation should increasingly show willingness to pay, repeatability, usage quality or conversion from current alternatives.
+
+At Growth stage, Market Validation should support durability, retention, expansion or efficient growth.
+
+Weak or missing Market Validation should usually be treated as an evidence or completeness issue unless the deck provides enough information to show that the market does not appear to want the product, future state or value proposition.
 
 ---
 
