@@ -23,6 +23,7 @@ See `CLAUDE.md` at the repo root for the working agreement governing how these a
 | `report-spec.md` | Defines the structure and content of the generated report. |
 | `calibration-examples.md` | Provides worked examples for calibrating scoring and report interpretation. |
 | `sample-report-format.md` | Defines the founder-facing sample report format. |
+| `sample-report-proxy-market-validation.md` | A full sample report demonstrating proxy market validation in an early-stage marketplace deck. |
 | `improvement-framework.md` | Defines how founder-facing improvements are generated. |
 
 Each artifact carries `Version`, `Status`, `Owner`, `Implementation Owner`, and `Purpose` fields at the top. Bump the version when content changes; treat `Status: Draft` as not yet wired into production behavior.
@@ -47,6 +48,8 @@ Report Specification
 Calibration Examples
         ↓
 Sample Report Format
+        ↓
+Sample Report — Proxy Market Validation
         ↓
 Improvement Framework
 ```
