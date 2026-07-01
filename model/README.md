@@ -24,6 +24,7 @@ See `CLAUDE.md` at the repo root for the working agreement governing how these a
 | `calibration-examples.md` | Provides worked examples for calibrating scoring and report interpretation. |
 | `sample-report-format.md` | Defines the founder-facing sample report format. |
 | `sample-report-proxy-market-validation.md` | A full sample report demonstrating proxy market validation in an early-stage marketplace deck. |
+| `sample-report-clear-deck-weak-opportunity.md` | A full sample report demonstrating a clear deck with a weak investment case for the intended investor audience. |
 | `improvement-framework.md` | Defines how founder-facing improvements are generated. |
 
 Each artifact carries `Version`, `Status`, `Owner`, `Implementation Owner`, and `Purpose` fields at the top. Bump the version when content changes; treat `Status: Draft` as not yet wired into production behavior.
@@ -50,6 +51,8 @@ Calibration Examples
 Sample Report Format
         ↓
 Sample Report — Proxy Market Validation
+        ↓
+Sample Report — Clear Deck, Weak Opportunity
         ↓
 Improvement Framework
 ```

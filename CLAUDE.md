@@ -37,6 +37,7 @@ The following files are product-owned. Claude must not author or modify their co
 - `model/calibration-examples.md`
 - `model/sample-report-format.md`
 - `model/sample-report-proxy-market-validation.md`
+- `model/sample-report-clear-deck-weak-opportunity.md`
 - `model/improvement-framework.md`
 
 Existing prompt and domain content (e.g., `netlify/functions/lib/v1Synthesis.js` prompt strings, `netlify/functions/lib/canonicalPatterns.js`, `model/01_…` through `model/09_…`) follow the same rule: preserve product content; refactor structure only when explicitly asked.
