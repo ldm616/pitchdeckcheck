@@ -308,6 +308,14 @@ export interface SaveShareUpgradeV2 {
   options: string[]
 }
 
+// Primary Diagnosis — the single most important constraint on investor
+// readiness. issue_type is one of the canonical issue types (Communication /
+// Evidence / Substance / Investor Fit), with 'None' when no constraint binds.
+export interface PrimaryDiagnosisV2 {
+  summary: string
+  issue_type: IssueTypeV2
+}
+
 // Top-level V2 report content shape.
 export interface PitchDeckCheckReportV2 {
   report_version: string
@@ -316,7 +324,7 @@ export interface PitchDeckCheckReportV2 {
   overall_grade: OverallGradeV2
   deck_communication_scores: DeckCommunicationScoresV2
   investment_case: InvestmentCaseV2
-  primary_diagnosis: string
+  primary_diagnosis: PrimaryDiagnosisV2
   what_investors_may_believe: string[]
   what_investors_may_question: string[]
   priority_improvements: PriorityImprovementV2[]

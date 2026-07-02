@@ -45,6 +45,9 @@ const { classifyCompanyContext } = require('./companyContextClassifier')
 // Additive, behavior-preserving: deterministic Investment Case synthesis.
 // Attached to report content as metadata only; does not affect scoring/grades.
 const { synthesizeInvestmentCase } = require('./investmentCaseSynthesizer')
+// Additive, behavior-preserving: assemble the new report_v2 shape by mapping
+// already-generated data. Stored alongside v1_report; does not replace it.
+const { assembleReportV2 } = require('./reportV2Assembler')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
@@ -1828,8 +1831,9 @@ async function generateFullReport(supabase, deckId, options = {}) {
     // Additive metadata: deterministic Investment Case as Presented synthesis.
     // Derived from already-computed thesis scores, slide grades, and company
     // context. Non-fatal and read by nothing in the scoring/grading path.
+    let investmentCase = null
     try {
-      const investmentCase = synthesizeInvestmentCase(
+      investmentCase = synthesizeInvestmentCase(
         { fullReport, slides, companyContext },
         {} // investor audience / raise not collected yet
       )
@@ -1841,6 +1845,26 @@ async function generateFullReport(supabase, deckId, options = {}) {
       )
     } catch (icError) {
       console.error('[investment-case] synthesis failed (non-fatal):', icError.message)
+    }
+
+    // Additive: assemble the new report_v2 shape from already-generated data.
+    // Non-fatal; stored alongside v1_report and read by nothing yet.
+    try {
+      const reportV2 = assembleReportV2({
+        fullReport,
+        v1Report,
+        freeReport,
+        companyContext,
+        investmentCase,
+      })
+      reportContent.report_v2 = reportV2
+      console.log(
+        `[report-v2] assembled grade=${reportV2.overall_grade.letter} ` +
+          `context="${reportV2.context_summary.company_context}" ` +
+          `priorities=${reportV2.priority_improvements.length}`
+      )
+    } catch (v2Error) {
+      console.error('[report-v2] assembly failed (non-fatal):', v2Error.message)
     }
 
     // Add debug info for v3 reports
