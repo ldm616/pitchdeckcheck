@@ -42,6 +42,9 @@ const { generateV1Report, V1_REPORT_VERSION } = require('./v1Synthesis')
 // Additive, behavior-preserving: deterministic Company Context stage inference.
 // Attached to report content as metadata only; does not affect scoring/grades.
 const { classifyCompanyContext } = require('./companyContextClassifier')
+// Additive, behavior-preserving: deterministic Investment Case synthesis.
+// Attached to report content as metadata only; does not affect scoring/grades.
+const { synthesizeInvestmentCase } = require('./investmentCaseSynthesizer')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
@@ -1811,14 +1814,33 @@ async function generateFullReport(supabase, deckId, options = {}) {
     // Additive metadata: deterministic Company Context stage inference.
     // Non-fatal — a failure here must never block report generation, and this
     // field is not read by scoring, grading, or the current frontend.
+    let companyContext = null
     try {
-      const companyContext = classifyCompanyContext(slides)
+      companyContext = classifyCompanyContext(slides)
       reportContent.company_context = companyContext
       console.log(
         `[company-context] detected="${companyContext.detected_context}" confidence=${companyContext.confidence}`
       )
     } catch (ccError) {
       console.error('[company-context] classification failed (non-fatal):', ccError.message)
+    }
+
+    // Additive metadata: deterministic Investment Case as Presented synthesis.
+    // Derived from already-computed thesis scores, slide grades, and company
+    // context. Non-fatal and read by nothing in the scoring/grading path.
+    try {
+      const investmentCase = synthesizeInvestmentCase(
+        { fullReport, slides, companyContext },
+        {} // investor audience / raise not collected yet
+      )
+      reportContent.investment_case = investmentCase
+      console.log(
+        `[investment-case] opportunity=${investmentCase.opportunity_strength.label} ` +
+          `execution=${investmentCase.execution_credibility.label} ` +
+          `investor_fit=${investmentCase.investor_fit.label}`
+      )
+    } catch (icError) {
+      console.error('[investment-case] synthesis failed (non-fatal):', icError.message)
     }
 
     // Add debug info for v3 reports
