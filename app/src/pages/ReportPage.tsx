@@ -14,6 +14,7 @@ import {
   QualityBreakdown,
   SlideFeedback,
   SaveReportSection,
+  V2Report,
 } from '../components/report'
 import type { ReportContent, SlideData } from '../lib/types'
 
@@ -160,6 +161,32 @@ export function ReportPage() {
           isOpen={showContact}
           onClose={() => setShowContact(false)}
         />
+      </div>
+    )
+  }
+
+  // Prefer the new V2 report when present; otherwise fall back to the existing
+  // V1 rendering path below (unchanged). Old stored reports keep working.
+  const reportV2 = report.report_v2
+  if (reportV2) {
+    return (
+      <div className="flex flex-col flex-1">
+        <FounderHeader />
+        <main className="flex-1 px-6 pb-16">
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
+              <V2Report report={reportV2} />
+
+              {secureCredentials && (
+                <SaveReportSection
+                  deckId={secureCredentials.deckId}
+                  accessToken={secureCredentials.accessToken}
+                />
+              )}
+            </div>
+          </div>
+        </main>
+        <FounderFooter />
       </div>
     )
   }
