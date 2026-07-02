@@ -160,6 +160,150 @@ function _interpret(areaName, label) {
   }
 }
 
+// --- Grounded deck-evidence extraction ---------------------------------------
+// All extraction is regex over already-extracted deck text. Numbers are only
+// ever surfaced when they literally appear in the text (nothing is invented).
+
+const MONEY = '\\$\\s?\\d[\\d,]*(?:\\.\\d+)?\\s?(?:k|m|mm|bn|b|billion|million|thousand)?';
+
+function _cap(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+// Join a list human-style: "a", "a and b", "a, b, and c".
+function _joinList(arr) {
+  const a = (arr || []).filter(Boolean);
+  if (a.length === 0) return '';
+  if (a.length === 1) return a[0];
+  if (a.length === 2) return `${a[0]} and ${a[1]}`;
+  return `${a.slice(0, -1).join(', ')}, and ${a[a.length - 1]}`;
+}
+
+function _detectRound(text) {
+  if (/\bseries\s+d\b/i.test(text)) return 'Series D';
+  if (/\bseries\s+c\b/i.test(text)) return 'Series C';
+  if (/\bseries\s+b\b/i.test(text)) return 'Series B';
+  if (/\bseries\s+a\b/i.test(text)) return 'Series A';
+  if (/\bpre[\s-]?seed\b/i.test(text)) return 'Pre-seed';
+  if (/(?<!pre[\s-])\bseed\b/i.test(text)) return 'Seed';
+  return null;
+}
+
+// Extract financing terms from deck text; each field null when not stated.
+function _extractFundingTerms(text) {
+  const t = text || '';
+  const clean = (s) => (s ? s.replace(/\s+/g, '') : null);
+  const round = _detectRound(t);
+
+  let raise = null;
+  const raiseCtx =
+    t.match(new RegExp(`\\braising\\s+(?:a\\s+)?(${MONEY})`, 'i')) ||
+    t.match(new RegExp(`(${MONEY})\\s+(?:seed|pre[\\s-]?seed|round|raise|safe|note)`, 'i')) ||
+    t.match(new RegExp(`(?:target(?:ing)?|raise|round)\\s*[:\\-]?\\s*(${MONEY})`, 'i'));
+  if (raiseCtx) raise = clean(raiseCtx[1]);
+
+  let instrument = null;
+  if (/\bSAFE\b/.test(t)) instrument = 'SAFE';
+  else if (/\bconvertible\s+note\b/i.test(t)) instrument = 'Convertible note';
+  else if (/\b(?:priced\s+)?equity\s+round\b/i.test(t)) instrument = 'Priced equity round';
+  else if (/\bnote\b/i.test(t)) instrument = 'Note';
+  else if (/\bequity\b/i.test(t)) instrument = 'Equity';
+
+  let cap = null;
+  const capM =
+    t.match(new RegExp(`(${MONEY})\\s*(?:post|pre)?[\\s-]*(?:money\\s+)?cap\\b`, 'i')) ||
+    t.match(new RegExp(`\\bcap\\s*(?:of)?\\s*(${MONEY})`, 'i'));
+  if (capM) cap = clean(capM[1]);
+
+  let discount = null;
+  const discM = t.match(/(\d{1,2})\s*%\s*discount/i);
+  if (discM) discount = `${discM[1]}%`;
+
+  let committed = null;
+  const commM =
+    t.match(new RegExp(`(${MONEY})\\s+(?:already\\s+)?(?:committed|soft[\\s-]?circled|secured|closed)`, 'i')) ||
+    t.match(new RegExp(`(?:committed|soft[\\s-]?circled|secured)\\s*[:\\-]?\\s*(${MONEY})`, 'i'));
+  if (commM) committed = clean(commM[1]);
+
+  let remaining = null;
+  const remM = t.match(new RegExp(`(${MONEY})\\s+(?:remaining|left|open|available)`, 'i'));
+  if (remM) remaining = clean(remM[1]);
+
+  return { round, raise, instrument, cap, discount, committed, remaining };
+}
+
+// Extract concrete direct-validation phrases (with numbers when present).
+function _extractDirectSignals(text) {
+  const t = text || '';
+  const out = [];
+  const seen = new Set();
+  const add = (p) => {
+    const k = (p || '').toLowerCase();
+    if (p && !seen.has(k)) {
+      seen.add(k);
+      out.push(p);
+    }
+  };
+  const NUM = '[\\d][\\d,\\.]*\\s?(?:k|m|thousand|million)?\\+?';
+  let m;
+  if ((m = t.match(new RegExp(`(${NUM})\\s+(?:registered |active |monthly |total )?users\\b`, 'i')))) add(`${m[1].trim()} users`);
+  if ((m = t.match(new RegExp(`(${NUM})\\s+(detailers|suppliers|hosts|providers|merchants|sellers|vendors|drivers)\\b`, 'i')))) add(`${m[1].trim()} ${m[2].toLowerCase()}`);
+  if ((m = t.match(new RegExp(`(${NUM})\\s+paying\\s+(?:customers|users)\\b`, 'i')))) add(`${m[1].trim()} paying customers`);
+  else if ((m = t.match(new RegExp(`(${NUM})\\s+customers\\b`, 'i')))) add(`${m[1].trim()} customers`);
+  if ((m = t.match(new RegExp(`(${MONEY})\\s+(?:revenue\\s+)?run[\\s-]?rate`, 'i')))) add(`${m[1].replace(/\s+/g, '')} revenue run rate`);
+  if ((m = t.match(new RegExp(`(${MONEY})\\s+ARR\\b`, 'i')))) add(`${m[1].replace(/\s+/g, '')} ARR`);
+  if ((m = t.match(new RegExp(`(${MONEY})\\s+MRR\\b`, 'i')))) add(`${m[1].replace(/\s+/g, '')} MRR`);
+  if ((m = t.match(/\b([0-5](?:\.\d)?)\s?(?:★|-?\s?stars?|-star)\b/i)) || (m = t.match(/rated\s+([0-5](?:\.\d)?)/i))) add(`${m[1]}-star app ratings`);
+  if ((m = t.match(/((?:thousands|hundreds)|[\d][\d,\.]*\s?(?:k|m)?\+?)(?:\s+of)?\s+(?:app[\s-]?store\s+|google\s+play\s+|5[\s-]?star\s+)?reviews\b/i))) {
+    const n = m[1].trim();
+    add(/^(?:thousands|hundreds)$/i.test(n) ? `${n} of reviews` : `${n} reviews`);
+  }
+  // Qualitative first-party signals (no number required).
+  const qual = [
+    [/\bwait[\s-]?list\b/i, 'a waitlist'],
+    [/\bdesign partners?\b/i, 'design partners'],
+    [/\bpilots?\b/i, 'pilots'],
+    [/\bLOIs?\b|letters?\s+of\s+intent/i, 'letters of intent'],
+  ];
+  for (const [re, label] of qual) if (re.test(t)) add(label);
+  return out;
+}
+
+// Deck-shape flags used to make priorities/diagnosis specific.
+function _detectFlags(text) {
+  const t = text || '';
+  return {
+    is_marketplace: /\b(marketplace|two[\s-]?sided|supply[\s-]?and[\s-]?demand|supply\/demand|liquidity|take[\s-]?rate|gmv|buyers?\s+and\s+sellers?|detailers|hosts)\b/i.test(t),
+    has_gtm_channels: /\b(acquisition|channels?|paid\s+(ads|marketing|acquisition)|organic|referral|seo|sem|\bads\b|growth\s+loops?)\b/i.test(t),
+    has_cac_economics: /\b(cac|payback|ltv|unit\s+economics|contribution\s+margin|cost\s+per\s+acquisition)\b/i.test(t),
+    has_market_size_claim: new RegExp(`\\b(tam|sam|som|market\\s+size|projection|projected|${MONEY}\\s+(?:market|opportunity))\\b`, 'i').test(t),
+    has_retention_data: /\b(retention|repeat\s+(usage|purchase|booking)|cohort|churn|ndr|nrr|net\s+(dollar|revenue)\s+retention)\b/i.test(t),
+    has_defensibility: /\b(moat|defensib|network\s+effect|switching\s+cost|proprietary|patent|lock[\s-]?in|barriers?\s+to\s+entry)\b/i.test(t),
+  };
+}
+
+// Best-effort company-name detection to avoid false "name missing" feedback.
+function _detectCompanyName(slides) {
+  const parts = [];
+  for (const s of slides || []) {
+    if (s && s.extracted_text) parts.push({ type: String(s.inferred_type || '').toLowerCase(), text: String(s.extracted_text) });
+  }
+  const all = parts.map((p) => p.text).join('\n');
+  let m = all.match(/\b[\w.+-]+@([a-z0-9-]+)\.(?:com|io|co|app|ai|xyz|net|org)\b/i);
+  if (m) return _cap(m[1]);
+  m = all.match(/\b(?:https?:\/\/)?(?:www\.)?([a-z0-9-]{2,})\.(?:com|io|co|app|ai)\b/i);
+  if (m && !/^www$/i.test(m[1])) return _cap(m[1]);
+  const cover = parts.find((p) => p.type === 'cover');
+  if (cover) {
+    const firstLine = cover.text.split(/\n/).map((s) => s.trim()).find(Boolean);
+    if (firstLine) {
+      const tok = firstLine.match(/^[A-Z][A-Za-z0-9&.\-]{1,20}/);
+      if (tok) return tok[0];
+    }
+  }
+  return null;
+}
+
 // --- Public API ---------------------------------------------------------------
 
 /**
@@ -182,54 +326,93 @@ function synthesizeInvestmentCase(deckData, options = {}) {
   const exe = _areaScore(fullReport, EXECUTION_THESIS_KEYS, EXECUTION_SLIDE_TYPES);
   const executionLabel = _scoreToLabel(exe, companyContext);
 
+  // --- Grounded deck-evidence extraction ---
+  const fundingTerms = _extractFundingTerms(text);
+  const directSignals = _extractDirectSignals(text);
+  const flags = _detectFlags(text);
+  const companyName = _detectCompanyName(slides);
+
   // --- Market Validation (evidence, not a score) ---
   const ccSignals = (companyContext && companyContext.signals) || {};
   const direct_validation = Boolean(
-    ccSignals.user_or_customer_evidence || ccSignals.revenue_evidence
+    directSignals.length > 0 || ccSignals.user_or_customer_evidence || ccSignals.revenue_evidence
   );
   const proxy_validation = PROXY_PATTERNS.some((re) => re.test(text));
   const missing_validation = !direct_validation && !proxy_validation;
 
   const mvEvidence = [];
   const mvSignals = [];
-  if (direct_validation) {
-    mvEvidence.push('Deck shows first-party validation (users, customers, or revenue).');
-    mvSignals.push('direct');
-  }
+  if (direct_validation) mvSignals.push('direct');
+  if (proxy_validation) mvSignals.push('proxy');
+  if (missing_validation) mvSignals.push('missing');
+  directSignals.forEach((p) => mvEvidence.push(p));
   if (proxy_validation) {
-    mvEvidence.push('Deck cites proxy or adjacent-behavior validation (substitutes, competitors, existing behavior).');
-    mvSignals.push('proxy');
+    mvEvidence.push('Proxy/adjacent-behavior validation (substitutes, competitors, or existing behavior).');
   }
-  if (missing_validation) {
-    mvEvidence.push('Deck does not yet show direct or proxy evidence that customers want the outcome.');
-    mvSignals.push('missing');
-  }
-  const mvSummary = missing_validation
-    ? 'Market validation is largely absent; the opportunity is asserted more than evidenced.'
-    : direct_validation
-      ? 'Market validation includes direct evidence from the company’s own users or customers.'
-      : 'Market validation is currently indirect: it relies on proxy or adjacent-market behavior and still needs direct proof.';
 
-  // --- Investor Fit (audience/raise not collected yet) ---
-  const hasAudience = Boolean(options && (options.investorAudience || options.targetRaise));
+  let mvSummary;
+  if (missing_validation) {
+    mvSummary = 'Market validation is largely absent; the opportunity is asserted more than evidenced.';
+  } else if (directSignals.length > 0) {
+    mvSummary = `The deck provides direct market validation through ${_joinList(directSignals)}.`;
+  } else if (direct_validation) {
+    mvSummary = 'Market validation includes direct evidence from the company’s own users or customers.';
+  } else {
+    mvSummary =
+      'Market validation is currently indirect: it relies on proxy or adjacent-market behavior and still needs direct proof.';
+  }
+
+  // --- Investor Fit (inferred from deck funding terms; audience optional) ---
+  let inferredAudience = (options && options.investorAudience) || null;
+  if (!inferredAudience && fundingTerms.round) {
+    const r = fundingTerms.round.toLowerCase();
+    if (r.includes('pre-seed')) inferredAudience = 'Pre-seed / angel investors';
+    else if (r.includes('seed')) inferredAudience = 'Seed investors / seed venture capital';
+    else inferredAudience = 'Growth / later-stage venture capital';
+  }
+  const hasStatedRaise = Boolean(
+    fundingTerms.round || fundingTerms.raise || (options && (options.investorAudience || options.targetRaise))
+  );
+
   const investorFitEvidence = [];
   const investorFitSignals = [];
   let investorFitLabel;
   let investorFitInterpretation;
-  if (!hasAudience) {
+
+  if (!hasStatedRaise) {
     investorFitLabel = 'Not Enough Information';
     investorFitInterpretation =
-      'Investor Fit cannot be assessed without a stated target investor audience or raise amount; it is left cautious by design.';
+      'The deck does not state a round or raise, and no investor audience was provided, so Investor Fit cannot be assessed.';
     investorFitSignals.push('audience_unknown');
-    if (companyContext && companyContext.detected_context) {
-      investorFitEvidence.push(`Detected company context: ${companyContext.detected_context}.`);
-    }
   } else {
-    // Placeholder for a future audience-aware path; conservative for now.
-    investorFitLabel = 'Not Enough Information';
-    investorFitInterpretation =
-      'Investor audience/raise provided, but audience-aware fit scoring is not yet implemented.';
-    investorFitSignals.push('audience_provided');
+    if (fundingTerms.round) investorFitEvidence.push(`Round: ${fundingTerms.round}.`);
+    if (fundingTerms.raise) investorFitEvidence.push(`Target raise: ${fundingTerms.raise}.`);
+    if (fundingTerms.instrument) investorFitEvidence.push(`Instrument: ${fundingTerms.instrument}.`);
+    if (fundingTerms.cap) investorFitEvidence.push(`Valuation cap: ${fundingTerms.cap}.`);
+    if (fundingTerms.discount) investorFitEvidence.push(`Discount: ${fundingTerms.discount}.`);
+    if (fundingTerms.committed) investorFitEvidence.push(`Committed: ${fundingTerms.committed}.`);
+    if (fundingTerms.remaining) investorFitEvidence.push(`Remaining: ${fundingTerms.remaining}.`);
+    investorFitSignals.push('round_or_raise_stated');
+
+    // Strong only when round+raise AND a well-supported case; else Mixed.
+    const strongCase =
+      opportunityLabel === 'Strong' &&
+      (executionLabel === 'Strong' || executionLabel === 'Mixed') &&
+      direct_validation;
+    investorFitLabel = strongCase && fundingTerms.round && fundingTerms.raise ? 'Strong' : 'Mixed';
+
+    const parts = [];
+    if (fundingTerms.round) parts.push(fundingTerms.round);
+    if (fundingTerms.raise) parts.push(fundingTerms.raise);
+    if (fundingTerms.instrument) parts.push(`on a ${fundingTerms.instrument}`);
+    const stated = parts.length
+      ? ` (${parts.join(' ')}${fundingTerms.committed ? `, ${fundingTerms.committed} committed` : ''})`
+      : '';
+    const caveat =
+      investorFitLabel === 'Strong'
+        ? 'this depends on continued proof of durable growth'
+        : 'some evidence — such as use-of-funds milestones and durable growth — is still thin';
+    investorFitInterpretation = `The deck presents a ${inferredAudience || 'venture'} raise${stated}. As presented it appears a plausible fit for ${inferredAudience || 'the stated investors'}, though ${caveat}.`;
   }
 
   return {
@@ -251,10 +434,16 @@ function synthesizeInvestmentCase(deckData, options = {}) {
     market_validation: {
       summary: mvSummary,
       evidence: mvEvidence,
+      direct_signals: directSignals,
       direct_validation,
       proxy_validation,
       missing_validation,
     },
+    funding_terms: fundingTerms,
+    inferred_investor_audience: inferredAudience,
+    detected: flags,
+    company_name: companyName,
+    company_name_present: Boolean(companyName),
     signals: {
       opportunity_signals: opp.signals,
       execution_signals: exe.signals,

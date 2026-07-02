@@ -92,6 +92,15 @@ function _assessmentFromGrade(grade) {
   return 'Under-supported';
 }
 
+// Join a list human-style: "a", "a and b", "a, b, and c".
+function _joinList(arr) {
+  const a = (arr || []).filter(Boolean);
+  if (a.length === 0) return '';
+  if (a.length === 1) return a[0];
+  if (a.length === 2) return `${a[0]} and ${a[1]}`;
+  return `${a.slice(0, -1).join(', ')}, and ${a[a.length - 1]}`;
+}
+
 // --- primary constraint (drives overall grade + primary diagnosis) ------------
 
 function _derivePrimaryConstraint(deckCommScores, investmentCase, marketValidation) {
@@ -135,6 +144,26 @@ function _derivePrimaryConstraint(deckCommScores, investmentCase, marketValidati
       summary: `The deck's ${minDim} makes it hard for investors to evaluate the thesis efficiently.`,
     };
   }
+  // Strong early traction but the opportunity is only under-supported: the real
+  // question is durability/scale, not whether demand exists. Name it specifically.
+  const flags = (investmentCase && investmentCase.detected) || {};
+  const oppUnder =
+    ic.opportunity_strength &&
+    (ic.opportunity_strength.label === 'Promising but Under-Supported' ||
+      ic.opportunity_strength.label === 'Mixed');
+  if (marketValidation && marketValidation.direct_validation && oppUnder) {
+    const concerns = [];
+    if (!flags.has_defensibility) concerns.push('defensibility');
+    if (!flags.has_retention_data) concerns.push('repeat usage and retention');
+    if (flags.is_marketplace) concerns.push('whether the marketplace can scale efficiently');
+    else if (flags.has_market_size_claim) concerns.push('the market-size assumptions');
+    const list = concerns.length ? _joinList(concerns.slice(0, 3)) : 'durability and scale';
+    return {
+      issue_type: 'Substance',
+      constraint: 'Defensibility & durability',
+      summary: `The deck shows strong early traction, but investors may still question ${list}.`,
+    };
+  }
   if (marketValidation && marketValidation.missing_validation) {
     return {
       issue_type: 'Evidence',
@@ -167,10 +196,10 @@ function _derivePrimaryConstraint(deckCommScores, investmentCase, marketValidati
 
 // --- section builders ---------------------------------------------------------
 
-function _buildHeader(v1Report, generatedAt) {
+function _buildHeader(v1Report, generatedAt, companyName) {
   return {
     report_title: 'Pitch Deck Check Report',
-    company_name: undefined,
+    company_name: companyName || undefined,
     deck_filename: undefined,
     generated_at: generatedAt,
     positioning_statement:
@@ -178,15 +207,20 @@ function _buildHeader(v1Report, generatedAt) {
   };
 }
 
-function _buildContextSummary(companyContext) {
+function _buildContextSummary(companyContext, investmentCase) {
   const cc = companyContext || {};
+  const ft = (investmentCase && investmentCase.funding_terms) || {};
+  const audience = (investmentCase && investmentCase.inferred_investor_audience) || undefined;
+  const evaluation_note =
+    audience || ft.raise
+      ? 'Investor audience and target raise were inferred from the deck; Investor Fit reflects the round the deck presents.'
+      : 'The deck did not state an investor audience or target raise, so Investor Fit is evaluated cautiously.';
   return {
     company_context: cc.detected_context || 'Unknown',
     context_confidence: cc.confidence || 'Low',
-    intended_investor_audience: undefined,
-    target_raise: undefined,
-    evaluation_note:
-      'Intended investor audience and target raise were not provided, so Investor Fit is evaluated cautiously.',
+    intended_investor_audience: audience,
+    target_raise: ft.raise || undefined,
+    evaluation_note,
   };
 }
 
@@ -227,55 +261,105 @@ function _buildInvestmentCase(investmentCase) {
   };
 }
 
-function _buildPriorityImprovements(deckCommScores, investmentCase, marketValidation) {
+function _buildPriorityImprovements(deckCommScores, investmentCase) {
   const ic = investmentCase || {};
+  const mv = ic.market_validation || {};
+  const flags = ic.detected || {};
   const items = [];
+  const push = (o) => {
+    if (items.length < 5) items.push(o);
+  };
 
-  // 1. Central substantive weaknesses first.
-  if (ic.opportunity_strength && ic.opportunity_strength.label === 'Weak') {
-    items.push({
+  const label = (a) => (a && a.label) || 'Not Enough Information';
+  const oppWeak = label(ic.opportunity_strength) === 'Weak';
+  const exeWeak = label(ic.execution_credibility) === 'Weak';
+  const oppUnder =
+    label(ic.opportunity_strength) === 'Promising but Under-Supported' ||
+    label(ic.opportunity_strength) === 'Mixed';
+  const strongTraction = Boolean(mv.direct_validation);
+
+  // 1. Substantive weaknesses first.
+  if (oppWeak) {
+    push({
       title: 'Strengthen the opportunity',
       why_it_matters: 'Investors need to believe the opportunity is large, urgent, and differentiated.',
-      what_to_add_or_change:
-        'Sharpen the value gap, market size, expansion path, and why this becomes a large outcome.',
+      what_to_add_or_change: 'Sharpen the value gap, market size, and why this becomes a large outcome.',
       issue_type: 'Substance',
     });
   }
-  if (ic.execution_credibility && ic.execution_credibility.label === 'Weak') {
-    items.push({
+  if (exeWeak) {
+    push({
       title: 'Show why this team can execute',
       why_it_matters: 'An attractive opportunity still needs a credible team to capture it.',
-      what_to_add_or_change:
-        'Add founder-market fit, relevant experience, and evidence of execution so far.',
+      what_to_add_or_change: 'Add founder-market fit, relevant experience, and evidence of execution so far.',
       issue_type: 'Substance',
     });
   }
 
-  // 2. Market validation gap.
-  if (marketValidation && marketValidation.missing_validation) {
-    items.push({
+  // 2. Genuinely missing validation.
+  if (mv.missing_validation) {
+    push({
       title: 'Add market validation',
-      why_it_matters: 'Investors need evidence that customers already want the promised outcome.',
+      why_it_matters: 'Investors need evidence that customers already want the outcome.',
       what_to_add_or_change:
         'Add customer discovery, waitlist quality, pilots, or proxy/adjacent-behavior evidence of demand.',
       issue_type: 'Evidence',
     });
   }
 
-  // 3. Under-supported (promising) areas.
-  for (const [key, name] of [
-    ['opportunity_strength', 'the opportunity'],
-    ['execution_credibility', 'execution'],
-  ]) {
-    const a = ic[key];
-    if (a && a.label === 'Promising but Under-Supported') {
-      items.push({
-        title: `Add evidence for ${name}`,
-        why_it_matters: `${name[0].toUpperCase() + name.slice(1)} looks promising but is not yet fully supported.`,
-        what_to_add_or_change: 'Add specific proof appropriate for the company’s stage.',
+  // 3. Strong traction but durability/scale gaps → SPECIFIC next-proof asks.
+  //    (When validation is already strong, do not fall back to a generic
+  //    "add evidence for the opportunity".)
+  if (strongTraction && (oppUnder || !flags.has_defensibility || !flags.has_retention_data)) {
+    if (!flags.has_defensibility) {
+      push({
+        title: 'Explain defensibility beyond first-mover advantage',
+        why_it_matters: 'Strong early traction invites fast followers; investors need a durable moat.',
+        what_to_add_or_change:
+          'Show defensibility beyond coverage, ratings, and being first — e.g. network effects, switching costs, proprietary data, or supply lock-in.',
+        issue_type: 'Substance',
+      });
+    }
+    if (!flags.has_retention_data) {
+      push({
+        title: 'Add retention and repeat-usage data',
+        why_it_matters: 'Durable demand, not just cumulative signups, drives venture outcomes.',
+        what_to_add_or_change: 'Add cohort retention, repeat-booking rates, or active-usage trends over time.',
         issue_type: 'Evidence',
       });
     }
+    if (flags.is_marketplace) {
+      push({
+        title: 'Show marketplace liquidity by market',
+        why_it_matters: 'Aggregate totals can mask thin liquidity in individual markets.',
+        what_to_add_or_change: 'Break out supply/demand density and repeat transactions per city or market.',
+        issue_type: 'Evidence',
+      });
+    }
+    if (flags.has_market_size_claim) {
+      push({
+        title: 'Support the market-size assumptions',
+        why_it_matters: 'Headline market and projection figures need a defensible build-up.',
+        what_to_add_or_change: 'Show bottom-up sizing and the assumptions behind the projection.',
+        issue_type: 'Evidence',
+      });
+    }
+    if (flags.has_gtm_channels && !flags.has_cac_economics) {
+      push({
+        title: 'Add acquisition economics (CAC / payback)',
+        why_it_matters: 'Channels are listed, but investors need to see efficient, scalable acquisition.',
+        what_to_add_or_change: 'Add CAC, payback period, and channel efficiency by channel.',
+        issue_type: 'Evidence',
+      });
+    }
+  } else if (oppUnder && !strongTraction) {
+    // Under-supported without strong traction: scoped evidence ask.
+    push({
+      title: 'Add evidence for the opportunity',
+      why_it_matters: 'The opportunity looks promising but is not yet supported by proof.',
+      what_to_add_or_change: 'Add stage-appropriate proof that customers want the outcome.',
+      issue_type: 'Evidence',
+    });
   }
 
   // 4. Lowest communication dimensions.
@@ -283,7 +367,7 @@ function _buildPriorityImprovements(deckCommScores, investmentCase, marketValida
     .filter(([, v]) => v && v.score <= 3)
     .sort((a, b) => a[1].score - b[1].score);
   for (const [dim, v] of dims) {
-    items.push({
+    push({
       title: `Improve ${dim}`,
       why_it_matters: 'Communication weaknesses make the thesis harder for investors to evaluate.',
       what_to_add_or_change: v.priority_improvement,
@@ -291,12 +375,12 @@ function _buildPriorityImprovements(deckCommScores, investmentCase, marketValida
     });
   }
 
-  // 5. Investor fit clarification.
-  if (ic.investor_fit && ic.investor_fit.label === 'Not Enough Information') {
-    items.push({
-      title: 'Clarify the intended investor audience',
-      why_it_matters: 'Investor Fit cannot be assessed without a target audience or raise amount.',
-      what_to_add_or_change: 'State the target raise, round stage, and intended investor type.',
+  // 5. Investor fit only when genuinely unknown.
+  if (label(ic.investor_fit) === 'Not Enough Information') {
+    push({
+      title: 'State the round, raise, and target investor',
+      why_it_matters: 'Investor Fit cannot be assessed without a round/raise or audience.',
+      what_to_add_or_change: 'State the target raise, round stage, instrument, and intended investor type.',
       issue_type: 'Investor Fit',
     });
   }
@@ -304,19 +388,33 @@ function _buildPriorityImprovements(deckCommScores, investmentCase, marketValida
   return items.slice(0, 5);
 }
 
-function _buildSlideLevelFeedback(v1Report) {
+// Claims that the company name is missing (false negatives we suppress when the
+// name is actually detectable elsewhere in the deck).
+const NAME_MISSING_RE = /company\s*name|company['’]s\s+name|missing\s+.*\bname\b|\bname\b\s+is\s+missing|no\s+company\s+name|lacks?\s+.*\bname\b/i;
+
+function _buildSlideLevelFeedback(v1Report, companyName) {
   const slides = (v1Report && v1Report.slides) || [];
   return slides.map((s) => {
     const typeKey = String(s.type || '').toLowerCase().replace(/\s+/g, '_');
+    let missing = s.missing_investor_proof || '';
+    let recommended = s.missing_investor_proof || '';
+
+    // Fix cover/company-name false negatives: if the company name is detectable
+    // in the deck, do not claim the cover is missing it. Use safer wording.
+    if ((typeKey === 'cover' || typeKey === 'contact') && companyName && NAME_MISSING_RE.test(missing)) {
+      missing = 'The positioning line could be sharper.';
+      recommended = 'Make the target customer or primary outcome more specific on the cover.';
+    }
+
     return {
       slide_number: s.slide_number,
       slide_title_or_section: s.type || 'Section',
       investor_decision: TYPE_TO_INVESTOR_DECISION[typeKey] || '',
       assessment: _assessmentFromGrade(s.grade),
       what_works: s.investor_insight || '',
-      what_is_missing: s.missing_investor_proof || '',
-      recommended_improvement: s.missing_investor_proof || '',
-      issue_type: s.missing_investor_proof ? 'Evidence' : 'None',
+      what_is_missing: missing,
+      recommended_improvement: recommended,
+      issue_type: missing ? 'Evidence' : 'None',
     };
   });
 }
@@ -391,8 +489,9 @@ function assembleReportV2(inputs = {}) {
     generatedAt = new Date().toISOString(),
   } = inputs;
 
-  const header = _buildHeader(v1Report, generatedAt);
-  const context_summary = _buildContextSummary(companyContext);
+  const companyName = (investmentCase && investmentCase.company_name) || null;
+  const header = _buildHeader(v1Report, generatedAt, companyName);
+  const context_summary = _buildContextSummary(companyContext, investmentCase);
   const deck_communication_scores = _buildDeckCommunicationScores(v1Report);
   const investment_case = _buildInvestmentCase(investmentCase);
   const marketValidation = (investmentCase && investmentCase.market_validation) || null;
@@ -423,10 +522,9 @@ function assembleReportV2(inputs = {}) {
 
   const priority_improvements = _buildPriorityImprovements(
     deck_communication_scores,
-    investmentCase,
-    marketValidation
+    investmentCase
   );
-  const slide_level_feedback = _buildSlideLevelFeedback(v1Report);
+  const slide_level_feedback = _buildSlideLevelFeedback(v1Report, companyName);
   const suggested_next_steps = _buildSuggestedNextSteps(constraint, priority_improvements);
   const save_share_upgrade = _buildSaveShareUpgrade();
 
