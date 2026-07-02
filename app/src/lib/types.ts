@@ -154,6 +154,180 @@ export interface V1Report {
   slide_summary?: V1SlideSummary[]
 }
 
+// ---------------------------------------------------------------------------
+// V2 report types (Pitch Deck Check product-owned model)
+//
+// These describe the NEW founder-facing report shape defined by the
+// product-owned artifacts (scoring-rubric.md, report-spec.md,
+// sample-report-format.md). They are ADDITIVE and PREPARATORY only:
+//   - No generator emits this shape yet.
+//   - No component renders it yet.
+//   - No API returns it yet.
+// They exist so Phase 3 generation and Phase 4 rendering have a stable target.
+// The V1 types above are unchanged; both shapes must coexist.
+// ---------------------------------------------------------------------------
+
+// Company Context stages (company-context.md). 'Unknown' is used when the stage
+// cannot be confidently classified.
+export type CompanyContextV2 =
+  | 'Idea / Pre-Product'
+  | 'Product / Pre-Revenue'
+  | 'Early Revenue'
+  | 'Growth'
+  | 'Unknown'
+
+export type ContextConfidenceV2 = 'High' | 'Medium' | 'Low'
+
+// The four Deck Communication Scores are graded on 1–5 internal bands.
+export type DeckCommunicationDimensionV2 =
+  | 'Completeness'
+  | 'Clarity'
+  | 'Brevity'
+  | 'Flow'
+
+export type DeckCommunicationScoreValueV2 = 1 | 2 | 3 | 4 | 5
+
+export type DeckCommunicationLabelV2 =
+  | 'Very Weak' // 1
+  | 'Weak' // 2
+  | 'Adequate' // 3
+  | 'Strong' // 4
+  | 'Excellent' // 5
+
+export interface DeckCommunicationScoreV2 {
+  score: DeckCommunicationScoreValueV2
+  label: DeckCommunicationLabelV2
+  explanation: string
+  primary_reason: string
+  priority_improvement: string
+}
+
+// Keyed by dimension; lowercase keys mirror the existing V1QualityDimensions.
+export interface DeckCommunicationScoresV2 {
+  completeness: DeckCommunicationScoreV2
+  clarity: DeckCommunicationScoreV2
+  brevity: DeckCommunicationScoreV2
+  flow: DeckCommunicationScoreV2
+}
+
+// Investment Case as Presented — qualitative assessment, NOT 1–5 peer scores.
+export type InvestmentCaseAreaV2 =
+  | 'Opportunity Strength'
+  | 'Execution Credibility'
+  | 'Investor Fit'
+
+export type InvestmentCaseLabelV2 =
+  | 'Strong'
+  | 'Promising but Under-Supported'
+  | 'Mixed'
+  | 'Weak'
+  | 'Not Enough Information'
+
+export interface InvestmentCaseAssessmentV2 {
+  label: InvestmentCaseLabelV2
+  interpretation: string
+}
+
+export interface InvestmentCaseV2 {
+  opportunity_strength: InvestmentCaseAssessmentV2
+  execution_credibility: InvestmentCaseAssessmentV2
+  investor_fit: InvestmentCaseAssessmentV2
+  // Market Validation is EVIDENCE that supports/weakens the areas above, never
+  // a separate score. Optional free-text narrative.
+  market_validation?: string
+}
+
+// Overall Grade letter set (scoring-rubric.md letter-grade cut points).
+// Intentionally distinct from the existing `GRADES` const (current A–E scale),
+// which is left unchanged.
+export type OverallGradeLetterV2 =
+  | 'A'
+  | 'A-'
+  | 'B+'
+  | 'B'
+  | 'B-'
+  | 'C+'
+  | 'C'
+  | 'C-'
+  | 'D'
+  | 'F'
+
+export interface OverallGradeV2 {
+  letter: OverallGradeLetterV2
+  concise_interpretation: string
+  primary_constraint: string
+  what_this_means: string
+}
+
+export interface ReportHeaderV2 {
+  report_title?: string
+  company_name?: string
+  deck_filename?: string
+  generated_at?: string
+  positioning_statement?: string
+}
+
+export interface ContextSummaryV2 {
+  company_context: CompanyContextV2
+  context_confidence?: ContextConfidenceV2
+  intended_investor_audience?: string
+  target_raise?: string
+  evaluation_note?: string
+}
+
+// Canonical issue types are Communication, Evidence, Substance, and Investor
+// Fit; samples also use compound tags (e.g. 'Evidence / Market Validation'), so
+// this is a free string rather than a closed union.
+export type IssueTypeV2 = string
+
+export interface PriorityImprovementV2 {
+  title: string
+  why_it_matters: string
+  what_to_add_or_change: string
+  issue_type: IssueTypeV2
+}
+
+export interface SlideLevelFeedbackV2 {
+  slide_number?: number
+  slide_title_or_section: string
+  investor_decision: string
+  assessment: string
+  what_works: string
+  what_is_missing: string
+  recommended_improvement: string
+  issue_type: IssueTypeV2
+}
+
+export interface SuggestedNextStepV2 {
+  title: string
+  detail?: string
+}
+
+export interface SaveShareUpgradeV2 {
+  intro?: string
+  options: string[]
+}
+
+// Top-level V2 report content shape.
+export interface PitchDeckCheckReportV2 {
+  report_version: string
+  header: ReportHeaderV2
+  context_summary: ContextSummaryV2
+  overall_grade: OverallGradeV2
+  deck_communication_scores: DeckCommunicationScoresV2
+  investment_case: InvestmentCaseV2
+  primary_diagnosis: string
+  what_investors_may_believe: string[]
+  what_investors_may_question: string[]
+  priority_improvements: PriorityImprovementV2[]
+  slide_level_feedback: SlideLevelFeedbackV2[]
+  suggested_next_steps: SuggestedNextStepV2[]
+  save_share_upgrade?: SaveShareUpgradeV2
+}
+
+// Alias so either name may be used by downstream code.
+export type ReportContentV2 = PitchDeckCheckReportV2
+
 // Legacy report types (for backwards compatibility)
 export interface ReportStrength {
   title?: string
@@ -209,9 +383,19 @@ export interface ReportContent {
   // V1 founder-facing report
   v1_report?: V1Report
 
+  // V2 founder-facing report (additive, not yet generated or rendered).
+  // Mirrors the v1_report nesting pattern so a V2 report can travel in the same
+  // content blob during migration without disturbing existing fields.
+  report_v2?: ReportContentV2
+
   // V3 debug output (admin only)
   debug?: V3DebugOutput
 }
+
+// Compatibility union for code that may later receive either the current
+// content shape or a top-level V2 report. NEW name — does not replace or
+// redefine `ReportContent`, so existing imports and field access stay valid.
+export type AnyReportContent = ReportContent | ReportContentV2
 
 export interface SlideData {
   slide_number: number
