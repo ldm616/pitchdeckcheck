@@ -6,6 +6,14 @@
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["busboy", "@napi-rs/canvas", "pdfjs-dist"]
+  # Bundle product-owned model artifacts (markdown) and the calibration
+  # registry so serverless/background functions can read them at runtime.
+  # esbuild does not auto-include non-imported files; included_files ships them
+  # alongside the bundled functions, preserving their repo-relative paths.
+  included_files = [
+    "model/*.md",
+    "model/calibration/calibrationRegistry.json"
+  ]
 
 [[redirects]]
   from = "/*"
