@@ -39,6 +39,9 @@ const {
 } = require('./evaluationRulesLoader')
 const { applySignalOverride } = require('./signalOverride')
 const { generateV1Report, V1_REPORT_VERSION } = require('./v1Synthesis')
+// Additive, behavior-preserving: deterministic Company Context stage inference.
+// Attached to report content as metadata only; does not affect scoring/grades.
+const { classifyCompanyContext } = require('./companyContextClassifier')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
@@ -1803,6 +1806,19 @@ async function generateFullReport(supabase, deckId, options = {}) {
       full_report: fullReport,
       free_report: freeReport,
       v1_report: v1Report,
+    }
+
+    // Additive metadata: deterministic Company Context stage inference.
+    // Non-fatal — a failure here must never block report generation, and this
+    // field is not read by scoring, grading, or the current frontend.
+    try {
+      const companyContext = classifyCompanyContext(slides)
+      reportContent.company_context = companyContext
+      console.log(
+        `[company-context] detected="${companyContext.detected_context}" confidence=${companyContext.confidence}`
+      )
+    } catch (ccError) {
+      console.error('[company-context] classification failed (non-fatal):', ccError.message)
     }
 
     // Add debug info for v3 reports
