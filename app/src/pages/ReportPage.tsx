@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { getReport, getReportByCode } from '../lib/api'
+import { Download } from 'lucide-react'
+import { getReport, getReportByCode, isAdmin } from '../lib/api'
 import { ROUTES } from '../lib/routes'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { FounderHeader } from '../components/FounderHeader'
@@ -165,6 +166,37 @@ export function ReportPage() {
     )
   }
 
+  // Admin-only affordance: a link back to the admin area, shown only when an
+  // admin has verified their password this session.
+  const adminBar = isAdmin() ? (
+    <div className="max-w-2xl mx-auto w-full px-6 pt-3">
+      <Link
+        to={ROUTES.ADMIN}
+        className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
+      >
+        ← Admin
+      </Link>
+    </div>
+  ) : null
+
+  // Download the report as a PDF via the browser's native print-to-PDF.
+  // No PDF dependency/backend is required; the report container is styled so
+  // the button itself is hidden from the printed output.
+  const handleDownload = () => window.print()
+
+  // A small "Download" button pinned to the report container's upper-right.
+  const downloadButton = (
+    <button
+      type="button"
+      onClick={handleDownload}
+      className="print:hidden absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
+      aria-label="Download report as PDF"
+    >
+      <Download className="w-4 h-4" />
+      Download
+    </button>
+  )
+
   // Prefer the new V2 report when present; otherwise fall back to the existing
   // V1 rendering path below (unchanged). Old stored reports keep working.
   const reportV2 = report.report_v2
@@ -172,9 +204,11 @@ export function ReportPage() {
     return (
       <div className="flex flex-col flex-1">
         <FounderHeader />
+        {adminBar}
         <main className="flex-1 px-6 pb-16">
           <div className="max-w-2xl mx-auto">
-            <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
+            <div className="relative bg-white rounded-xl shadow-sm p-8 sm:p-10">
+              {downloadButton}
               <V2Report report={reportV2} />
 
               {secureCredentials && (
@@ -228,10 +262,12 @@ export function ReportPage() {
   return (
     <div className="flex flex-col flex-1">
       <FounderHeader />
+      {adminBar}
 
       <main className="flex-1 px-6 pb-16">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-xl shadow-sm p-8 sm:p-10">
+          <div className="relative bg-white rounded-xl shadow-sm p-8 sm:p-10">
+            {downloadButton}
             {/* 1. Overall Investor Readout */}
             <ReportHeader
               report={v1Report}

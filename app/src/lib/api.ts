@@ -16,6 +16,12 @@ function getAdminPassword(): string {
   return sessionStorage.getItem(SESSION_PASSWORD_KEY) || ''
 }
 
+// True when an admin has verified their password this session (used to show
+// admin-only affordances such as the Admin link on the report page).
+export function isAdmin(): boolean {
+  return !!sessionStorage.getItem(SESSION_PASSWORD_KEY)
+}
+
 // Verify admin password
 export async function verifyPassword(password: string): Promise<{ ok: boolean; error?: string }> {
   const response = await fetch('/.netlify/functions/verify-password', {

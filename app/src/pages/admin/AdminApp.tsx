@@ -887,19 +887,22 @@ export function AdminApp() {
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1, minWidth: '200px' }}>
-                            <input
-                              type="checkbox"
-                              checked={selectedDeckIds.has(item.deck_id)}
-                              onChange={() => toggleSelectDeck(item.deck_id)}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                width: '16px',
-                                height: '16px',
-                                cursor: 'pointer',
-                                marginTop: '2px',
-                                accentColor: selectedDeckIds.has(item.deck_id) ? undefined : '#d1d5db',
-                              }}
-                            />
+                            {/* Only show selection checkbox when there is more than one report */}
+                            {reportsList.length > 1 && (
+                              <input
+                                type="checkbox"
+                                checked={selectedDeckIds.has(item.deck_id)}
+                                onChange={() => toggleSelectDeck(item.deck_id)}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  cursor: 'pointer',
+                                  marginTop: '2px',
+                                  accentColor: selectedDeckIds.has(item.deck_id) ? undefined : '#d1d5db',
+                                }}
+                              />
+                            )}
                             <div
                               onClick={() => handleViewReport(item)}
                               style={{ cursor: 'pointer', flex: 1 }}
