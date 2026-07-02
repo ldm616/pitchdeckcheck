@@ -29,3 +29,6 @@ coverage/
 
 # Misc
 *.local
+
+# Local Netlify folder
+.netlify

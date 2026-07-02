@@ -174,6 +174,13 @@ exports.handler = async (event) => {
     reportContent.v1_report = report.content.v1_report
   }
 
+  // Include the additive v2 report if present (new founder-facing shape).
+  // Without this passthrough the frontend never sees report_v2 and always
+  // falls back to V1 rendering.
+  if (report.content?.report_v2) {
+    reportContent.report_v2 = report.content.report_v2
+  }
+
   // Include v3 debug data if present (for admin viewing)
   if (report.content?.debug) {
     reportContent.debug = report.content.debug
