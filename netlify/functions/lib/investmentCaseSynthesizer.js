@@ -179,13 +179,46 @@ function _joinList(arr) {
   return `${a.slice(0, -1).join(', ')}, and ${a[a.length - 1]}`;
 }
 
+// Fallback: most-mature round mentioned anywhere (seed beats pre-seed, so the
+// standalone-seed lookbehind check must come BEFORE pre-seed).
 function _detectRound(text) {
   if (/\bseries\s+d\b/i.test(text)) return 'Series D';
   if (/\bseries\s+c\b/i.test(text)) return 'Series C';
   if (/\bseries\s+b\b/i.test(text)) return 'Series B';
   if (/\bseries\s+a\b/i.test(text)) return 'Series A';
-  if (/\bpre[\s-]?seed\b/i.test(text)) return 'Pre-seed';
   if (/(?<!pre[\s-])\bseed\b/i.test(text)) return 'Seed';
+  if (/\bpre[\s-]?seed\b/i.test(text)) return 'Pre-seed';
+  return null;
+}
+
+// Explicit CURRENT financing ask (e.g. "raising $2M seed", "Seed Round pitch
+// deck"). Takes priority over historical/timeline stage labels elsewhere in the
+// deck (a funding history may list both "Pre-Seed" and "Seed").
+function _detectCurrentRound(text) {
+  const t = text || '';
+  const AMT = `(?:${MONEY}\\s+)?`;
+  // Series A–D ask.
+  let m =
+    t.match(new RegExp(`(?:raising|raise|closing|our|seeking)\\s+(?:a\\s+)?${AMT}series\\s+([a-d])\\b`, 'i')) ||
+    t.match(/series\s+([a-d])\s+(?:round|pitch\s+deck|financing|raise)/i) ||
+    t.match(new RegExp(`${MONEY}\\s+series\\s+([a-d])\\b`, 'i'));
+  if (m) return `Series ${m[1].toUpperCase()}`;
+  // Pre-seed ask (checked before seed so "seed" inside "pre-seed" doesn't win).
+  if (
+    new RegExp(`(?:raising|raise|closing|our|seeking)\\s+(?:a\\s+)?${AMT}pre[\\s-]?seed\\b`, 'i').test(t) ||
+    /pre[\s-]?seed\s+round\s+(?:pitch|deck|to|of|financing)/i.test(t) ||
+    new RegExp(`${MONEY}\\s+pre[\\s-]?seed\\s+round`, 'i').test(t)
+  ) {
+    return 'Pre-seed';
+  }
+  // Seed ask (lookbehind excludes "pre-seed").
+  if (
+    new RegExp(`(?:raising|raise|closing|our|seeking)\\s+(?:a\\s+)?${AMT}(?<!pre[\\s-])seed\\b`, 'i').test(t) ||
+    new RegExp(`${MONEY}\\s+(?<!pre[\\s-])seed\\s+round`, 'i').test(t) ||
+    /(?<!pre[\s-])seed\s+round\s+(?:pitch|deck)/i.test(t)
+  ) {
+    return 'Seed';
+  }
   return null;
 }
 
@@ -193,7 +226,8 @@ function _detectRound(text) {
 function _extractFundingTerms(text) {
   const t = text || '';
   const clean = (s) => (s ? s.replace(/\s+/g, '') : null);
-  const round = _detectRound(t);
+  // Explicit current ask wins over any timeline/historical stage labels.
+  const round = _detectCurrentRound(t) || _detectRound(t);
 
   let raise = null;
   const raiseCtx =
@@ -279,6 +313,8 @@ function _detectFlags(text) {
     has_market_size_claim: new RegExp(`\\b(tam|sam|som|market\\s+size|projection|projected|${MONEY}\\s+(?:market|opportunity))\\b`, 'i').test(t),
     has_retention_data: /\b(retention|repeat\s+(usage|purchase|booking)|cohort|churn|ndr|nrr|net\s+(dollar|revenue)\s+retention)\b/i.test(t),
     has_defensibility: /\b(moat|defensib|network\s+effect|switching\s+cost|proprietary|patent|lock[\s-]?in|barriers?\s+to\s+entry)\b/i.test(t),
+    // A built, shipping product (used to suppress "product maturity unclear").
+    product_built: /\b(web\s?app|responsive\s+web|native\s+(ios|android)|ios\s+(app|and\s+android)|android\s+app|mobile\s+apps?|app\s?store|google\s+play|screenshots?|(?:is|now)\s+live|in\s+production|shipping|beta)\b/i.test(t),
   };
 }
 
@@ -366,9 +402,10 @@ function synthesizeInvestmentCase(deckData, options = {}) {
   let inferredAudience = (options && options.investorAudience) || null;
   if (!inferredAudience && fundingTerms.round) {
     const r = fundingTerms.round.toLowerCase();
-    if (r.includes('pre-seed')) inferredAudience = 'Pre-seed / angel investors';
-    else if (r.includes('seed')) inferredAudience = 'Seed investors / seed venture capital';
-    else inferredAudience = 'Growth / later-stage venture capital';
+    if (r.includes('pre-seed')) inferredAudience = 'Pre-seed investors or angel investors';
+    else if (r === 'seed') inferredAudience = 'Seed investors / seed venture capital';
+    else if (r === 'series a') inferredAudience = 'Series A investors';
+    else inferredAudience = 'Growth-stage venture investors';
   }
   const hasStatedRaise = Boolean(
     fundingTerms.round || fundingTerms.raise || (options && (options.investorAudience || options.targetRaise))
@@ -394,12 +431,29 @@ function synthesizeInvestmentCase(deckData, options = {}) {
     if (fundingTerms.remaining) investorFitEvidence.push(`Remaining: ${fundingTerms.remaining}.`);
     investorFitSignals.push('round_or_raise_stated');
 
-    // Strong only when round+raise AND a well-supported case; else Mixed.
-    const strongCase =
+    // Open diligence questions that should keep fit below "Strong".
+    const diligenceGaps = [];
+    if (!flags.has_defensibility) diligenceGaps.push('defensibility');
+    if (!flags.has_retention_data) diligenceGaps.push('retention/repeat usage');
+    if (flags.is_marketplace) diligenceGaps.push('marketplace liquidity');
+    if (flags.has_gtm_channels && !flags.has_cac_economics) diligenceGaps.push('acquisition economics');
+    if (flags.has_market_size_claim && opportunityLabel !== 'Strong') diligenceGaps.push('market-size assumptions');
+
+    // Strong only when round+raise AND everything is well supported with no
+    // open diligence gaps. Strong traction with gaps → Promising but
+    // Under-Supported. Otherwise Mixed.
+    const wellSupported =
       opportunityLabel === 'Strong' &&
       (executionLabel === 'Strong' || executionLabel === 'Mixed') &&
-      direct_validation;
-    investorFitLabel = strongCase && fundingTerms.round && fundingTerms.raise ? 'Strong' : 'Mixed';
+      direct_validation &&
+      diligenceGaps.length === 0;
+    if (wellSupported && fundingTerms.round && fundingTerms.raise) {
+      investorFitLabel = 'Strong';
+    } else if (direct_validation && diligenceGaps.length > 0) {
+      investorFitLabel = 'Promising but Under-Supported';
+    } else {
+      investorFitLabel = 'Mixed';
+    }
 
     const parts = [];
     if (fundingTerms.round) parts.push(fundingTerms.round);
@@ -408,10 +462,14 @@ function synthesizeInvestmentCase(deckData, options = {}) {
     const stated = parts.length
       ? ` (${parts.join(' ')}${fundingTerms.committed ? `, ${fundingTerms.committed} committed` : ''})`
       : '';
-    const caveat =
-      investorFitLabel === 'Strong'
-        ? 'this depends on continued proof of durable growth'
-        : 'some evidence — such as use-of-funds milestones and durable growth — is still thin';
+    let caveat;
+    if (investorFitLabel === 'Strong') {
+      caveat = 'this depends on continued proof of durable growth';
+    } else if (diligenceGaps.length > 0) {
+      caveat = `key ${(fundingTerms.round || 'venture').toLowerCase()} diligence questions — ${_joinList(diligenceGaps.slice(0, 4))} — are still open`;
+    } else {
+      caveat = 'some evidence, such as use-of-funds milestones and durable growth, is still thin';
+    }
     investorFitInterpretation = `The deck presents a ${inferredAudience || 'venture'} raise${stated}. As presented it appears a plausible fit for ${inferredAudience || 'the stated investors'}, though ${caveat}.`;
   }
 

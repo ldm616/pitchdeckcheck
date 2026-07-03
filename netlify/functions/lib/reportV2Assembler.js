@@ -144,25 +144,32 @@ function _derivePrimaryConstraint(deckCommScores, investmentCase, marketValidati
       summary: `The deck's ${minDim} makes it hard for investors to evaluate the thesis efficiently.`,
     };
   }
-  // Strong early traction but the opportunity is only under-supported: the real
-  // question is durability/scale, not whether demand exists. Name it specifically.
+  // Strong early traction with open diligence gaps: name the specific remaining
+  // questions rather than declaring the case resolved. Fires whenever there is
+  // direct validation and at least one concern, regardless of the opportunity
+  // label (a strong-traction deck can still have real durability questions).
   const flags = (investmentCase && investmentCase.detected) || {};
-  const oppUnder =
-    ic.opportunity_strength &&
-    (ic.opportunity_strength.label === 'Promising but Under-Supported' ||
-      ic.opportunity_strength.label === 'Mixed');
-  if (marketValidation && marketValidation.direct_validation && oppUnder) {
+  const areaStrongish = (a) =>
+    a && (a.label === 'Strong' || a.label === 'Mixed' || a.label === 'Promising but Under-Supported');
+  if (marketValidation && marketValidation.direct_validation) {
     const concerns = [];
     if (!flags.has_defensibility) concerns.push('defensibility');
-    if (!flags.has_retention_data) concerns.push('repeat usage and retention');
-    if (flags.is_marketplace) concerns.push('whether the marketplace can scale efficiently');
-    else if (flags.has_market_size_claim) concerns.push('the market-size assumptions');
-    const list = concerns.length ? _joinList(concerns.slice(0, 3)) : 'durability and scale';
-    return {
-      issue_type: 'Substance',
-      constraint: 'Defensibility & durability',
-      summary: `The deck shows strong early traction, but investors may still question ${list}.`,
-    };
+    if (!flags.has_retention_data) concerns.push('repeat usage');
+    if (flags.is_marketplace) concerns.push('marketplace liquidity');
+    if (flags.has_gtm_channels && !flags.has_cac_economics) concerns.push('acquisition efficiency');
+    if (flags.has_market_size_claim && !(ic.opportunity_strength && ic.opportunity_strength.label === 'Strong')) {
+      concerns.push('the market-size assumptions');
+    }
+    if (concerns.length > 0) {
+      const lead = areaStrongish(ic.execution_credibility)
+        ? 'strong early traction and credible execution'
+        : 'strong early traction';
+      return {
+        issue_type: 'Substance',
+        constraint: 'Defensibility & durability',
+        summary: `The deck shows ${lead}, but investors may still question ${_joinList(concerns.slice(0, 4))}.`,
+      };
+    }
   }
   if (marketValidation && marketValidation.missing_validation) {
     return {
@@ -392,7 +399,11 @@ function _buildPriorityImprovements(deckCommScores, investmentCase) {
 // name is actually detectable elsewhere in the deck).
 const NAME_MISSING_RE = /company\s*name|company['’]s\s+name|missing\s+.*\bname\b|\bname\b\s+is\s+missing|no\s+company\s+name|lacks?\s+.*\bname\b/i;
 
-function _buildSlideLevelFeedback(v1Report, companyName) {
+// Claims that product maturity/stage is unclear — a false negative when the
+// deck clearly shows a built, shipping product.
+const PRODUCT_MATURITY_RE = /product\s+maturity|maturity\s+level|maturity\s+is\s+unclear|how\s+mature|stage\s+of\s+(?:the\s+)?product|whether\s+the\s+product\s+is\s+built|level\s+of\s+product\s+maturity/i;
+
+function _buildSlideLevelFeedback(v1Report, companyName, productBuilt) {
   const slides = (v1Report && v1Report.slides) || [];
   return slides.map((s) => {
     const typeKey = String(s.type || '').toLowerCase().replace(/\s+/g, '_');
@@ -404,6 +415,13 @@ function _buildSlideLevelFeedback(v1Report, companyName) {
     if ((typeKey === 'cover' || typeKey === 'contact') && companyName && NAME_MISSING_RE.test(missing)) {
       missing = 'The positioning line could be sharper.';
       recommended = 'Make the target customer or primary outcome more specific on the cover.';
+    }
+
+    // Fix product-maturity false negatives: if the deck shows a built, shipping
+    // product, do not say maturity is unclear — focus on delivered value.
+    if (typeKey === 'product' && productBuilt && PRODUCT_MATURITY_RE.test(missing)) {
+      missing = 'Investors need more evidence that the product consistently delivers the promised value.';
+      recommended = 'Add evidence of product differentiation, reliability, repeat usage, or workflow depth.';
     }
 
     return {
@@ -524,7 +542,10 @@ function assembleReportV2(inputs = {}) {
     deck_communication_scores,
     investmentCase
   );
-  const slide_level_feedback = _buildSlideLevelFeedback(v1Report, companyName);
+  const productBuilt = Boolean(
+    investmentCase && investmentCase.detected && investmentCase.detected.product_built
+  );
+  const slide_level_feedback = _buildSlideLevelFeedback(v1Report, companyName, productBuilt);
   const suggested_next_steps = _buildSuggestedNextSteps(constraint, priority_improvements);
   const save_share_upgrade = _buildSaveShareUpgrade();
 
