@@ -17,6 +17,11 @@
 
 'use strict';
 
+// Read-only import of the deterministic rubric definitions so V2 can assess a
+// mapped framework slide against its topic's investor questions. This does not
+// modify rubrics.js or any scoring behavior.
+const { RUBRICS } = require('./rubrics');
+
 const REPORT_V2_VERSION = 'v2';
 
 // Investor Decisions per framework slide type (product-owned content from
@@ -460,6 +465,213 @@ const FINANCIALS_MISSING =
 const FINANCIALS_RECOMMENDED =
   'Show the assumptions behind the projections and the bridge from the current run rate to the projected run rate.';
 
+// Map a slide/framework type to the rubric key whose investor questions apply.
+// Types without their own rubric borrow the closest topic's rubric.
+const TYPE_TO_RUBRIC_KEY = {
+  cover: 'cover',
+  problem: 'problem',
+  solution: 'solution',
+  product: 'product',
+  market: 'market',
+  market_opportunity: 'market',
+  business_model: 'business_model',
+  traction: 'traction',
+  competition: 'competition',
+  moat: 'competition',
+  team: 'team',
+  financials: 'financials',
+  ask: 'ask',
+  funding: 'ask',
+  go_to_market: 'go_to_market',
+  roadmap: 'roadmap',
+  product_roadmap: 'roadmap',
+  contact: 'contact',
+};
+
+// Topic-specific investor expectations (founder-facing copy supplied in the task
+// spec, Step 5). Used to describe what a mapped framework slide should answer.
+const TOPIC_EXPECTATIONS = {
+  product: {
+    what_is_missing:
+      'The slide should show how the product delivers value: workflow, differentiation, reliability, usage quality, and proof that the product works.',
+    recommended:
+      'Revise this slide so it clearly shows the product workflow, differentiation, and evidence that it reliably delivers value.',
+  },
+  business_model: {
+    what_is_missing:
+      'The slide should explain the revenue mechanics: unit economics, margin assumptions, take-rate durability, transaction volume, and CAC/payback.',
+    recommended:
+      'Revise this slide so it shows unit economics, take-rate durability, and CAC/payback assumptions.',
+  },
+  go_to_market: {
+    what_is_missing:
+      'The slide should show repeatable acquisition: channels, CAC/payback, funnel conversion, channel efficiency, and the sales/marketing motion.',
+    recommended:
+      'Revise this slide so it shows channel efficiency and CAC/payback for a repeatable acquisition motion.',
+  },
+  roadmap: {
+    what_is_missing:
+      'The slide should show sequencing tied to customer value, business value, defensibility, and the next financing milestone.',
+    recommended:
+      'Revise this slide so the roadmap connects milestones to customer value, defensibility, and the next financing milestone.',
+  },
+  ask: {
+    what_is_missing:
+      'The slide should state the raise amount, instrument, use of funds, runway, and the milestone path to the next value inflection.',
+    recommended:
+      'Revise this slide so it shows use of funds, runway, and the milestones the round will fund.',
+  },
+  financials: {
+    what_is_missing: FINANCIALS_MISSING,
+    recommended: FINANCIALS_RECOMMENDED,
+  },
+};
+
+// Slide letter grade -> founder-facing assessment label (includes "Not answered"
+// for the weakest grades, which the communication-dimension mapping does not).
+const SLIDE_GRADE_ASSESSMENT = {
+  A: 'Strong',
+  B: 'Mostly answered',
+  C: 'Partially answered',
+  D: 'Under-supported',
+  E: 'Not answered',
+  F: 'Not answered',
+};
+
+function _slideAssessment(grade) {
+  const g = String(grade || '').trim().toUpperCase()[0];
+  return SLIDE_GRADE_ASSESSMENT[g] || 'Partially answered';
+}
+
+// A recognized framework topic is anything with a rubric or an investor
+// decision, excluding non-framework / recap buckets. Only non-framework slides
+// may fall through to "Not assessed".
+function _isFrameworkType(typeKey) {
+  if (!typeKey) return false;
+  if (['other', 'unknown', 'appendix', 'investment_highlights'].includes(typeKey)) return false;
+  return Boolean(TYPE_TO_RUBRIC_KEY[typeKey]) || Boolean(TYPE_TO_INVESTOR_DECISION[typeKey]);
+}
+
+function _hasUsableQuestions(questions) {
+  if (!Array.isArray(questions) || questions.length === 0) return false;
+  return questions.some(
+    (q) =>
+      q &&
+      (typeof q.score === 'number' ||
+        (q.assessment && String(q.assessment).trim()) ||
+        (q.gap && String(q.gap).trim()))
+  );
+}
+
+function _topicExpectation(typeKey, rubricKey) {
+  return TOPIC_EXPECTATIONS[rubricKey] || TOPIC_EXPECTATIONS[typeKey] || null;
+}
+
+// Contact is logistical: assess completeness, never ask for investor proof.
+function _contactFeedback(questions) {
+  const scored = (questions || []).filter((q) => q && typeof q.score === 'number');
+  const hasInfo = scored.length === 0 ? true : scored.some((q) => q.score >= 3);
+  return {
+    assessment: hasInfo ? 'Strong' : 'Mostly answered',
+    what_works: hasInfo
+      ? 'Contact details are provided so investors can follow up.'
+      : 'This is a logistics slide whose job is to make follow-up easy.',
+    what_is_missing: hasInfo
+      ? ''
+      : 'Add clear contact details (email, and ideally phone or website) so investors can reach you.',
+    recommended: hasInfo
+      ? ''
+      : 'Include a direct email and the best way to continue the conversation.',
+    issue_type: 'None',
+  };
+}
+
+// Step 2/3: build feedback from already-computed rubric question results.
+function _feedbackFromQuestions(questions, grade, typeKey, rubricKey) {
+  const scored = questions.filter((q) => q && typeof q.score === 'number');
+  const strong = scored.filter((q) => q.score >= 4).sort((a, b) => b.score - a.score);
+  const weak = scored.filter((q) => q.score <= 2).sort((a, b) => a.score - b.score);
+  const partial = scored.filter((q) => q.score === 3);
+  const gradeInitial = String(grade || '').trim().toUpperCase()[0];
+
+  // What works: prefer the strongest question's evaluator rationale (real,
+  // already-generated evaluation — not invented). Otherwise safe wording.
+  const topStrong = strong.find((q) => q.assessment && String(q.assessment).trim());
+  let whatWorks;
+  if (topStrong) {
+    whatWorks = String(topStrong.assessment).trim();
+  } else if (['A', 'B', 'C'].includes(gradeInitial)) {
+    whatWorks = 'The slide addresses its core investor questions for this section.';
+  } else {
+    whatWorks = 'The slide is present, but it does not yet provide strong evidence for this section.';
+  }
+
+  // A gap exists if anything scored weak/partial, or the grade is below A.
+  const gapExists = weak.length > 0 || partial.length > 0 || gradeInitial !== 'A';
+  let missing = '';
+  let recommended = '';
+  if (gapExists) {
+    const exp = _topicExpectation(typeKey, rubricKey);
+    if (exp) {
+      missing = exp.what_is_missing;
+      recommended = exp.recommended;
+    } else {
+      const weakSet = weak.length ? weak : partial;
+      const texts = weakSet
+        .map((q) => (q.gap && q.gap !== 'None' && String(q.gap).trim() ? q.gap : q.question))
+        .filter(Boolean);
+      missing = texts.length
+        ? `Investors still need stronger answers to: ${texts.slice(0, 3).join('; ')}.`
+        : '';
+      const weakest = weakSet[0];
+      recommended = weakest
+        ? weakest.fix && weakest.fix !== 'None' && String(weakest.fix).trim()
+          ? weakest.fix
+          : `Add evidence that directly answers: ${weakest.question}`
+        : '';
+    }
+  }
+
+  const issue_type = !missing
+    ? 'None'
+    : gradeInitial === 'E' || gradeInitial === 'F'
+    ? 'Substance'
+    : 'Evidence';
+
+  return {
+    assessment: _slideAssessment(grade),
+    what_works: whatWorks,
+    what_is_missing: missing,
+    recommended,
+    issue_type,
+  };
+}
+
+// Step 4: recognized framework slide with no V1 feedback and no usable question
+// data. Never "Not assessed" — list the rubric questions it fails to answer.
+function _frameworkWeakFallback(typeKey, rubricKey, grade) {
+  const topic = TYPE_DISPLAY_NAMES[typeKey] || 'this section';
+  const rubricQs = rubricKey && RUBRICS[rubricKey] ? RUBRICS[rubricKey].map((q) => q.question) : [];
+  const questionList = rubricQs.length
+    ? rubricQs
+    : TYPE_TO_INVESTOR_DECISION[typeKey]
+    ? [TYPE_TO_INVESTOR_DECISION[typeKey]]
+    : [];
+  const g = String(grade || '').trim().toUpperCase()[0];
+  const assessment = g === 'E' || g === 'F' ? 'Not answered' : 'Under-supported';
+  const missing = questionList.length
+    ? `The slide does not clearly answer: ${questionList.slice(0, 3).join('; ')}.`
+    : 'The slide does not provide enough usable evidence for this section.';
+  return {
+    assessment,
+    what_works:
+      'The slide is present, but it does not provide enough usable evidence to show that this topic is answered well.',
+    what_is_missing: missing,
+    recommended: `Revise this slide so it directly answers the investor questions for ${topic}.`,
+    issue_type: g === 'E' || g === 'F' ? 'Substance' : 'Evidence',
+  };
+}
+
 const _normType = (t) => String(t || '').toLowerCase().replace(/\s+/g, '_');
 
 function _buildSlideLevelFeedback(v1Report, companyName, productBuilt, analyzedSlides) {
@@ -515,7 +727,9 @@ function _buildSlideLevelFeedback(v1Report, companyName, productBuilt, analyzedS
 
     const slideNumber = canonSlide.slide_number;
     const typeKey = _normType(useAnalyzed ? canonSlide.type : v1 && v1.type);
+    const rubricKey = TYPE_TO_RUBRIC_KEY[typeKey] || null;
     const grade = (v1 && v1.grade) || (useAnalyzed ? canonSlide.grade : null) || null;
+    const questions = useAnalyzed && Array.isArray(canonSlide.questions) ? canonSlide.questions : [];
     const hasV1Feedback = Boolean(v1 && (v1.investor_insight || v1.missing_investor_proof));
 
     let effectiveTypeKey = typeKey;
@@ -524,17 +738,45 @@ function _buildSlideLevelFeedback(v1Report, companyName, productBuilt, analyzedS
     let whatWorks;
     let missing;
     let recommended;
+    let issueType = 'Evidence';
     let notAssessed = false;
 
+    // Feedback hierarchy (Step 2): V1 overlay → rubric-question data → framework
+    // weak-answer fallback → "Not assessed" only for unknown/non-framework slides.
     if (hasV1Feedback) {
-      // B. Overlay the model's slide feedback when present.
+      // 1. Overlay the model's substantive slide feedback when present.
       whatWorks = v1.investor_insight || '';
       missing = v1.missing_investor_proof || '';
       recommended = v1.missing_investor_proof || '';
       assessment = _assessmentFromGrade(grade);
+      issueType = missing ? 'Evidence' : 'None';
+    } else if (typeKey === 'contact') {
+      // Contact is logistical — assess completeness, not investor proof.
+      const c = _contactFeedback(questions);
+      assessment = c.assessment;
+      whatWorks = c.what_works;
+      missing = c.what_is_missing;
+      recommended = c.recommended;
+      issueType = c.issue_type;
+    } else if (_hasUsableQuestions(questions)) {
+      // 2. Assess the slide against its rubric questions using existing results.
+      const f = _feedbackFromQuestions(questions, grade, typeKey, rubricKey);
+      assessment = f.assessment;
+      whatWorks = f.what_works;
+      missing = f.what_is_missing;
+      recommended = f.recommended;
+      issueType = f.issue_type;
+    } else if (_isFrameworkType(typeKey)) {
+      // 3. Recognized framework slide but no usable data → weak-answer fallback
+      //    listing the rubric questions it fails to answer (never "Not assessed").
+      const f = _frameworkWeakFallback(typeKey, rubricKey, grade);
+      assessment = f.assessment;
+      whatWorks = f.what_works;
+      missing = f.what_is_missing;
+      recommended = f.recommended;
+      issueType = f.issue_type;
     } else {
-      // C. Conservative fallback: the slide was in the deck but was not
-      //    individually assessed. Never invent claims about content quality.
+      // 4. Truly unknown / unmapped / non-framework slide.
       notAssessed = true;
       assessment = 'Not assessed';
       whatWorks =
@@ -542,6 +784,7 @@ function _buildSlideLevelFeedback(v1Report, companyName, productBuilt, analyzedS
       missing = 'Review this slide manually to confirm it supports the investor narrative.';
       recommended =
         'Ensure this slide clearly answers its intended investor question and avoids duplicating earlier content.';
+      issueType = 'None';
     }
 
     // F. First-slide cover remapping. A slide 1 that upstream typed as
@@ -562,11 +805,13 @@ function _buildSlideLevelFeedback(v1Report, companyName, productBuilt, analyzedS
       missing = COVER_MISSING;
       recommended = COVER_RECOMMENDED;
       assessment = _assessmentFromGrade(grade);
+      issueType = 'Evidence';
       notAssessed = false;
     }
 
-    // The remaining polish only refines genuine V1-derived feedback. It is never
-    // applied to a "Not assessed" fallback (that would fabricate specific gaps).
+    // The remaining polish refines assessed feedback (V1, rubric-derived, or
+    // framework fallback). It is never applied to a "Not assessed" fallback
+    // (that would fabricate specific gaps) or to the cover remap above.
     if (!notAssessed && !coverOverride) {
       // Cover/company-name false negative on an already-typed cover/contact.
       if (
@@ -607,7 +852,7 @@ function _buildSlideLevelFeedback(v1Report, companyName, productBuilt, analyzedS
       what_works: whatWorks,
       what_is_missing: missing,
       recommended_improvement: recommended,
-      issue_type: notAssessed ? 'None' : missing ? 'Evidence' : 'None',
+      issue_type: notAssessed ? 'None' : missing ? issueType : 'None',
     };
   });
 }
