@@ -45,6 +45,34 @@ const TYPE_TO_INVESTOR_DECISION = {
   contact: 'How do I continue the conversation with this company?',
 };
 
+// Display names for framework/slide-type keys. Analyzed slides carry the raw
+// inferred-type key (e.g. `business_model`); this maps them to founder-facing
+// section titles for the V2 slide list.
+const TYPE_DISPLAY_NAMES = {
+  cover: 'Cover',
+  problem: 'Problem',
+  solution: 'Solution',
+  product: 'Product',
+  market: 'Market',
+  market_opportunity: 'Market',
+  business_model: 'Business Model',
+  traction: 'Traction',
+  competition: 'Competition',
+  moat: 'Moat',
+  team: 'Team',
+  financials: 'Financials',
+  ask: 'Ask',
+  funding: 'Funding',
+  go_to_market: 'Go-to-Market',
+  why_now: 'Why Now',
+  roadmap: 'Roadmap',
+  product_roadmap: 'Product Roadmap',
+  vision: 'Vision',
+  contact: 'Contact',
+  appendix: 'Appendix',
+  other: 'Other',
+};
+
 const V2_GRADE_LETTERS = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'];
 const SCORE_LABEL = { 1: 'Very Weak', 2: 'Weak', 3: 'Adequate', 4: 'Strong', 5: 'Excellent' };
 // Quality dimension letter -> 1–5 band (label meaning aligned: B=Strong, C=Adequate).
@@ -432,90 +460,154 @@ const FINANCIALS_MISSING =
 const FINANCIALS_RECOMMENDED =
   'Show the assumptions behind the projections and the bridge from the current run rate to the projected run rate.';
 
-function _buildSlideLevelFeedback(v1Report, companyName, productBuilt) {
-  // NOTE: V2 can only map slides that are present in `v1_report.slides`. If the
-  // upstream V1 synthesis omits deck slides from its output (e.g. a 17-page deck
-  // yielding 15 slide entries), those slides are simply not available here — V2
-  // does not invent slides, so this list mirrors whatever v1_report.slides holds.
-  const slides = (v1Report && v1Report.slides) || [];
+const _normType = (t) => String(t || '').toLowerCase().replace(/\s+/g, '_');
 
-  // Does the deck have a dedicated Financials slide? Used so a Business Model
-  // slide is not told "broader financial projections" are missing when the
+function _buildSlideLevelFeedback(v1Report, companyName, productBuilt, analyzedSlides) {
+  const v1Slides = (v1Report && v1Report.slides) || [];
+
+  // Canonical slide list: prefer the analyzed slide list (fullReport.slides),
+  // which contains every evaluated deck page, so V2 slide count / order /
+  // identity no longer depend on how many slides V1 synthesis happened to
+  // return. Fall back to v1_report.slides for older reports / partial content
+  // where the analyzed list is unavailable (backward compatibility).
+  const useAnalyzed = Array.isArray(analyzedSlides) && analyzedSlides.length > 0;
+  const source = useAnalyzed ? analyzedSlides : v1Slides;
+
+  // Index V1 feedback by slide number so it can be overlaid onto the canonical
+  // slides. First substantive entry wins; later duplicate slide numbers are
+  // ignored deterministically.
+  const v1ByNumber = new Map();
+  for (const s of v1Slides) {
+    const n = Number(s.slide_number);
+    if (!Number.isFinite(n) || v1ByNumber.has(n)) continue;
+    v1ByNumber.set(n, s);
+  }
+
+  // Does the deck have a dedicated Financials slide anywhere? Used so a Business
+  // Model slide is not told "broader financial projections" are missing when the
   // Financials slide already covers them.
-  const hasFinancials = slides.some(
-    (s) => String(s.type || '').toLowerCase().replace(/\s+/g, '_') === 'financials'
-  );
+  const hasFinancials = source.some((s) => _normType(s.type) === 'financials');
 
-  return slides.map((s) => {
-    const typeKey = String(s.type || '').toLowerCase().replace(/\s+/g, '_');
-    let missing = s.missing_investor_proof || '';
-    let recommended = s.missing_investor_proof || '';
-    let whatWorks = s.investor_insight || '';
-    let displayTitle = s.type || 'Section';
+  // Deduplicate the canonical list by slide number (keep the first entry), then
+  // sort ascending so output order is stable regardless of input order.
+  const seen = new Set();
+  const ordered = [];
+  for (const s of source) {
+    const n = Number(s.slide_number);
+    const key = Number.isFinite(n) ? n : `_pos_${ordered.length}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    ordered.push(s);
+  }
+  ordered.sort((a, b) => {
+    const an = Number(a.slide_number);
+    const bn = Number(b.slide_number);
+    if (!Number.isFinite(an) && !Number.isFinite(bn)) return 0;
+    if (!Number.isFinite(an)) return 1;
+    if (!Number.isFinite(bn)) return -1;
+    return an - bn;
+  });
 
-    // A. Cover mapping. A first slide that upstream typed as `other`/unknown is
-    //    almost always the deck cover. When it shows cover-like signals (a
-    //    detectable company name, or cover/round language), map it to Cover, use
-    //    the Cover investor decision, and give cover feedback rather than calling
-    //    it non-informative.
-    const isFirstSlide = Number(s.slide_number) === 1;
+  return ordered.map((canonSlide) => {
+    // Overlay V1 feedback matched by slide number. In fallback mode the canonical
+    // entry already IS a V1 slide, so it is its own overlay.
+    const v1 = useAnalyzed ? v1ByNumber.get(Number(canonSlide.slide_number)) : canonSlide;
+
+    const slideNumber = canonSlide.slide_number;
+    const typeKey = _normType(useAnalyzed ? canonSlide.type : v1 && v1.type);
+    const grade = (v1 && v1.grade) || (useAnalyzed ? canonSlide.grade : null) || null;
+    const hasV1Feedback = Boolean(v1 && (v1.investor_insight || v1.missing_investor_proof));
+
+    let effectiveTypeKey = typeKey;
+    let displayTitle = TYPE_DISPLAY_NAMES[typeKey] || (v1 && v1.type) || 'Section';
+    let assessment;
+    let whatWorks;
+    let missing;
+    let recommended;
+    let notAssessed = false;
+
+    if (hasV1Feedback) {
+      // B. Overlay the model's slide feedback when present.
+      whatWorks = v1.investor_insight || '';
+      missing = v1.missing_investor_proof || '';
+      recommended = v1.missing_investor_proof || '';
+      assessment = _assessmentFromGrade(grade);
+    } else {
+      // C. Conservative fallback: the slide was in the deck but was not
+      //    individually assessed. Never invent claims about content quality.
+      notAssessed = true;
+      assessment = 'Not assessed';
+      whatWorks =
+        'This slide was present in the deck but was not individually assessed in the generated slide feedback.';
+      missing = 'Review this slide manually to confirm it supports the investor narrative.';
+      recommended =
+        'Ensure this slide clearly answers its intended investor question and avoids duplicating earlier content.';
+    }
+
+    // F. First-slide cover remapping. A slide 1 that upstream typed as
+    //    other/unknown is almost always the cover; when corroborated by a
+    //    detectable company name or cover-like language, map it to Cover with
+    //    cover feedback rather than leaving it Other / non-informative. This is
+    //    deterministic (position + company name), not fabricated content.
+    const coverText = `${(v1 && v1.investor_insight) || ''} ${(v1 && v1.missing_investor_proof) || ''}`;
+    const isFirstSlide = Number(slideNumber) === 1;
     const untyped = typeKey === '' || typeKey === 'other' || typeKey === 'unknown';
-    const coverText = `${s.investor_insight || ''} ${s.missing_investor_proof || ''}`;
     const coverOverride =
       isFirstSlide && untyped && (Boolean(companyName) || COVER_SIGNAL_RE.test(coverText));
 
-    const effectiveTypeKey = coverOverride ? 'cover' : typeKey;
-
     if (coverOverride) {
+      effectiveTypeKey = 'cover';
       displayTitle = 'Cover';
       whatWorks = COVER_WORKS;
       missing = COVER_MISSING;
       recommended = COVER_RECOMMENDED;
+      assessment = _assessmentFromGrade(grade);
+      notAssessed = false;
     }
 
-    // Fix cover/company-name false negatives on an already-typed cover/contact:
-    // if the company name is detectable in the deck, do not claim it is missing.
-    if (
-      !coverOverride &&
-      (effectiveTypeKey === 'cover' || effectiveTypeKey === 'contact') &&
-      companyName &&
-      NAME_MISSING_RE.test(missing)
-    ) {
-      missing = 'The positioning line could be sharper.';
-      recommended = 'Make the target customer or primary outcome more specific on the cover.';
-    }
+    // The remaining polish only refines genuine V1-derived feedback. It is never
+    // applied to a "Not assessed" fallback (that would fabricate specific gaps).
+    if (!notAssessed && !coverOverride) {
+      // Cover/company-name false negative on an already-typed cover/contact.
+      if (
+        (effectiveTypeKey === 'cover' || effectiveTypeKey === 'contact') &&
+        companyName &&
+        NAME_MISSING_RE.test(missing)
+      ) {
+        missing = 'The positioning line could be sharper.';
+        recommended = 'Make the target customer or primary outcome more specific on the cover.';
+      }
 
-    // Fix product-maturity false negatives: if the deck shows a built, shipping
-    // product, do not say maturity is unclear — focus on delivered value.
-    if (effectiveTypeKey === 'product' && productBuilt && PRODUCT_MATURITY_RE.test(missing)) {
-      missing = 'Investors need more evidence that the product consistently delivers the promised value.';
-      recommended = 'Add evidence of product differentiation, reliability, repeat usage, or workflow depth.';
-    }
+      // Product-maturity false negative when the deck shows a built product.
+      if (effectiveTypeKey === 'product' && productBuilt && PRODUCT_MATURITY_RE.test(missing)) {
+        missing = 'Investors need more evidence that the product consistently delivers the promised value.';
+        recommended = 'Add evidence of product differentiation, reliability, repeat usage, or workflow depth.';
+      }
 
-    // C. Business Model: don't claim broader financial projections are missing
-    //    when a Financials slide exists — prefer revenue-mechanics proof asks.
-    if (effectiveTypeKey === 'business_model' && hasFinancials && FIN_PROJECTION_RE.test(missing)) {
-      missing = BIZMODEL_MISSING;
-      recommended = BIZMODEL_RECOMMENDED;
-    }
+      // Business Model: don't claim broader financial projections are missing
+      // when a Financials slide exists — prefer revenue-mechanics proof asks.
+      if (effectiveTypeKey === 'business_model' && hasFinancials && FIN_PROJECTION_RE.test(missing)) {
+        missing = BIZMODEL_MISSING;
+        recommended = BIZMODEL_RECOMMENDED;
+      }
 
-    // D. Financials: focus missing proof on the assumptions and the run-rate
-    //    bridge behind the projections. Only fill when upstream text is empty or
-    //    non-informative, so specific, useful feedback is never clobbered.
-    if (effectiveTypeKey === 'financials' && (!missing || NON_INFORMATIVE_RE.test(missing))) {
-      missing = FINANCIALS_MISSING;
-      recommended = FINANCIALS_RECOMMENDED;
+      // Financials: focus missing proof on the assumptions and the run-rate
+      // bridge. Only fill when upstream text is empty or non-informative.
+      if (effectiveTypeKey === 'financials' && (!missing || NON_INFORMATIVE_RE.test(missing))) {
+        missing = FINANCIALS_MISSING;
+        recommended = FINANCIALS_RECOMMENDED;
+      }
     }
 
     return {
-      slide_number: s.slide_number,
+      slide_number: slideNumber,
       slide_title_or_section: displayTitle,
       investor_decision: TYPE_TO_INVESTOR_DECISION[effectiveTypeKey] || '',
-      assessment: _assessmentFromGrade(s.grade),
+      assessment,
       what_works: whatWorks,
       what_is_missing: missing,
       recommended_improvement: recommended,
-      issue_type: missing ? 'Evidence' : 'None',
+      issue_type: notAssessed ? 'None' : missing ? 'Evidence' : 'None',
     };
   });
 }
@@ -634,7 +726,15 @@ function assembleReportV2(inputs = {}) {
   const productBuilt = Boolean(
     investmentCase && investmentCase.detected && investmentCase.detected.product_built
   );
-  const slide_level_feedback = _buildSlideLevelFeedback(v1Report, companyName, productBuilt);
+  // Analyzed slides (every evaluated deck page) are the canonical source for V2
+  // slide count/order/identity; V1 feedback is overlaid when available.
+  const analyzedSlides = (fullReport && Array.isArray(fullReport.slides) && fullReport.slides) || null;
+  const slide_level_feedback = _buildSlideLevelFeedback(
+    v1Report,
+    companyName,
+    productBuilt,
+    analyzedSlides
+  );
   const suggested_next_steps = _buildSuggestedNextSteps(constraint, priority_improvements);
   const save_share_upgrade = _buildSaveShareUpgrade();
 
