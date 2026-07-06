@@ -403,33 +403,116 @@ const NAME_MISSING_RE = /company\s*name|company['’]s\s+name|missing\s+.*\bname
 // deck clearly shows a built, shipping product.
 const PRODUCT_MATURITY_RE = /product\s+maturity|maturity\s+level|maturity\s+is\s+unclear|how\s+mature|stage\s+of\s+(?:the\s+)?product|whether\s+the\s+product\s+is\s+built|level\s+of\s+product\s+maturity/i;
 
+// Cover-like signals for a first slide. V2 slide objects carry only
+// type/grade/investor_insight/missing_investor_proof (see v1Synthesis
+// buildV1Report) — no raw slide text — so cover intent is inferred from those
+// narrative fields plus positional and company-name context.
+const COVER_SIGNAL_RE = /pitch\s*deck|seed\s*round|pre-?seed|series\s+[a-e]\b|\braising\b|one[-\s]?liner|positioning|tag\s*line|\bcover\b|\blike\s+\w+,?\s+but\s+for\b/i;
+
+// Claims that broader financial projections are missing — a false negative on a
+// Business Model slide when the deck has a dedicated Financials slide elsewhere.
+const FIN_PROJECTION_RE = /financial\s+projection|broader\s+financial|financial\s+forecast|financial\s+model|revenue\s+projection|\bprojections?\b/i;
+
+// Non-informative / low-signal phrasing we replace with focused proof asks.
+const NON_INFORMATIVE_RE = /non[-\s]?informative|no\s+(?:investor[-\s]?relevant\s+)?information|not\s+informative|provides?\s+(?:little|no)\b|lacks?\s+content|no\s+meaningful\s+content/i;
+
+// Product-owned founder-facing copy (supplied by the product owner in the task
+// spec; assembled here, not authored by the mapping layer).
+const COVER_WORKS =
+  'The cover quickly explains the company concept, target category, and financing context.';
+const COVER_MISSING =
+  'The positioning could be sharper about the target customer or primary outcome.';
+const COVER_RECOMMENDED = 'Make the one-line positioning more specific and investor-ready.';
+const BIZMODEL_MISSING =
+  'Investors need more detail on unit economics, margin assumptions, take-rate durability, CAC/payback, or transaction volume assumptions.';
+const BIZMODEL_RECOMMENDED =
+  'Investors need to understand whether the revenue mechanics can support an attractive business at scale.';
+const FINANCIALS_MISSING =
+  'Investors need the assumptions behind revenue and user/detailer growth, take rate, transaction volume, expenses/burn/runway, CAC/payback, and the path from the current run rate to the projected run rate.';
+const FINANCIALS_RECOMMENDED =
+  'Show the assumptions behind the projections and the bridge from the current run rate to the projected run rate.';
+
 function _buildSlideLevelFeedback(v1Report, companyName, productBuilt) {
+  // NOTE: V2 can only map slides that are present in `v1_report.slides`. If the
+  // upstream V1 synthesis omits deck slides from its output (e.g. a 17-page deck
+  // yielding 15 slide entries), those slides are simply not available here — V2
+  // does not invent slides, so this list mirrors whatever v1_report.slides holds.
   const slides = (v1Report && v1Report.slides) || [];
+
+  // Does the deck have a dedicated Financials slide? Used so a Business Model
+  // slide is not told "broader financial projections" are missing when the
+  // Financials slide already covers them.
+  const hasFinancials = slides.some(
+    (s) => String(s.type || '').toLowerCase().replace(/\s+/g, '_') === 'financials'
+  );
+
   return slides.map((s) => {
     const typeKey = String(s.type || '').toLowerCase().replace(/\s+/g, '_');
     let missing = s.missing_investor_proof || '';
     let recommended = s.missing_investor_proof || '';
+    let whatWorks = s.investor_insight || '';
+    let displayTitle = s.type || 'Section';
 
-    // Fix cover/company-name false negatives: if the company name is detectable
-    // in the deck, do not claim the cover is missing it. Use safer wording.
-    if ((typeKey === 'cover' || typeKey === 'contact') && companyName && NAME_MISSING_RE.test(missing)) {
+    // A. Cover mapping. A first slide that upstream typed as `other`/unknown is
+    //    almost always the deck cover. When it shows cover-like signals (a
+    //    detectable company name, or cover/round language), map it to Cover, use
+    //    the Cover investor decision, and give cover feedback rather than calling
+    //    it non-informative.
+    const isFirstSlide = Number(s.slide_number) === 1;
+    const untyped = typeKey === '' || typeKey === 'other' || typeKey === 'unknown';
+    const coverText = `${s.investor_insight || ''} ${s.missing_investor_proof || ''}`;
+    const coverOverride =
+      isFirstSlide && untyped && (Boolean(companyName) || COVER_SIGNAL_RE.test(coverText));
+
+    const effectiveTypeKey = coverOverride ? 'cover' : typeKey;
+
+    if (coverOverride) {
+      displayTitle = 'Cover';
+      whatWorks = COVER_WORKS;
+      missing = COVER_MISSING;
+      recommended = COVER_RECOMMENDED;
+    }
+
+    // Fix cover/company-name false negatives on an already-typed cover/contact:
+    // if the company name is detectable in the deck, do not claim it is missing.
+    if (
+      !coverOverride &&
+      (effectiveTypeKey === 'cover' || effectiveTypeKey === 'contact') &&
+      companyName &&
+      NAME_MISSING_RE.test(missing)
+    ) {
       missing = 'The positioning line could be sharper.';
       recommended = 'Make the target customer or primary outcome more specific on the cover.';
     }
 
     // Fix product-maturity false negatives: if the deck shows a built, shipping
     // product, do not say maturity is unclear — focus on delivered value.
-    if (typeKey === 'product' && productBuilt && PRODUCT_MATURITY_RE.test(missing)) {
+    if (effectiveTypeKey === 'product' && productBuilt && PRODUCT_MATURITY_RE.test(missing)) {
       missing = 'Investors need more evidence that the product consistently delivers the promised value.';
       recommended = 'Add evidence of product differentiation, reliability, repeat usage, or workflow depth.';
     }
 
+    // C. Business Model: don't claim broader financial projections are missing
+    //    when a Financials slide exists — prefer revenue-mechanics proof asks.
+    if (effectiveTypeKey === 'business_model' && hasFinancials && FIN_PROJECTION_RE.test(missing)) {
+      missing = BIZMODEL_MISSING;
+      recommended = BIZMODEL_RECOMMENDED;
+    }
+
+    // D. Financials: focus missing proof on the assumptions and the run-rate
+    //    bridge behind the projections. Only fill when upstream text is empty or
+    //    non-informative, so specific, useful feedback is never clobbered.
+    if (effectiveTypeKey === 'financials' && (!missing || NON_INFORMATIVE_RE.test(missing))) {
+      missing = FINANCIALS_MISSING;
+      recommended = FINANCIALS_RECOMMENDED;
+    }
+
     return {
       slide_number: s.slide_number,
-      slide_title_or_section: s.type || 'Section',
-      investor_decision: TYPE_TO_INVESTOR_DECISION[typeKey] || '',
+      slide_title_or_section: displayTitle,
+      investor_decision: TYPE_TO_INVESTOR_DECISION[effectiveTypeKey] || '',
       assessment: _assessmentFromGrade(s.grade),
-      what_works: s.investor_insight || '',
+      what_works: whatWorks,
       what_is_missing: missing,
       recommended_improvement: recommended,
       issue_type: missing ? 'Evidence' : 'None',
@@ -446,10 +529,16 @@ function _buildSuggestedNextSteps(constraint, priorityImprovements) {
     });
   }
   if (constraint.issue_type === 'Substance') {
-    steps.push({
-      title: 'Strengthen the investment case',
-      detail: constraint.summary,
-    });
+    // Suppress the generic "Strengthen the investment case" step when specific
+    // priority improvements exist — those specific priorities are the actionable
+    // next steps and are appended below. Only fall back to the generic step when
+    // there are no specific priorities to lead with.
+    if (!priorityImprovements || priorityImprovements.length === 0) {
+      steps.push({
+        title: 'Strengthen the investment case',
+        detail: constraint.summary,
+      });
+    }
   }
   if (constraint.issue_type === 'Evidence') {
     steps.push({
