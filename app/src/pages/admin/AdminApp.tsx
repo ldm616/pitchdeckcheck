@@ -12,6 +12,7 @@ import {
   deleteCalibrationDeck,
 } from '../../lib/api'
 import { ROUTES } from '../../lib/routes'
+import { V2Report } from '../../components/report'
 import type {
   ReportListItem,
   CalibrationDeck,
@@ -641,41 +642,48 @@ export function AdminApp() {
               padding: '48px 40px',
             }}
           >
-            {/* Simple report display for admin - uses same data */}
-            {(() => {
-              const grade = report.overall_grade || report.v1_report?.overall.grade || '?'
-              const gradeColor = grade.startsWith('A') ? '#22c55e'
-                : grade.startsWith('B') ? '#84cc16'
-                : grade.startsWith('C') ? '#eab308'
-                : grade.startsWith('D') ? '#f97316'
-                : '#ef4444'
+            {/* Render the full canonical report when present; otherwise fall
+                back to a minimal grade + summary display for older reports. */}
+            {report.report_v2 ? (
+              <V2Report report={report.report_v2} />
+            ) : (
+              <>
+                {(() => {
+                  const grade = report.overall_grade || report.v1_report?.overall.grade || '?'
+                  const gradeColor = grade.startsWith('A') ? '#22c55e'
+                    : grade.startsWith('B') ? '#84cc16'
+                    : grade.startsWith('C') ? '#eab308'
+                    : grade.startsWith('D') ? '#f97316'
+                    : '#ef4444'
 
-              return (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                  <span
-                    style={{
-                      width: '10px',
-                      height: '10px',
-                      borderRadius: '50%',
-                      backgroundColor: gradeColor,
-                    }}
-                  />
-                  <span style={{ fontSize: '24px', fontWeight: 600, color: '#111827' }}>
-                    {grade}
-                  </span>
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                    {slideCount || 0} slides
-                    {reportCreatedAt && ` · ${new Date(reportCreatedAt).toLocaleDateString()}`}
-                  </span>
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+                      <span
+                        style={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          backgroundColor: gradeColor,
+                        }}
+                      />
+                      <span style={{ fontSize: '24px', fontWeight: 600, color: '#111827' }}>
+                        {grade}
+                      </span>
+                      <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                        {slideCount || 0} slides
+                        {reportCreatedAt && ` · ${new Date(reportCreatedAt).toLocaleDateString()}`}
+                      </span>
+                    </div>
+                  )
+                })()}
+
+                <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                  <p style={{ margin: 0, fontSize: '15px', color: '#374151', lineHeight: 1.7 }}>
+                    {report.summary || report.v1_report?.overall.synthesis || 'No summary available'}
+                  </p>
                 </div>
-              )
-            })()}
-
-            <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-              <p style={{ margin: 0, fontSize: '15px', color: '#374151', lineHeight: 1.7 }}>
-                {report.summary || report.v1_report?.overall.synthesis || 'No summary available'}
-              </p>
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>
