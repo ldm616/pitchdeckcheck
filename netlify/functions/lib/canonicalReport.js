@@ -138,6 +138,23 @@ const SPECIFIC_TOPIC_NEUTRAL_LEAD = {
 // Evidence that a roadmap connects milestones to value/defensibility/financing.
 const ROADMAP_LINKAGE_RE = /(customer value|retention|repeat|defensib|moat|revenue growth|revenue|financing|next round|runway|milestone[^.]*fund|fund[^.]*milestone|value inflection)/i;
 
+// Slide types exempt from the "Strong must have no gap" cap. team/traction can
+// stay Strong with a forward-looking next-proof caveat; cover/contact are
+// logistical.
+const GAP_CAP_EXEMPT_TYPES = new Set(['cover', 'contact', 'team', 'traction']);
+
+// "No gap" phrasing — a criterion that is fully met. Such answers must not be
+// treated as missing evidence downstream.
+const NO_GAP_RE = /^\s*none\b|criterion\s+(?:met|fully\s+met)|fully\s+met|no\s+gap|not\s+applicable|none\s+needed/i;
+function _isNoGap(gap) {
+  const g = String(gap || '').trim();
+  return g === '' || NO_GAP_RE.test(g);
+}
+
+// Caveat language that disqualifies a statement from positive-only sections
+// (investor beliefs / recommended investment highlights).
+const CAVEAT_RE = /\b(however|but|lacks?|missing|without|not provided|unclear|though|although|yet to|need to|needs? more)\b/i;
+
 // Market is only fully answered when the size is externally sourced AND there is
 // a credible capture pathway. These detect those signals in the rubric evidence.
 const MARKET_SOURCING_RE = /(sourc|third[-\s]?party|citation|report|analyst|external|verified|per\s+\w+\s+data)/i;
@@ -311,6 +328,9 @@ function deriveAnswerLocation(score, present) {
 
 function buildQuestionCoverage(q, slideNumber, present) {
   const answered = present && typeof q.score === 'number' && q.score >= 1;
+  // A "criterion met" answer carries no real gap, so it must not surface as
+  // missing evidence or as an optional recommendation.
+  const noGap = _isNoGap(q.gap);
   return {
     question: q.question,
     answer_quality: deriveAnswerQuality(q.score),
@@ -318,9 +338,9 @@ function buildQuestionCoverage(q, slideNumber, present) {
     evidence_slide_numbers: answered ? [slideNumber] : [],
     evidence_summary: q.assessment || '',
     rationale: q.assessment || '',
-    missing_evidence: q.gap && q.gap !== 'None' ? q.gap : '',
+    missing_evidence: noGap ? '' : q.gap,
     investor_impact: q.investor_impact || '',
-    recommendation: q.fix && q.fix !== 'None' ? q.fix : '',
+    recommendation: noGap ? '' : q.fix && q.fix !== 'None' ? q.fix : '',
     confidence: q.confidence || 'medium',
   };
 }
@@ -586,6 +606,20 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
     issueType = 'Evidence';
   }
 
+  // Team: when founder-market fit is present (grade B or better), missing
+  // role-level accomplishments are a strengthening opportunity, not core
+  // investor friction — do not let them downgrade a strong team.
+  if (!notAssessed && effectiveTypeKey === 'team' && missing) {
+    const g = String(grade || '').trim().toUpperCase()[0];
+    if (g === 'A' || g === 'B') {
+      missing =
+        'The founders are directly relevant to this market; adding specific role-level outcomes or metrics would strengthen the case further.';
+      recommended =
+        "Add concrete outcomes or metrics from the founders' most relevant prior roles.";
+      issueType = 'None';
+    }
+  }
+
   // Prefer a concrete marketplace side label (e.g. "detailers") over generic
   // "supply" when the deck makes the side detectable.
   if (supplyLabel) {
@@ -594,14 +628,16 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
   }
 
   // Consistency cap: a slide with a real evidence/substance gap should not read
-  // as Strong. Cover and contact are logistical (their "missing" is a soft
-  // suggestion), so they are exempt.
+  // as Strong. Exemptions:
+  //  - cover/contact are logistical (their "missing" is a soft suggestion);
+  //  - team/traction can be Strong with a forward-looking next-proof caveat
+  //    (accomplishments / retention) without erasing strong founder-market fit
+  //    or strong concrete growth.
   if (
     assessment === 'Strong' &&
     missing &&
     (issueType === 'Evidence' || issueType === 'Substance') &&
-    effectiveTypeKey !== 'cover' &&
-    effectiveTypeKey !== 'contact'
+    !GAP_CAP_EXEMPT_TYPES.has(effectiveTypeKey)
   ) {
     assessment = 'Mostly answered';
   }
@@ -714,8 +750,9 @@ function deriveBelieve(evalSlides) {
       ) {
         const evidence = _beliefEvidence(q.assessment);
         const existing = byTopic.get(typeKey);
-        // Keep the highest-scoring grounded statement per topic.
-        if (evidence && (!existing || q.score > existing.score)) {
+        // Keep the highest-scoring grounded statement per topic. Beliefs are
+        // positive-only, so skip any evidence fragment carrying a caveat.
+        if (evidence && !CAVEAT_RE.test(evidence) && (!existing || q.score > existing.score)) {
           byTopic.set(typeKey, { evidence, score: q.score, priority: BELIEF_TOPIC_PRIORITY[typeKey], typeKey });
         }
       }

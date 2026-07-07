@@ -193,6 +193,15 @@ block an investment judgment.`;
   return _scoringCache;
 }
 
+// Topic-specific scoring calibration folded into the prompt for topics that the
+// generic guidance tends to mis-weight.
+const TOPIC_SCORING_GUIDANCE = {
+  team:
+    "Weight direct founder-market fit heavily: relevant companies, roles, and domain experience are strong evidence. Do NOT heavily penalize the absence of specific role-level accomplishments or metrics when the founders' backgrounds are clearly relevant to this business — treat that as a strengthening opportunity, not core investor friction. Directly relevant founder-market fit can score Strong even without detailed accomplishments.",
+  traction:
+    'Concrete growth across users, supply, and revenue over multiple periods is STRONG traction and can score Strong. Missing retention or repeat-usage evidence is an important next proof point, but it must not erase or heavily discount strong, concrete growth evidence.',
+}
+
 // --- prompt builder -----------------------------------------------------------
 
 /**
@@ -223,9 +232,15 @@ function buildArtifactSlidePrompt(slideType, rubricQuestions) {
     ? `\nVisual criterion: ${section.visual_criterion}`
     : '';
 
+  const topicGuidance = TOPIC_SCORING_GUIDANCE[String(slideType || '').toLowerCase()]
+    ? `\nTopic calibration: ${TOPIC_SCORING_GUIDANCE[String(slideType || '').toLowerCase()]}\n`
+    : '';
+
   return `You are an expert venture investor evaluating ONE slide of a startup pitch deck.
 
 You judge investor SIGNAL QUALITY — specificity, credibility, and evidence — not slide polish. Evaluate in two layers: (1) is this topic answered anywhere in the deck, and (2) does this specific slide contribute what it should?
+
+CROSS-SLIDE CONTEXT: Use the DECK OUTLINE provided in the user message. If a secondary question is clearly answered elsewhere in the deck (for example, a screenshot or workflow shown on a later Product slide), do NOT report it as missing from the deck and do NOT recommend adding it to this slide. Say it is answered elsewhere in the assessment, or omit that gap. Only report a gap when the deck as a whole does not answer it.
 
 FRAMEWORK SECTION: ${section.header}
 Primary investor question: ${section.primary_question}
@@ -233,7 +248,7 @@ Secondary diagnostic questions:
 ${secondary}${visualLine}
 Diagnostic framing: ${section.diagnostic_framing}
 What a stronger answer would add: ${section.fix_triggers}
-
+${topicGuidance}
 ${_getScoringExpectations()}
 
 INVESTOR QUESTIONS TO ANSWER (answer every one, keyed by its question_id):
@@ -259,6 +274,8 @@ Return STRICT JSON only, in this exact shape:
 Rules:
 - Provide exactly one answer object per question_id listed above.
 - score is an integer 0–5; do not use 0 or 1 if relevant content exists.
+- If a criterion is fully met, set gap to "None - criterion met", fix to "None needed", and investor_impact to "None - no investor friction".
+- Do not list something as a gap or recommend adding it to this slide if it is already answered clearly elsewhere in the deck.
 - Do not mention pattern names or internal rule names in the output.
 - Output valid JSON with a top-level "answers" array and nothing else.`;
 }

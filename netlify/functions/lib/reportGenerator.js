@@ -51,6 +51,10 @@ const {
 // Artifact-grounded slide evaluator — the default/primary evaluation path.
 const { buildArtifactSlidePrompt } = require('./artifactEvaluator')
 
+// A satisfied criterion ("None - criterion met" and variants) carries no real
+// gap; such answers are normalized so downstream never treats them as missing.
+const NO_GAP_ANSWER_RE = /^\s*none\b|criterion\s+(?:met|fully\s+met)|fully\s+met|no\s+gap|not\s+applicable|none\s+needed/i
+
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
 const REPORT_VERSION_V3 = 'report_v3.0.0-draft'
@@ -953,13 +957,24 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
       if (!['high', 'medium', 'low'].includes(confidence)) {
         confidence = score === 0 ? 'low' : score >= 4 ? 'high' : 'medium'
       }
+      let gap = a.gap || 'Unable to determine gap.'
+      let investorImpact = a.investor_impact || 'Unable to determine investor impact.'
+      let fix = a.fix || 'Unable to provide guidance.'
+      // Normalize "criterion met" answers so a satisfied criterion never carries
+      // a stray optional fix or investor-impact that downstream could read as a
+      // missing-evidence signal.
+      if (NO_GAP_ANSWER_RE.test(gap)) {
+        gap = 'None - criterion met'
+        fix = 'None needed'
+        investorImpact = 'None - no investor friction'
+      }
       return {
         question_id: a.question_id,
         score,
         assessment: a.assessment || 'Unable to assess.',
-        gap: a.gap || 'Unable to determine gap.',
-        investor_impact: a.investor_impact || 'Unable to determine investor impact.',
-        fix: a.fix || 'Unable to provide guidance.',
+        gap,
+        investor_impact: investorImpact,
+        fix,
         confidence,
       }
     })
@@ -1113,6 +1128,10 @@ For each thesis question, evaluate how well the COMPLETE DECK answers it. Look a
  * Focus on high-impact slides (traction, market, team, problem, solution) where
  * the deck shows genuine strength (score >= 4 on important questions).
  */
+// Caveat language that disqualifies a signal from the positive-only investment
+// highlights. Caveats belong in gaps / priority improvements / questions.
+const HIGHLIGHT_CAVEAT_RE = /\b(however|but|lacks?|missing|without|not provided|unclear|though|although)\b/i
+
 function generateRecommendedInvestmentHighlights(slideEvaluations, investmentThesis) {
   const highlights = []
 
@@ -1128,8 +1147,9 @@ function generateRecommendedInvestmentHighlights(slideEvaluations, investmentThe
     const strongQuestions = slide.questions.filter((q) => q.score >= 4 && q.confidence !== 'low')
 
     for (const q of strongQuestions) {
-      // Extract key insight from assessment
-      if (q.assessment && q.assessment !== 'Not addressed in slide') {
+      // Extract key insight from assessment. Skip caveated statements —
+      // investment highlights are positive-only.
+      if (q.assessment && q.assessment !== 'Not addressed in slide' && !HIGHLIGHT_CAVEAT_RE.test(q.assessment)) {
         highlights.push({
           category: slideType,
           signal: q.assessment,
@@ -1140,10 +1160,10 @@ function generateRecommendedInvestmentHighlights(slideEvaluations, investmentThe
     }
   }
 
-  // Add strong thesis elements (score >= 4)
+  // Add strong thesis elements (score >= 4), positive-only.
   if (investmentThesis) {
     for (const [key, thesis] of Object.entries(investmentThesis)) {
-      if (thesis.score >= 4) {
+      if (thesis.score >= 4 && thesis.verdict && !HIGHLIGHT_CAVEAT_RE.test(thesis.verdict)) {
         highlights.push({
           category: key.replace('why_', '').replace('_', ' '),
           signal: thesis.verdict,
