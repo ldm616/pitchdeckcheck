@@ -28,9 +28,6 @@ const {
   TYPE_DISPLAY_NAMES,
   TYPE_TO_INVESTOR_DECISION,
   TYPE_TO_RUBRIC_KEY,
-  COVER_WORKS,
-  COVER_MISSING,
-  COVER_RECOMMENDED,
   _toV2Letter,
   _normType,
   _isFrameworkType,
@@ -104,20 +101,24 @@ const SPECIFIC_TOPIC_GAP = {
     'investors still need to know whether the per-transaction economics stay attractive after acquisition, support, payment processing, refunds, and marketplace operations',
   go_to_market:
     'investors need evidence that one or two channels can repeatedly acquire users and supply at an acceptable CAC and payback',
-  ask: 'investors still need an explicit use-of-funds and runway bridge showing why this round reaches the next value inflection',
+  ask: 'investors still need clearer use-of-funds detail, a runway bridge, and milestone timing showing why this round reaches the next value inflection',
   funding:
-    'investors still need an explicit use-of-funds and runway bridge showing why this round reaches the next value inflection',
+    'investors still need clearer use-of-funds detail, a runway bridge, and milestone timing showing why this round reaches the next value inflection',
   financials:
     'investors need the bridge from the current run rate to the target: transaction volume, take rate, user and supply growth, CAC/payback, burn, and operating assumptions',
+  product:
+    'investors need proof that the product delivers value: activation, conversion, completed transactions, repeat usage, reliability, or clear preference over alternatives',
 };
 const SPECIFIC_TOPIC_RECOMMENDED = {
   business_model:
     'Show whether the per-transaction economics remain attractive after all marketplace and acquisition costs.',
   go_to_market: 'Show CAC and payback for one or two channels that can scale repeatably.',
-  ask: 'Add an explicit use-of-funds and runway bridge to the next value inflection.',
-  funding: 'Add an explicit use-of-funds and runway bridge to the next value inflection.',
+  ask: 'Add an explicit use-of-funds and runway bridge, with milestone timing, to the next value inflection.',
+  funding: 'Add an explicit use-of-funds and runway bridge, with milestone timing, to the next value inflection.',
   financials:
     'Show the bridge from the current run rate to the target with the underlying growth and cost assumptions.',
+  product:
+    'Add proof of value delivery — activation, completed transactions, repeat usage, or reliability — beyond describing what the product does.',
 };
 // Neutral lead-ins for the specific gap wording when no strong grounded evidence
 // exists to lead with (contains no invented facts/numbers).
@@ -127,9 +128,46 @@ const SPECIFIC_TOPIC_NEUTRAL_LEAD = {
   ask: 'The raise and terms are stated',
   funding: 'The raise and terms are stated',
   financials: 'The headline targets are stated',
+  product: 'The product and workflow are explained',
 };
 // Evidence that a roadmap connects milestones to value/defensibility/financing.
 const ROADMAP_LINKAGE_RE = /(customer value|retention|repeat|defensib|moat|revenue growth|revenue|financing|next round|runway|milestone[^.]*fund|fund[^.]*milestone|value inflection)/i;
+
+// Cover feedback assesses investor comprehension and positioning — not logo or
+// company-name visibility. These replace any name/tagline-presence feedback.
+const COVER_WHAT_WORKS =
+  'The cover communicates the company concept and category, so investors can quickly grasp what the company does.';
+const COVER_MISSING =
+  'The positioning could more clearly state the target customer and the core outcome the product delivers.';
+const COVER_RECOMMENDED =
+  'Sharpen the one-line positioning so it names the target customer and primary outcome, not just the category.';
+
+// Investor-level framing that converts a strong, grounded topic assessment into
+// a synthesized belief (the evidence itself is never invented).
+const BELIEF_FRAMING = {
+  team: (ev) => `The team appears credible for this market — ${ev}`,
+  traction: (ev) => `The deck shows real early demand — ${ev}`,
+  market: (ev) => `The market opportunity looks meaningful — ${ev}`,
+  business_model: (ev) => `The business model is understandable — ${ev}`,
+  product: (ev) => `The product concept is easy to understand — ${ev}`,
+  solution: (ev) => `The solution is clear — ${ev}`,
+  competition: (ev) => `The competitive positioning is credible — ${ev}`,
+  moat: (ev) => `There is a credible basis for defensibility — ${ev}`,
+  ask: (ev) => `The financing ask is clear — ${ev}`,
+  funding: (ev) => `The financing ask is clear — ${ev}`,
+  go_to_market: (ev) => `The go-to-market approach is defined — ${ev}`,
+  problem: (ev) => `The problem is well-defined — ${ev}`,
+  financials: (ev) => `The financial picture is presented — ${ev}`,
+};
+
+function _capitalize(s) {
+  const t = String(s || '').trim();
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+}
+function _lowerFirst(s) {
+  const t = String(s || '').trim();
+  return t ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+}
 
 // --- small numeric helpers ----------------------------------------------------
 
@@ -410,12 +448,39 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
     issueType = 'None';
   }
 
-  // Make selected topic feedback more specific: lead with grounded evidence
-  // from the deck, then name the concrete remaining gap. Only when a gap exists
-  // and only using facts already present in the rubric evidence (no invention).
-  if (!notAssessed && SPECIFIC_TOPIC_GAP[effectiveTypeKey] && missing) {
-    const lead = _strongLead(questions) || SPECIFIC_TOPIC_NEUTRAL_LEAD[effectiveTypeKey];
-    missing = `${lead}, but ${SPECIFIC_TOPIC_GAP[effectiveTypeKey]}.`;
+  // Ask / Funding is Strong only when the full financing picture is supported.
+  // If use of funds or timeline/milestone granularity is partial, cap at
+  // "Mostly answered" and force the specific missing-proof wording below.
+  let forceSpecific = false;
+  if (!notAssessed && (effectiveTypeKey === 'ask' || effectiveTypeKey === 'funding')) {
+    const uof = questions.find((q) => /use of funds/i.test(q.question || ''));
+    const timing = questions.find((q) => /timeline|milestone/i.test(q.question || ''));
+    const partial =
+      (uof && typeof uof.score === 'number' && uof.score < 4) ||
+      (timing && typeof timing.score === 'number' && timing.score < 4);
+    if (partial) {
+      if (assessment === 'Strong') assessment = 'Mostly answered';
+      if (issueType === 'None') issueType = 'Evidence';
+      forceSpecific = true;
+    }
+  }
+
+  // Make selected topic feedback more specific: lead with grounded evidence from
+  // the deck, then name the concrete remaining gap. Only using facts already
+  // present in the rubric evidence (no invention). Avoid repeating the exact
+  // what_works sentence at the start of what_is_missing (issue 5).
+  if (!notAssessed && SPECIFIC_TOPIC_GAP[effectiveTypeKey] && (missing || forceSpecific)) {
+    const gap = SPECIFIC_TOPIC_GAP[effectiveTypeKey];
+    const lead = _strongLead(questions);
+    const worksStripped = String(whatWorks || '').trim().replace(/\.+$/, '');
+    if (lead && lead !== worksStripped) {
+      missing = `${lead}, but ${gap}.`;
+    } else if (!lead && SPECIFIC_TOPIC_NEUTRAL_LEAD[effectiveTypeKey]) {
+      missing = `${SPECIFIC_TOPIC_NEUTRAL_LEAD[effectiveTypeKey]}, but ${gap}.`;
+    } else {
+      // what_works already states the grounded lead — don't repeat it.
+      missing = `${_capitalize(gap)}.`;
+    }
     recommended = SPECIFIC_TOPIC_RECOMMENDED[effectiveTypeKey];
   }
 
@@ -445,12 +510,19 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
   if (isFirstSlide && untyped && companyName) {
     effectiveTypeKey = 'cover';
     displayTitle = 'Cover';
-    whatWorks = COVER_WORKS;
+    notAssessed = false;
+  }
+
+  // Cover normalization: assess investor comprehension and positioning, not
+  // logo/name/tagline visibility. This overrides any name-presence feedback that
+  // the cover rubric questions would otherwise surface as the main what_works.
+  if (effectiveTypeKey === 'cover') {
+    displayTitle = 'Cover';
+    whatWorks = COVER_WHAT_WORKS;
     missing = COVER_MISSING;
     recommended = COVER_RECOMMENDED;
     assessment = _assessmentFromGrade(grade);
     issueType = 'Evidence';
-    notAssessed = false;
   }
 
   return {
@@ -559,11 +631,11 @@ function deriveBelieve(evalSlides) {
         q.assessment.trim().length > 20 &&
         !LOW_LEVEL_BELIEF_RE.test(q.assessment)
       ) {
-        const text = q.assessment.trim();
+        const evidence = q.assessment.trim().replace(/\.+$/, '');
         const existing = byTopic.get(typeKey);
         // Keep the highest-scoring grounded statement per topic.
         if (!existing || q.score > existing.score) {
-          byTopic.set(typeKey, { text, score: q.score, priority: BELIEF_TOPIC_PRIORITY[typeKey] });
+          byTopic.set(typeKey, { evidence, score: q.score, priority: BELIEF_TOPIC_PRIORITY[typeKey], typeKey });
         }
       }
     }
@@ -571,7 +643,13 @@ function deriveBelieve(evalSlides) {
   const ranked = Array.from(byTopic.values()).sort(
     (a, b) => a.priority - b.priority || b.score - a.score
   );
-  return _dedupe(ranked.map((b) => b.text)).slice(0, 4);
+  // Synthesize an investor-level conclusion per topic, grounded in the real
+  // evidence (framing adds the conclusion; the evidence itself is never invented).
+  const beliefs = ranked.map((b) => {
+    const frame = BELIEF_FRAMING[b.typeKey];
+    return frame ? frame(_lowerFirst(b.evidence)) : b.evidence;
+  });
+  return _dedupe(beliefs).slice(0, 4);
 }
 
 // Investor-level, consequence-ranked concerns derived from the deterministic
