@@ -999,7 +999,9 @@ export function AdminApp() {
                                 opacity: actionDeckId === item.deck_id ? 0.5 : 1,
                               }}
                             >
-                              Delete
+                              {actionDeckId === item.deck_id && actionType === 'delete'
+                                ? 'Deleting...'
+                                : 'Delete'}
                             </button>
                           </div>
                         </div>
