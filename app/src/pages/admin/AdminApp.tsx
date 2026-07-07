@@ -25,6 +25,19 @@ import { ARCHETYPES, STAGES, ERAS, GRADES } from '../../lib/types'
 type AdminView = 'upload' | 'reports' | 'calibration'
 
 const fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+
+// Format a report's generated timestamp in the user's local time, e.g.
+// "Tue July 7 4:33 PM". Returns '' for missing/invalid dates.
+function formatGeneratedAt(iso?: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const weekday = d.toLocaleDateString(undefined, { weekday: 'short' })
+  const month = d.toLocaleDateString(undefined, { month: 'long' })
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+  return `${weekday} ${month} ${d.getDate()} ${time}`
+}
+
 const SESSION_KEY = 'pdc_authenticated'
 const SESSION_PASSWORD_KEY = 'pdc_admin_pw'
 const ADMIN_MODE_KEY = 'pdc_admin_mode'
@@ -991,6 +1004,8 @@ export function AdminApp() {
                                 }}
                               >
                                 {item.original_filename || 'Unknown file'} · {item.slide_count || 0} slides
+                                {formatGeneratedAt(item.report_created_at) &&
+                                  ` · ${formatGeneratedAt(item.report_created_at)}`}
                               </p>
                             </div>
                           </div>
