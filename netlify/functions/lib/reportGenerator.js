@@ -1482,6 +1482,10 @@ async function generateFullReport(supabase, deckId, options = {}) {
     const archSource = architectureOverride ? 'header override' : 'env'
     console.log(`[eval] Using architecture: ${evalArchitecture} (${archSource})`)
 
+    // TODO: retire legacy v2/v3 evaluator paths after artifact calibration.
+    // Artifact mode (evaluateSlide) is the product direction; v2 (hardcoded
+    // prompt) and v3 (DB rule packs/prompts, below) remain only as short-term
+    // fallbacks while artifact mode is validated.
     let evalContext = null
     if (evalArchitecture === 'v3') {
       // Detect appropriate rule pack version based on deck characteristics
@@ -1701,7 +1705,12 @@ async function generateFullReport(supabase, deckId, options = {}) {
       architecture_version: evalArchitecture,
       architecture_source: archSource,
       rule_pack_version_key: evalContext?.rulePack?.versionKey || null,
-      prompt_source: evalContext?.promptVersionCount > 0 ? 'database' : 'hardcoded',
+      prompt_source:
+        evalArchitecture === 'artifact'
+          ? 'artifact'
+          : evalContext?.promptVersionCount > 0
+          ? 'database'
+          : 'hardcoded',
       all_rules_loaded_count: evalContext?.rulePack?.originalRuleCount || evalContext?.rulePack?.ruleCount || 0,
       injected_rules_count: evalContext?.rulePack?.ruleCount || 0,
       prompt_versions_loaded_count: evalContext?.promptVersionCount || 0,

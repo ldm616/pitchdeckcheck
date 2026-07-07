@@ -12,6 +12,7 @@ import {
   upsertCalibrationDeck,
   deleteCalibrationDeck,
 } from '../../lib/api'
+import type { EvaluationArchitecture } from '../../lib/api'
 import { ROUTES } from '../../lib/routes'
 import { V2Report } from '../../components/report'
 import type {
@@ -60,6 +61,12 @@ export function AdminApp() {
   const [actionType, setActionType] = useState<'delete' | 'regenerate' | null>(null)
   const [actionError, setActionError] = useState('')
   const [regenProgress, setRegenProgress] = useState<string | null>(null)
+  // TEMPORARY migration tooling — not a long-term product feature.
+  // Admin-only evaluation architecture for the Regen button. Defaults to
+  // 'artifact' (the committed product direction); v2/v3 remain only as
+  // short-term safety fallbacks while artifact mode is validated.
+  // TODO: remove architecture selector after artifact evaluator is validated and made default.
+  const [regenArchitecture, setRegenArchitecture] = useState<EvaluationArchitecture>('artifact')
 
   // Bulk selection state
   const [selectedDeckIds, setSelectedDeckIds] = useState<Set<string>>(new Set())
@@ -365,7 +372,7 @@ export function AdminApp() {
 
     startRegenPolling(deckId)
 
-    triggerReportRegeneration(deckId).catch((err) => {
+    triggerReportRegeneration(deckId, regenArchitecture).catch((err) => {
       console.error('Background regen trigger error:', err)
       setActionError('Failed to trigger regeneration')
       setActionDeckId(null)
@@ -863,6 +870,45 @@ export function AdminApp() {
                 >
                   Reports
                 </h2>
+                {/* TEMPORARY migration tooling. Lets an admin regen with v2/v3/artifact
+                    while artifact mode is validated.
+                    TODO: remove architecture selector after artifact evaluator is validated and made default. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', color: '#6b7280' }} htmlFor="regen-arch">
+                    Regen with
+                  </label>
+                  <select
+                    id="regen-arch"
+                    value={regenArchitecture}
+                    onChange={(e) => setRegenArchitecture(e.target.value as EvaluationArchitecture)}
+                    style={{
+                      padding: '5px 8px',
+                      fontSize: '13px',
+                      fontFamily,
+                      color: '#111827',
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="v2">v2</option>
+                    <option value="v3">v3</option>
+                    <option value="artifact">artifact</option>
+                  </select>
+                  <span
+                    style={{
+                      fontSize: '12px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: '#eef2ff',
+                      color: '#4338ca',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Regen → {regenArchitecture}
+                  </span>
+                </div>
                 {selectedDeckIds.size > 1 && (
                   <button
                     onClick={handleBulkDelete}
