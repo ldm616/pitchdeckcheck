@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { Download, Copy, Check } from 'lucide-react'
+import { Download, Copy } from 'lucide-react'
 import { getReport, getReportByCode, isAdmin } from '../lib/api'
 import { ROUTES } from '../lib/routes'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -203,30 +203,41 @@ export function ReportPage() {
     'print:hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors'
 
   // Actions pinned to the report container's upper-right. The Copy button is
-  // admin-only; Download is available to everyone.
+  // admin-only; Download is available to everyone. Copy confirms via a
+  // disappearing "Report copied" toast (see below).
   const reportActions = (
-    <div className="print:hidden absolute top-4 right-4 flex items-center gap-2">
-      {isAdmin() && (
+    <>
+      <div className="print:hidden absolute top-4 right-4 flex items-center gap-2">
+        {isAdmin() && (
+          <button
+            type="button"
+            onClick={handleCopyReport}
+            className={buttonClass}
+            aria-label="Copy entire report to clipboard"
+            title="Copy report"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        )}
         <button
           type="button"
-          onClick={handleCopyReport}
+          onClick={handleDownload}
           className={buttonClass}
-          aria-label="Copy entire report to clipboard"
+          aria-label="Download report as PDF"
         >
-          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-          {copied ? 'Copied' : 'Copy'}
+          <Download className="w-4 h-4" />
+          Download
         </button>
+      </div>
+      {copied && (
+        <div
+          role="status"
+          className="print:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg shadow-lg"
+        >
+          Report copied
+        </div>
       )}
-      <button
-        type="button"
-        onClick={handleDownload}
-        className={buttonClass}
-        aria-label="Download report as PDF"
-      >
-        <Download className="w-4 h-4" />
-        Download
-      </button>
-    </div>
+    </>
   )
 
   // Prefer the new V2 report when present; otherwise fall back to the existing

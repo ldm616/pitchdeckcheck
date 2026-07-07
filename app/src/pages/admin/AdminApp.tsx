@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Copy } from 'lucide-react'
 import {
   verifyPassword,
   getReportsList,
@@ -51,6 +52,8 @@ export function AdminApp() {
   const [slideCount, setSlideCount] = useState<number | null>(null)
   const [reportCreatedAt, setReportCreatedAt] = useState<string | null>(null)
   const [viewingReport, setViewingReport] = useState(false)
+  // Transient "Report copied" toast for the admin copy-report affordance.
+  const [reportCopied, setReportCopied] = useState(false)
 
   // Admin action state
   const [actionDeckId, setActionDeckId] = useState<string | null>(null)
@@ -184,6 +187,19 @@ export function AdminApp() {
       setCalibrationError('Failed to fetch calibration decks')
     } finally {
       setCalibrationLoading(false)
+    }
+  }
+
+  // Copy the entire report content (as JSON) to the clipboard, confirming with
+  // a disappearing "Report copied" toast. Admin-only by virtue of this view.
+  const handleCopyReport = async () => {
+    if (!report) return
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(report, null, 2))
+      setReportCopied(true)
+      setTimeout(() => setReportCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy report failed:', err)
     }
   }
 
@@ -609,26 +625,68 @@ export function AdminApp() {
             >
               Admin
             </h1>
-            <button
-              onClick={() => {
-                setViewingReport(false)
-                setReport(null)
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                fontSize: '14px',
-                fontWeight: 500,
-                fontFamily,
-                color: '#6b7280',
-                cursor: 'pointer',
-              }}
-            >
-              Back to Reports
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <button
+                onClick={handleCopyReport}
+                title="Copy report"
+                aria-label="Copy report to clipboard"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: '#6b7280',
+                  cursor: 'pointer',
+                }}
+              >
+                <Copy size={16} />
+              </button>
+              <button
+                onClick={() => {
+                  setViewingReport(false)
+                  setReport(null)
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  fontFamily,
+                  color: '#6b7280',
+                  cursor: 'pointer',
+                }}
+              >
+                Back to Reports
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Disappearing "Report copied" confirmation toast */}
+        {reportCopied && (
+          <div
+            role="status"
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 50,
+              padding: '8px 16px',
+              backgroundColor: '#111827',
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: 500,
+              fontFamily,
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            }}
+          >
+            Report copied
+          </div>
+        )}
 
         {/* Report Content */}
         <div style={{ padding: '32px 24px' }}>
