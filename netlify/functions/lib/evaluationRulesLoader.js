@@ -25,11 +25,16 @@ const DEFAULT_V3_RULE_MODE = 'minimal'
 
 /**
  * Get the current evaluation architecture from environment.
- * @returns {'v2' | 'v3'} - Current architecture version
+ * - 'artifact': artifact-grounded slide prompts (Milestone 1, opt-in).
+ * - 'v3': DB rule-pack / prompt-version path.
+ * - 'v2' (default): hardcoded prompts.
+ * @returns {'v2' | 'v3' | 'artifact'} - Current architecture version
  */
 function getEvaluationArchitecture() {
   const arch = process.env.EVALUATION_ARCHITECTURE || 'v2'
-  return arch === 'v3' ? 'v3' : 'v2'
+  if (arch === 'v3') return 'v3'
+  if (arch === 'artifact') return 'artifact'
+  return 'v2'
 }
 
 /**

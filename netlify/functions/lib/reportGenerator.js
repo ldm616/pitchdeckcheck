@@ -48,6 +48,9 @@ const {
   buildCanonicalReport,
   buildCanonicalReportV2Sections,
 } = require('./canonicalReport')
+// Artifact-grounded slide evaluator (Milestone 1). Opt-in via
+// EVALUATION_ARCHITECTURE=artifact / x-evaluation-architecture: artifact.
+const { buildArtifactSlidePrompt } = require('./artifactEvaluator')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
@@ -831,7 +834,7 @@ function applyGradeCalibrationCap(deckScoreResult, slideEvaluations) {
  * @param {Object[]} deckOutline - Compact deck outline for cross-slide context
  * @param {Object|null} evalContext - v3 evaluation context with promptVersions (optional)
  */
-async function evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext = null) {
+async function evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext = null, architecture = null) {
   // Sort questions by importance for display
   const sortedRubric = sortByImportance(rubric)
 
@@ -888,11 +891,26 @@ ${JSON.stringify(
 
 Evaluate each question. Include assessment, gap, investor_impact, fix, and confidence for each.`
 
-  // Determine which prompt to use: DB (v3) or hardcoded (v2)
+  // Determine which prompt to use: artifact (opt-in), DB (v3), or hardcoded (v2).
   let systemPrompt = RUBRIC_EVAL_PROMPT
   let promptSource = 'hardcoded'
 
-  if (evalContext && evalContext.promptVersions && evalContext.promptVersions.length > 0) {
+  // Artifact mode: build the system prompt from the product-owned section map.
+  // Only applies when the slide type has an artifact section; otherwise the
+  // slide falls through to the existing v2/v3 behavior below.
+  if (architecture === 'artifact') {
+    try {
+      const artifactPrompt = buildArtifactSlidePrompt(slide.inferred_type, questions)
+      if (artifactPrompt) {
+        systemPrompt = artifactPrompt
+        promptSource = 'artifact'
+      }
+    } catch (artifactErr) {
+      console.error(`Artifact prompt build failed for slide ${slide.slide_number}:`, artifactErr.message)
+    }
+  }
+
+  if (promptSource === 'hardcoded' && evalContext && evalContext.promptVersions && evalContext.promptVersions.length > 0) {
     const dbPrompt = getPromptByType(evalContext.promptVersions, 'slide_analysis')
     if (dbPrompt && dbPrompt.promptText) {
       systemPrompt = dbPrompt.promptText
@@ -1511,7 +1529,7 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
       console.log(`Evaluating slide ${slide.slide_number} (${slideType})...`)
 
-      const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext)
+      const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext, evalArchitecture)
       const answers = result.answers
 
       // Capture debug info for v3

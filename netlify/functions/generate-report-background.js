@@ -37,7 +37,8 @@ exports.handler = async (event) => {
 
   // Read optional architecture override from header
   const archHeader = event.headers['x-evaluation-architecture']
-  const architectureOverride = archHeader === 'v3' ? 'v3' : archHeader === 'v2' ? 'v2' : null
+  const architectureOverride =
+    archHeader === 'v3' ? 'v3' : archHeader === 'v2' ? 'v2' : archHeader === 'artifact' ? 'artifact' : null
 
   if (!deck_id) {
     return {
