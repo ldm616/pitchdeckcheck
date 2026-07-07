@@ -108,6 +108,8 @@ const SPECIFIC_TOPIC_GAP = {
     'investors need the bridge from the current run rate to the target: transaction volume, take rate, user and supply growth, CAC/payback, burn, and operating assumptions',
   product:
     'investors need proof that the product delivers value: activation, conversion, completed transactions, repeat usage, reliability, or clear preference over alternatives',
+  market:
+    'investors still need stronger external sourcing for the market size and a clearer path to capturing meaningful share',
 };
 const SPECIFIC_TOPIC_RECOMMENDED = {
   business_model:
@@ -119,6 +121,8 @@ const SPECIFIC_TOPIC_RECOMMENDED = {
     'Show the bridge from the current run rate to the target with the underlying growth and cost assumptions.',
   product:
     'Add proof of value delivery — activation, completed transactions, repeat usage, or reliability — beyond describing what the product does.',
+  market:
+    'Add external sourcing for the market size and show a credible path to capturing meaningful share.',
 };
 // Neutral lead-ins for the specific gap wording when no strong grounded evidence
 // exists to lead with (contains no invented facts/numbers).
@@ -129,9 +133,19 @@ const SPECIFIC_TOPIC_NEUTRAL_LEAD = {
   funding: 'The raise and terms are stated',
   financials: 'The headline targets are stated',
   product: 'The product and workflow are explained',
+  market: 'The market is defined and sized',
 };
 // Evidence that a roadmap connects milestones to value/defensibility/financing.
 const ROADMAP_LINKAGE_RE = /(customer value|retention|repeat|defensib|moat|revenue growth|revenue|financing|next round|runway|milestone[^.]*fund|fund[^.]*milestone|value inflection)/i;
+
+// Market is only fully answered when the size is externally sourced AND there is
+// a credible capture pathway. These detect those signals in the rubric evidence.
+const MARKET_SOURCING_RE = /(sourc|third[-\s]?party|citation|report|analyst|external|verified|per\s+\w+\s+data)/i;
+const MARKET_CAPTURE_RE = /(capture|market share|serviceable|\bsom\b|\bsam\b|beachhead|wedge|go[-\s]?to[-\s]?market|path to|obtainable|penetrat)/i;
+
+// Marketplace supply-side role labels, used to prefer concrete terms (e.g.
+// "detailers") over generic "supply" when the deck makes the side detectable.
+const SUPPLY_ROLE_RE = /\b(detailers?|drivers?|hosts?|sellers?|providers?|suppliers?|merchants?|couriers?|creators?|freelancers?|contractors?|vendors?|professionals?|caterers?|cleaners?|tutors?|stylists?|shoppers?|renters?)\b/i;
 
 // Cover feedback assesses investor comprehension and positioning — not logo or
 // company-name visibility. These replace any name/tagline-presence feedback.
@@ -143,21 +157,21 @@ const COVER_RECOMMENDED =
   'Sharpen the one-line positioning so it names the target customer and primary outcome, not just the category.';
 
 // Investor-level framing that converts a strong, grounded topic assessment into
-// a synthesized belief (the evidence itself is never invented).
+// a synthesized, single-sentence belief (the evidence itself is never invented).
 const BELIEF_FRAMING = {
-  team: (ev) => `The team appears credible for this market — ${ev}`,
-  traction: (ev) => `The deck shows real early demand — ${ev}`,
-  market: (ev) => `The market opportunity looks meaningful — ${ev}`,
-  business_model: (ev) => `The business model is understandable — ${ev}`,
-  product: (ev) => `The product concept is easy to understand — ${ev}`,
-  solution: (ev) => `The solution is clear — ${ev}`,
-  competition: (ev) => `The competitive positioning is credible — ${ev}`,
-  moat: (ev) => `There is a credible basis for defensibility — ${ev}`,
-  ask: (ev) => `The financing ask is clear — ${ev}`,
-  funding: (ev) => `The financing ask is clear — ${ev}`,
-  go_to_market: (ev) => `The go-to-market approach is defined — ${ev}`,
-  problem: (ev) => `The problem is well-defined — ${ev}`,
-  financials: (ev) => `The financial picture is presented — ${ev}`,
+  team: (ev) => `The team appears credible for this market: ${ev}.`,
+  traction: (ev) => `The deck shows real early marketplace demand: ${ev}.`,
+  market: (ev) => `The market opportunity appears meaningful: ${ev}.`,
+  business_model: (ev) => `The business model is easy to understand: ${ev}.`,
+  product: (ev) => `The product concept is easy to understand: ${ev}.`,
+  solution: (ev) => `The solution is clear: ${ev}.`,
+  competition: (ev) => `The competitive positioning is credible: ${ev}.`,
+  moat: (ev) => `There is a credible basis for defensibility: ${ev}.`,
+  ask: (ev) => `The financing ask is clear: ${ev}.`,
+  funding: (ev) => `The financing ask is clear: ${ev}.`,
+  go_to_market: (ev) => `The go-to-market approach is defined: ${ev}.`,
+  problem: (ev) => `The problem is well-defined: ${ev}.`,
+  financials: (ev) => `The financial picture is presented: ${ev}.`,
 };
 
 function _capitalize(s) {
@@ -167,6 +181,40 @@ function _capitalize(s) {
 function _lowerFirst(s) {
   const t = String(s || '').trim();
   return t ? t.charAt(0).toLowerCase() + t.slice(1) : t;
+}
+
+// Reduce a rubric assessment to a concise, single-sentence belief fragment:
+// take the first sentence, drop "the slide/deck provides/shows…" lead-ins.
+function _beliefEvidence(assessment) {
+  let ev = String(assessment || '').trim();
+  ev = (ev.split(/(?<=[.!?])\s+/)[0] || ev).replace(/[.!?]+$/, '').trim();
+  ev = ev.replace(
+    /^(the\s+slide|the\s+deck|this\s+slide|it)\s+(provides|shows|includes|has|presents|highlights|demonstrates|lists|contains|offers)\s+/i,
+    ''
+  );
+  ev = ev.replace(/^(the\s+slide|the\s+deck|this\s+slide)\s+/i, '');
+  return _lowerFirst(ev);
+}
+
+// Detect a concrete marketplace supply-side label (e.g. "detailers") from the
+// deck evidence so wording can prefer it over the generic "supply".
+function _detectSupplyLabel(evalSlides) {
+  for (const s of evalSlides || []) {
+    for (const q of s.questions || []) {
+      const m = SUPPLY_ROLE_RE.exec(`${q.assessment || ''} ${q.gap || ''}`);
+      if (m) return m[1].toLowerCase();
+    }
+  }
+  return null;
+}
+
+// Replace generic "users and supply" phrasing with the detected side label.
+function _applySupplyLabel(text, label) {
+  if (!text || !label) return text;
+  const singular = label.replace(/s$/, '');
+  return text
+    .replace(/\busers and supply\b/gi, `users and ${label}`)
+    .replace(/\buser and supply\b/gi, `user and ${singular}`);
 }
 
 // --- small numeric helpers ----------------------------------------------------
@@ -402,7 +450,7 @@ function toV2CommScores(dims) {
 // --- slide / topic feedback (rubric-derived, no V1) ---------------------------
 
 function buildSlideFeedbackEntry(slide, opts = {}) {
-  const { companyName = null } = opts;
+  const { companyName = null, supplyLabel = null } = opts;
   const typeKey = _normType(slide.type);
   const grade = slide.grade || null;
   const questions = Array.isArray(slide.questions) ? slide.questions : [];
@@ -459,6 +507,19 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
       (uof && typeof uof.score === 'number' && uof.score < 4) ||
       (timing && typeof timing.score === 'number' && timing.score < 4);
     if (partial) {
+      if (assessment === 'Strong') assessment = 'Mostly answered';
+      if (issueType === 'None') issueType = 'Evidence';
+      forceSpecific = true;
+    }
+  }
+
+  // Market is Strong only when size is externally sourced AND there is a credible
+  // capture pathway. If sourcing or capture logic is incomplete, cap at "Mostly
+  // answered" and surface the sourcing/capture gap.
+  if (!notAssessed && effectiveTypeKey === 'market') {
+    const marketText = questions.map((q) => `${q.assessment || ''} ${q.gap || ''}`).join(' ');
+    const complete = MARKET_SOURCING_RE.test(marketText) && MARKET_CAPTURE_RE.test(marketText);
+    if (!complete) {
       if (assessment === 'Strong') assessment = 'Mostly answered';
       if (issueType === 'None') issueType = 'Evidence';
       forceSpecific = true;
@@ -525,6 +586,26 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
     issueType = 'Evidence';
   }
 
+  // Prefer a concrete marketplace side label (e.g. "detailers") over generic
+  // "supply" when the deck makes the side detectable.
+  if (supplyLabel) {
+    missing = _applySupplyLabel(missing, supplyLabel);
+    recommended = _applySupplyLabel(recommended, supplyLabel);
+  }
+
+  // Consistency cap: a slide with a real evidence/substance gap should not read
+  // as Strong. Cover and contact are logistical (their "missing" is a soft
+  // suggestion), so they are exempt.
+  if (
+    assessment === 'Strong' &&
+    missing &&
+    (issueType === 'Evidence' || issueType === 'Substance') &&
+    effectiveTypeKey !== 'cover' &&
+    effectiveTypeKey !== 'contact'
+  ) {
+    assessment = 'Mostly answered';
+  }
+
   return {
     slide_number: slide.slide_number,
     slide_title_or_section: displayTitle,
@@ -537,8 +618,8 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
   };
 }
 
-function deriveTopicFeedback(representativeSlide, companyName) {
-  const e = buildSlideFeedbackEntry(representativeSlide, { companyName });
+function deriveTopicFeedback(representativeSlide, companyName, supplyLabel) {
+  const e = buildSlideFeedbackEntry(representativeSlide, { companyName, supplyLabel });
   return {
     assessment: e.assessment,
     what_works: e.what_works,
@@ -550,7 +631,7 @@ function deriveTopicFeedback(representativeSlide, companyName) {
 
 // --- topic coverage -----------------------------------------------------------
 
-function buildTopicCoverage(evalSlides, companyName) {
+function buildTopicCoverage(evalSlides, companyName, supplyLabel) {
   const byType = new Map();
   for (const s of evalSlides || []) {
     const key = _normType(s.type);
@@ -578,7 +659,7 @@ function buildTopicCoverage(evalSlides, companyName) {
       status,
       topic_communication_scores: deriveTopicCommunicationScores(group),
       questions,
-      topic_feedback: deriveTopicFeedback(rep, companyName),
+      topic_feedback: deriveTopicFeedback(rep, companyName, supplyLabel),
     });
   }
 
@@ -631,10 +712,10 @@ function deriveBelieve(evalSlides) {
         q.assessment.trim().length > 20 &&
         !LOW_LEVEL_BELIEF_RE.test(q.assessment)
       ) {
-        const evidence = q.assessment.trim().replace(/\.+$/, '');
+        const evidence = _beliefEvidence(q.assessment);
         const existing = byTopic.get(typeKey);
         // Keep the highest-scoring grounded statement per topic.
-        if (!existing || q.score > existing.score) {
+        if (evidence && (!existing || q.score > existing.score)) {
           byTopic.set(typeKey, { evidence, score: q.score, priority: BELIEF_TOPIC_PRIORITY[typeKey], typeKey });
         }
       }
@@ -647,7 +728,7 @@ function deriveBelieve(evalSlides) {
   // evidence (framing adds the conclusion; the evidence itself is never invented).
   const beliefs = ranked.map((b) => {
     const frame = BELIEF_FRAMING[b.typeKey];
-    return frame ? frame(_lowerFirst(b.evidence)) : b.evidence;
+    return frame ? frame(b.evidence) : `${_capitalize(b.evidence)}.`;
   });
   return _dedupe(beliefs).slice(0, 4);
 }
@@ -655,7 +736,7 @@ function deriveBelieve(evalSlides) {
 // Investor-level, consequence-ranked concerns derived from the deterministic
 // investment-case flags (the same signals that drive Priority Improvements),
 // plus genuinely missing core topics. Limited to 2–4 questions.
-function deriveQuestion(evalSlides, missingTopics, investmentCase) {
+function deriveQuestion(evalSlides, missingTopics, investmentCase, supplyLabel) {
   const flags = (investmentCase && investmentCase.detected) || {};
   const mv = (investmentCase && investmentCase.market_validation) || {};
   const candidates = []; // { p (lower = higher consequence), text }
@@ -709,7 +790,7 @@ function deriveQuestion(evalSlides, missingTopics, investmentCase) {
     });
 
   candidates.sort((a, b) => a.p - b.p);
-  return _dedupe(candidates.map((c) => c.text)).slice(0, 4);
+  return _dedupe(candidates.map((c) => _applySupplyLabel(c.text, supplyLabel))).slice(0, 4);
 }
 
 // --- public API ---------------------------------------------------------------
@@ -727,8 +808,9 @@ function buildCanonicalReport(input = {}) {
   const evalSlides = Array.isArray(fullReport.slides) ? fullReport.slides : [];
   const companyName = (investmentCase && investmentCase.company_name) || null;
   const marketValidation = (investmentCase && investmentCase.market_validation) || null;
+  const supplyLabel = _detectSupplyLabel(evalSlides);
 
-  const topics = buildTopicCoverage(evalSlides, companyName);
+  const topics = buildTopicCoverage(evalSlides, companyName, supplyLabel);
   const deck_communication_scores = deriveDeckCommunicationScores(evalSlides, investmentCase);
   const deckCommV2 = toV2CommScores(deck_communication_scores);
 
@@ -738,7 +820,7 @@ function buildCanonicalReport(input = {}) {
 
   const missingTopics = topics.filter((t) => t.status === 'missing');
   const what_investors_may_believe = deriveBelieve(evalSlides);
-  const what_investors_may_question = deriveQuestion(evalSlides, missingTopics, investmentCase);
+  const what_investors_may_question = deriveQuestion(evalSlides, missingTopics, investmentCase, supplyLabel);
 
   return {
     report_version: CANONICAL_REPORT_VERSION,
@@ -770,11 +852,12 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
   } = ctx;
   const companyName = (investmentCase && investmentCase.company_name) || null;
   const evalSlides = Array.isArray(fullReport.slides) ? fullReport.slides : [];
+  const supplyLabel = _detectSupplyLabel(evalSlides);
 
   const slide_level_feedback = evalSlides
     .slice()
     .sort((a, b) => _num(a.slide_number) - _num(b.slide_number))
-    .map((s) => buildSlideFeedbackEntry(s, { companyName }));
+    .map((s) => buildSlideFeedbackEntry(s, { companyName, supplyLabel }));
 
   return {
     report_version: 'v2',
