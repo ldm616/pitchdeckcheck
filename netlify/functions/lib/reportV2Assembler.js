@@ -1003,4 +1003,32 @@ function assembleReportV2(inputs = {}) {
 module.exports = {
   REPORT_V2_VERSION,
   assembleReportV2,
+  // Reusable, non-V1 helpers consumed by the canonical report engine
+  // (canonicalReport.js). Exporting these keeps a single source of truth for
+  // section mapping and rubric-question feedback; none of them read v1_report.
+  SCORE_LABEL,
+  TYPE_DISPLAY_NAMES,
+  TYPE_TO_INVESTOR_DECISION,
+  TYPE_TO_RUBRIC_KEY,
+  COVER_WORKS,
+  COVER_MISSING,
+  COVER_RECOMMENDED,
+  COVER_SIGNAL_RE,
+  _toV2Letter,
+  _normType,
+  _isFrameworkType,
+  _hasUsableQuestions,
+  _slideAssessment,
+  _assessmentFromGrade,
+  _commImprovement,
+  _feedbackFromQuestions,
+  _frameworkWeakFallback,
+  _contactFeedback,
+  _buildHeader,
+  _buildContextSummary,
+  _buildInvestmentCase,
+  _buildSaveShareUpgrade,
+  _buildPriorityImprovements,
+  _derivePrimaryConstraint,
+  _buildSuggestedNextSteps,
 };

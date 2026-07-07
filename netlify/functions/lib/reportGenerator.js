@@ -38,16 +38,16 @@ const {
   applyDeckContextFiltering,
 } = require('./evaluationRulesLoader')
 const { applySignalOverride } = require('./signalOverride')
-const { generateV1Report, V1_REPORT_VERSION } = require('./v1Synthesis')
-// Additive, behavior-preserving: deterministic Company Context stage inference.
-// Attached to report content as metadata only; does not affect scoring/grades.
+// Deterministic Company Context stage inference (metadata; no scoring effect).
 const { classifyCompanyContext } = require('./companyContextClassifier')
-// Additive, behavior-preserving: deterministic Investment Case synthesis.
-// Attached to report content as metadata only; does not affect scoring/grades.
+// Deterministic Investment Case synthesis (metadata; no scoring effect).
 const { synthesizeInvestmentCase } = require('./investmentCaseSynthesizer')
-// Additive, behavior-preserving: assemble the new report_v2 shape by mapping
-// already-generated data. Stored alongside v1_report; does not replace it.
-const { assembleReportV2 } = require('./reportV2Assembler')
+// Canonical, artifact-based report engine. Builds the live report_v2 directly
+// from rubric evaluations + company context + investment case — no v1_report.
+const {
+  buildCanonicalReport,
+  buildCanonicalReportV2Sections,
+} = require('./canonicalReport')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
 const REPORT_VERSION = 'report_v2.7'
@@ -1792,26 +1792,13 @@ async function generateFullReport(supabase, deckId, options = {}) {
     // Derive free report subset from full report
     const freeReport = deriveFreeReport(fullReport)
 
-    // Generate V1 founder-facing report
-    console.log(`[eval] Generating V1 founder-facing report...`)
-    let v1Report = null
-    try {
-      // Pass deck context for stage-calibrated synthesis
-      const v1Options = {
-        deckContext: evalContext?.deckContext || null,
-      }
-      v1Report = await generateV1Report(fullReport, slides, v1Options)
-      console.log(`[eval] V1 report generated successfully`)
-    } catch (v1Error) {
-      console.error(`[eval] V1 report generation failed:`, v1Error.message)
-      // V1 generation failure is non-fatal - continue with existing report
-    }
-
-    // Store all report versions in content (plus debug for v3)
+    // Store report content. The canonical engine (below) generates the live
+    // founder-facing report_v2 directly from rubric evaluations + context +
+    // investment case. The legacy V1 unified synthesis is no longer generated
+    // or used as report intelligence.
     const reportContent = {
       full_report: fullReport,
       free_report: freeReport,
-      v1_report: v1Report,
     }
 
     // Additive metadata: deterministic Company Context stage inference.
@@ -1847,24 +1834,32 @@ async function generateFullReport(supabase, deckId, options = {}) {
       console.error('[investment-case] synthesis failed (non-fatal):', icError.message)
     }
 
-    // Additive: assemble the new report_v2 shape from already-generated data.
-    // Non-fatal; stored alongside v1_report and read by nothing yet.
+    // Canonical, artifact-based report engine. Builds the live report_v2
+    // directly from rubric evaluations + company context + investment case —
+    // no v1_report. Non-fatal: a failure here leaves full_report/free_report
+    // intact so the request still succeeds.
     try {
-      const reportV2 = assembleReportV2({
+      const canonical = buildCanonicalReport({
         fullReport,
-        v1Report,
-        freeReport,
+        slides,
         companyContext,
         investmentCase,
       })
-      reportContent.report_v2 = reportV2
+      reportContent.canonical = canonical
+      reportContent.report_v2 = buildCanonicalReportV2Sections(canonical, {
+        fullReport,
+        companyContext,
+        investmentCase,
+        generatedAt: new Date().toISOString(),
+      })
       console.log(
-        `[report-v2] assembled grade=${reportV2.overall_grade.letter} ` +
-          `context="${reportV2.context_summary.company_context}" ` +
-          `priorities=${reportV2.priority_improvements.length}`
+        `[canonical] report built grade=${reportContent.report_v2.overall_grade.letter} ` +
+          `topics=${canonical.topics.length} ` +
+          `slides=${reportContent.report_v2.slide_level_feedback.length} ` +
+          `priorities=${reportContent.report_v2.priority_improvements.length}`
       )
-    } catch (v2Error) {
-      console.error('[report-v2] assembly failed (non-fatal):', v2Error.message)
+    } catch (canonicalError) {
+      console.error('[canonical] report build failed (non-fatal):', canonicalError.message)
     }
 
     // Add debug info for v3 reports
