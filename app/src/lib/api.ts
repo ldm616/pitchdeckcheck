@@ -162,21 +162,14 @@ export async function deleteDeck(deckId: string): Promise<DeleteResult> {
   return response.json()
 }
 
-// Architecture options for admin-triggered report regeneration.
-export type EvaluationArchitecture = 'v2' | 'v3' | 'artifact'
-
-// Trigger report regeneration (admin only). The architecture selects the
-// slide-evaluation path via the x-evaluation-architecture header; defaults to
-// 'v3' to preserve prior admin behavior.
-export async function triggerReportRegeneration(
-  deckId: string,
-  architecture: EvaluationArchitecture = 'v3'
-): Promise<void> {
+// Trigger report regeneration (admin only). Report generation uses the
+// artifact-native evaluator (the backend default) — there is no architecture
+// selection.
+export async function triggerReportRegeneration(deckId: string): Promise<void> {
   await fetch('/.netlify/functions/generate-report-background', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-evaluation-architecture': architecture,
     },
     body: JSON.stringify({
       deck_id: deckId,

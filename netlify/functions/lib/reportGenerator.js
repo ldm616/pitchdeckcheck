@@ -48,8 +48,7 @@ const {
   buildCanonicalReport,
   buildCanonicalReportV2Sections,
 } = require('./canonicalReport')
-// Artifact-grounded slide evaluator (Milestone 1). Opt-in via
-// EVALUATION_ARCHITECTURE=artifact / x-evaluation-architecture: artifact.
+// Artifact-grounded slide evaluator — the default/primary evaluation path.
 const { buildArtifactSlidePrompt } = require('./artifactEvaluator')
 
 // Report version for evaluation tracking (update when report structure/logic changes)
@@ -891,14 +890,19 @@ ${JSON.stringify(
 
 Evaluate each question. Include assessment, gap, investor_impact, fix, and confidence for each.`
 
-  // Determine which prompt to use: artifact (opt-in), DB (v3), or hardcoded (v2).
+  // PRIMARY PATH: build the system prompt from the product-owned section map
+  // (artifact-native evaluation). This is the default for all slide types that
+  // have an artifact section. Slides without a section (e.g. roadmap, contact)
+  // fall back to the hardcoded prompt below.
+  //
+  // The legacy v2 (hardcoded) / v3 (DB prompt) paths are EMERGENCY dead-paths
+  // only, selected via the EVALUATION_ARCHITECTURE env var.
+  // TODO: retire the legacy v2/v3 prompt code once artifact is fully calibrated.
   let systemPrompt = RUBRIC_EVAL_PROMPT
   let promptSource = 'hardcoded'
 
-  // Artifact mode: build the system prompt from the product-owned section map.
-  // Only applies when the slide type has an artifact section; otherwise the
-  // slide falls through to the existing v2/v3 behavior below.
-  if (architecture === 'artifact') {
+  const legacyEmergency = architecture === 'v2' || architecture === 'v3'
+  if (!legacyEmergency) {
     try {
       const artifactPrompt = buildArtifactSlidePrompt(slide.inferred_type, questions)
       if (artifactPrompt) {
@@ -910,6 +914,7 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
     }
   }
 
+  // Emergency v3 only: DB-loaded slide-analysis prompt.
   if (promptSource === 'hardcoded' && evalContext && evalContext.promptVersions && evalContext.promptVersions.length > 0) {
     const dbPrompt = getPromptByType(evalContext.promptVersions, 'slide_analysis')
     if (dbPrompt && dbPrompt.promptText) {
@@ -1396,12 +1401,9 @@ function deriveFreeReport(fullReport) {
  *
  * @param {Object} supabase - Supabase client
  * @param {string} deckId - Deck UUID
- * @param {Object} options - Optional settings
- * @param {string} options.architectureOverride - Override evaluation architecture ('v2' or 'v3')
  * @returns {Object} - { success, reportId, overallGrade } or { success: false, error }
  */
-async function generateFullReport(supabase, deckId, options = {}) {
-  const { architectureOverride = null } = options
+async function generateFullReport(supabase, deckId) {
   const openaiKey = process.env.OPENAI_API_KEY
 
   if (!openaiKey) {
@@ -1478,14 +1480,15 @@ async function generateFullReport(supabase, deckId, options = {}) {
 
     // ===== V3 Architecture: Load evaluation context =====
     // Use override from request header if provided, otherwise fall back to env
-    const evalArchitecture = architectureOverride || getEvaluationArchitecture()
-    const archSource = architectureOverride ? 'header override' : 'env'
+    const evalArchitecture = getEvaluationArchitecture()
+    const archSource = 'env'
     console.log(`[eval] Using architecture: ${evalArchitecture} (${archSource})`)
 
-    // TODO: retire legacy v2/v3 evaluator paths after artifact calibration.
-    // Artifact mode (evaluateSlide) is the product direction; v2 (hardcoded
-    // prompt) and v3 (DB rule packs/prompts, below) remain only as short-term
-    // fallbacks while artifact mode is validated.
+    // Artifact-native evaluation is the default (evalArchitecture === 'artifact').
+    // The v2 (hardcoded prompt) and v3 (DB rule packs/prompts, below) paths are
+    // EMERGENCY dead-paths only, reachable via the EVALUATION_ARCHITECTURE env
+    // var — they are not client-selectable.
+    // TODO: retire the legacy v2/v3 evaluator paths once artifact is calibrated.
     let evalContext = null
     if (evalArchitecture === 'v3') {
       // Detect appropriate rule pack version based on deck characteristics

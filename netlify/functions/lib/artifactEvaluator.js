@@ -5,9 +5,9 @@
  * (model/01_section_question_map.md + model/scoring-rubric.md) instead of the
  * generic hardcoded RUBRIC_EVAL_PROMPT / DB v3 prompt.
  *
- * ADDITIVE + GATED:
- *   - Only used when architecture === 'artifact' (env EVALUATION_ARCHITECTURE
- *     or the x-evaluation-architecture header). Default behavior is unchanged.
+ * DEFAULT EVALUATION PATH:
+ *   - This is the primary/default slide evaluator. Legacy v2/v3 prompts remain
+ *     only as an internal emergency dead-path (EVALUATION_ARCHITECTURE env var).
  *   - Preserves the existing answers[] output schema exactly
  *     (question_id, score, assessment, gap, investor_impact, fix, confidence),
  *     so computeSlideScore, guardrails, and the canonical report are unaffected.

@@ -24,17 +24,19 @@ const DEFAULT_V3_VERSION_KEY = 'v3.0.0-draft'
 const DEFAULT_V3_RULE_MODE = 'minimal'
 
 /**
- * Get the current evaluation architecture from environment.
- * - 'artifact': artifact-grounded slide prompts (Milestone 1, opt-in).
- * - 'v3': DB rule-pack / prompt-version path.
- * - 'v2' (default): hardcoded prompts.
- * @returns {'v2' | 'v3' | 'artifact'} - Current architecture version
+ * Get the current evaluation architecture.
+ *
+ * Artifact-native evaluation is the product direction and the DEFAULT. The
+ * legacy 'v2' (hardcoded prompt) and 'v3' (DB rule-pack/prompt) paths remain
+ * only as an internal EMERGENCY dead-path, selectable via the
+ * EVALUATION_ARCHITECTURE env var — they are not admin/user-facing.
+ * @returns {'artifact' | 'v2' | 'v3'} - Current architecture version
  */
 function getEvaluationArchitecture() {
-  const arch = process.env.EVALUATION_ARCHITECTURE || 'v2'
+  const arch = process.env.EVALUATION_ARCHITECTURE
+  if (arch === 'v2') return 'v2'
   if (arch === 'v3') return 'v3'
-  if (arch === 'artifact') return 'artifact'
-  return 'v2'
+  return 'artifact'
 }
 
 /**

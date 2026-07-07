@@ -35,10 +35,8 @@ exports.handler = async (event) => {
 
   const { deck_id, admin_password } = body
 
-  // Read optional architecture override from header
-  const archHeader = event.headers['x-evaluation-architecture']
-  const architectureOverride =
-    archHeader === 'v3' ? 'v3' : archHeader === 'v2' ? 'v2' : archHeader === 'artifact' ? 'artifact' : null
+  // Report generation uses the artifact-native evaluator (the backend default).
+  // No architecture switching from the client.
 
   if (!deck_id) {
     return {
@@ -93,10 +91,10 @@ exports.handler = async (event) => {
     }
   }
 
-  console.log(`Starting report regeneration for deck ${deck_id}${architectureOverride ? ` (architecture: ${architectureOverride})` : ''}`)
+  console.log(`Starting report regeneration for deck ${deck_id}`)
 
-  // Generate full report with optional architecture override
-  const result = await generateFullReport(supabase, deck_id, { architectureOverride })
+  // Generate full report (artifact-native evaluator by default).
+  const result = await generateFullReport(supabase, deck_id)
 
   if (result.success) {
     await setDeckStatus(supabase, deck_id, 'ready', null)
