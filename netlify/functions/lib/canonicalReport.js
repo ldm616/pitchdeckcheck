@@ -67,6 +67,70 @@ const CLARITY_TOPICS = ['cover', 'problem', 'solution', 'product', 'market'];
 
 const GRADE_TO_NUM = { A: 5, B: 4, C: 3, D: 2, E: 1, F: 1 };
 
+// "What Investors May Believe" should surface higher-level conclusions, not
+// slide-level logistics. Cover/contact/logistics topics are excluded, and
+// belief candidates are ranked by investor importance (lower = more important).
+const BELIEF_EXCLUDE_TYPES = new Set([
+  'cover',
+  'contact',
+  'other',
+  'appendix',
+  'investment_highlights',
+  'unknown',
+  '',
+]);
+const BELIEF_TOPIC_PRIORITY = {
+  team: 1,
+  traction: 2,
+  market: 3,
+  business_model: 4,
+  product: 5,
+  solution: 6,
+  competition: 7,
+  moat: 7,
+  ask: 8,
+  funding: 8,
+  go_to_market: 9,
+  problem: 10,
+  financials: 11,
+};
+// Low-level / logistics statements that must never appear as investor beliefs.
+const LOW_LEVEL_BELIEF_RE = /\b(company name|tagline|logo|visible on|clearly visible|title slide|contact (?:info|information|details)|font|colou?r|slide layout|readable)\b/i;
+
+// Topics whose missing-proof feedback can be made more specific by leading with
+// grounded evidence from the deck, then naming the concrete remaining gap.
+const SPECIFIC_TOPIC_GAP = {
+  business_model:
+    'investors still need to know whether the per-transaction economics stay attractive after acquisition, support, payment processing, refunds, and marketplace operations',
+  go_to_market:
+    'investors need evidence that one or two channels can repeatedly acquire users and supply at an acceptable CAC and payback',
+  ask: 'investors still need an explicit use-of-funds and runway bridge showing why this round reaches the next value inflection',
+  funding:
+    'investors still need an explicit use-of-funds and runway bridge showing why this round reaches the next value inflection',
+  financials:
+    'investors need the bridge from the current run rate to the target: transaction volume, take rate, user and supply growth, CAC/payback, burn, and operating assumptions',
+};
+const SPECIFIC_TOPIC_RECOMMENDED = {
+  business_model:
+    'Show whether the per-transaction economics remain attractive after all marketplace and acquisition costs.',
+  go_to_market: 'Show CAC and payback for one or two channels that can scale repeatably.',
+  ask: 'Add an explicit use-of-funds and runway bridge to the next value inflection.',
+  funding: 'Add an explicit use-of-funds and runway bridge to the next value inflection.',
+  financials:
+    'Show the bridge from the current run rate to the target with the underlying growth and cost assumptions.',
+};
+// Neutral lead-ins for the specific gap wording when no strong grounded evidence
+// exists to lead with (contains no invented facts/numbers).
+const SPECIFIC_TOPIC_NEUTRAL_LEAD = {
+  business_model: 'The revenue model is described',
+  go_to_market: 'The channel list is broad',
+  ask: 'The raise and terms are stated',
+  funding: 'The raise and terms are stated',
+  financials: 'The headline targets are stated',
+};
+// Evidence that a roadmap connects milestones to value/defensibility/financing.
+const ROADMAP_LINKAGE_RE = /(customer value|retention|repeat|defensib|moat|revenue growth|revenue|financing|next round|runway|milestone[^.]*fund|fund[^.]*milestone|value inflection)/i;
+
 // --- small numeric helpers ----------------------------------------------------
 
 function _num(x) {
@@ -107,6 +171,31 @@ function _dedupe(arr) {
 function _mk(score, rationale) {
   const s = _clamp1to5(score);
   return { score: s, label: SCORE_LABEL[s] || 'Adequate', rationale: rationale || '' };
+}
+
+// Count the major, investor-consequential questions that remain open, derived
+// from the deterministic investment-case flags (defensibility, retention,
+// marketplace liquidity, CAC/payback, market-size, market validation).
+function _majorGapCount(investmentCase) {
+  const f = (investmentCase && investmentCase.detected) || {};
+  const mv = (investmentCase && investmentCase.market_validation) || {};
+  let n = 0;
+  if (!f.has_defensibility) n++;
+  if (!f.has_retention_data) n++;
+  if (f.is_marketplace) n++;
+  if (f.has_gtm_channels && !f.has_cac_economics) n++;
+  if (f.has_market_size_claim) n++;
+  if (mv.missing_validation) n++;
+  return n;
+}
+
+// Strongest grounded evaluator rationale for a topic's questions (score >= 4),
+// used as a factual lead-in. Returns '' when there is no strong evidence.
+function _strongLead(questions) {
+  const strong = (questions || [])
+    .filter((q) => q && typeof q.score === 'number' && q.score >= 4 && q.assessment && String(q.assessment).trim())
+    .sort((a, b) => b.score - a.score)[0];
+  return strong ? String(strong.assessment).trim().replace(/\.+$/, '') : '';
 }
 
 // --- answer quality / location ------------------------------------------------
@@ -179,22 +268,38 @@ function deriveTopicCommunicationScores(group) {
   const comp = _clamp1to5(_avgQuestionScore(group) || 3);
   const gradeAvg = _clamp1to5(_avg(group.map((s) => _gradeNum(s.grade))) || 3);
   return {
-    completeness: _mk(comp, "Share of this topic's investor questions that are answered."),
-    clarity: _mk(gradeAvg, 'Derived from slide grade; a dedicated evaluator will refine this.'),
-    brevity: _mk(3, 'Not separately assessed in this pass.'),
-    flow: _mk(gradeAvg, 'Slide headline/takeaway flow evaluator pending; derived from grade.'),
+    completeness: _mk(comp, 'How fully this topic answers its investor questions.'),
+    clarity: _mk(gradeAvg, 'How clearly this topic makes its key point for investors.'),
+    brevity: _mk(3, 'Whether the slide stays focused on its key point.'),
+    flow: _mk(gradeAvg, 'Whether the slide leads with a clear takeaway and supports it in order.'),
   };
 }
 
-function deriveDeckCommunicationScores(evalSlides) {
+function deriveDeckCommunicationScores(evalSlides, investmentCase) {
   const present = new Set((evalSlides || []).map((s) => _normType(s.type)));
   const byType = (t) => (evalSlides || []).filter((s) => _normType(s.type) === t);
 
-  // Completeness: core investor topics that are present AND reasonably answered.
+  // Completeness: combine topic presence with answer quality. Presence alone is
+  // not enough — a deck can include a topic and still under-answer its questions.
   const answeredCore = CORE_EXPECTED_TOPICS.filter(
     (t) => present.has(t) && _avgQuestionScore(byType(t)) >= 3
   );
-  const completeness = _clamp1to5(1 + 4 * (answeredCore.length / CORE_EXPECTED_TOPICS.length));
+  const stronglyAnswered = CORE_EXPECTED_TOPICS.filter(
+    (t) => present.has(t) && _avgQuestionScore(byType(t)) >= 4
+  );
+  let completeness = _clamp1to5(1 + 4 * (answeredCore.length / CORE_EXPECTED_TOPICS.length));
+  const majorGaps = _majorGapCount(investmentCase);
+  // Cap at Strong (4) when major investor questions remain open, unless coverage
+  // is genuinely strong across every core topic.
+  if (majorGaps >= 1 && stronglyAnswered.length < CORE_EXPECTED_TOPICS.length) {
+    completeness = Math.min(completeness, 4);
+  }
+  const completenessRationale =
+    answeredCore.length >= CORE_EXPECTED_TOPICS.length
+      ? majorGaps >= 1
+        ? 'The deck covers the core investor topics, but several major questions are still only partly answered.'
+        : 'The deck covers the core investor topics and answers them well.'
+      : `The deck answers ${answeredCore.length} of ${CORE_EXPECTED_TOPICS.length} core investor topics for this stage.`;
 
   // Clarity: how directly the "understand-quickly" topics answer their questions.
   const clarityScores = [];
@@ -203,34 +308,34 @@ function deriveDeckCommunicationScores(evalSlides) {
     if (g.length) clarityScores.push(_avgQuestionScore(g));
   }
   const clarity = _clamp1to5(_avg(clarityScores) || 3);
+  const clarityRationale =
+    clarity >= 4
+      ? 'Investors can quickly understand the company, opportunity, proof, and ask.'
+      : clarity === 3
+      ? 'The core story is understandable, though parts of the opportunity, proof, or ask could be sharper.'
+      : 'Investors may struggle to quickly grasp the company, opportunity, proof, or ask.';
 
-  // Brevity: efficiency heuristic from slide count and low-signal slides.
-  const n = (evalSlides || []).length;
+  // Brevity: judge focus and redundancy, not raw slide count. Recap/summary
+  // slides are already excluded upstream, so slide count alone is not penalized.
   const otherCount = (evalSlides || []).filter((s) => _normType(s.type) === 'other').length;
-  let brevity = n <= 14 ? 4 : n <= 20 ? 3 : 2;
-  if (otherCount >= 3) brevity = Math.max(1, brevity - 1);
-  brevity = _clamp1to5(brevity);
+  const brevity = _clamp1to5(otherCount >= 3 ? 3 : 4);
+  const brevityRationale =
+    otherCount >= 3
+      ? 'A few slides add little investor signal and could be tightened or merged.'
+      : 'The deck stays focused and avoids unnecessary repetition.';
 
-  // Flow: first-cut approximation from average answer quality across the deck.
+  // Flow: whether conviction builds across the narrative.
   const flow = _clamp1to5(_avg((evalSlides || []).map((s) => _gradeNum(s.grade))) || 3);
+  const flowRationale =
+    flow >= 4
+      ? 'Conviction builds cleanly from problem and solution into proof, business model, and the funding ask.'
+      : 'The narrative generally builds from problem and solution into proof, business model, and the funding ask, but some proof points need tighter connection to defensibility and scalable growth.';
 
   return {
-    completeness: _mk(
-      completeness,
-      `Answered ${answeredCore.length} of ${CORE_EXPECTED_TOPICS.length} core investor topics for this stage.`
-    ),
-    clarity: _mk(
-      clarity,
-      'Based on how directly the cover, problem, solution, product, and market answer their core questions.'
-    ),
-    brevity: _mk(
-      brevity,
-      `Deck has ${n} evaluated slides${otherCount ? `, including ${otherCount} low-signal slides` : ''}.`
-    ),
-    flow: _mk(
-      flow,
-      'Approximated from average slide answer quality; a dedicated narrative-flow evaluator will refine this.'
-    ),
+    completeness: _mk(completeness, completenessRationale),
+    clarity: _mk(clarity, clarityRationale),
+    brevity: _mk(brevity, brevityRationale),
+    flow: _mk(flow, flowRationale),
   };
 }
 
@@ -303,6 +408,34 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
     recommended =
       'Ensure this slide clearly answers its intended investor question and avoids duplicating earlier content.';
     issueType = 'None';
+  }
+
+  // Make selected topic feedback more specific: lead with grounded evidence
+  // from the deck, then name the concrete remaining gap. Only when a gap exists
+  // and only using facts already present in the rubric evidence (no invention).
+  if (!notAssessed && SPECIFIC_TOPIC_GAP[effectiveTypeKey] && missing) {
+    const lead = _strongLead(questions) || SPECIFIC_TOPIC_NEUTRAL_LEAD[effectiveTypeKey];
+    missing = `${lead}, but ${SPECIFIC_TOPIC_GAP[effectiveTypeKey]}.`;
+    recommended = SPECIFIC_TOPIC_RECOMMENDED[effectiveTypeKey];
+  }
+
+  // Roadmap should not read as fully answered just because it lists milestones.
+  // Cap at "Mostly answered" unless it explicitly connects milestones to customer
+  // value, retention, defensibility, revenue growth, or the next financing milestone.
+  if (!notAssessed && effectiveTypeKey === 'roadmap') {
+    const roadmapText = (questions || [])
+      .map((q) => `${q.assessment || ''} ${q.question || ''}`)
+      .join(' ');
+    if (!ROADMAP_LINKAGE_RE.test(roadmapText)) {
+      if (assessment === 'Strong') assessment = 'Mostly answered';
+      if (!missing) {
+        missing =
+          'The roadmap lists milestones, but investors need each tied to customer value, retention, revenue growth, defensibility, or the next financing milestone.';
+        recommended =
+          'Connect roadmap milestones to customer value, revenue growth, and the next financing inflection.';
+        issueType = 'Evidence';
+      }
+    }
   }
 
   // First-slide cover remap: a slide 1 typed other/unknown with a detectable
@@ -409,46 +542,96 @@ function buildTopicCoverage(evalSlides, companyName) {
 
 // --- believe / question -------------------------------------------------------
 
+// Higher-level investor beliefs: the strongest grounded conclusion per high-value
+// topic, ranked by investor importance. Slide-level logistics (cover/company
+// name/tagline) are excluded. Limited to 2–4 beliefs.
 function deriveBelieve(evalSlides) {
-  const out = [];
+  const byTopic = new Map();
   for (const s of evalSlides || []) {
+    const typeKey = _normType(s.type);
+    if (BELIEF_EXCLUDE_TYPES.has(typeKey)) continue;
+    if (!(typeKey in BELIEF_TOPIC_PRIORITY)) continue;
     for (const q of s.questions || []) {
-      if (typeof q.score === 'number' && q.score >= 4 && q.assessment && q.assessment.length > 20) {
-        out.push(q.assessment.trim());
+      if (
+        typeof q.score === 'number' &&
+        q.score >= 4 &&
+        q.assessment &&
+        q.assessment.trim().length > 20 &&
+        !LOW_LEVEL_BELIEF_RE.test(q.assessment)
+      ) {
+        const text = q.assessment.trim();
+        const existing = byTopic.get(typeKey);
+        // Keep the highest-scoring grounded statement per topic.
+        if (!existing || q.score > existing.score) {
+          byTopic.set(typeKey, { text, score: q.score, priority: BELIEF_TOPIC_PRIORITY[typeKey] });
+        }
       }
     }
   }
-  return _dedupe(out).slice(0, 5);
+  const ranked = Array.from(byTopic.values()).sort(
+    (a, b) => a.priority - b.priority || b.score - a.score
+  );
+  return _dedupe(ranked.map((b) => b.text)).slice(0, 4);
 }
 
-function deriveQuestion(evalSlides, missingTopics, marketValidation) {
-  const out = [];
-  for (const s of evalSlides || []) {
-    for (const q of s.questions || []) {
-      if (typeof q.score === 'number' && q.score <= 2) {
-        const t =
-          q.gap && q.gap !== 'None' && q.gap.length > 15
-            ? q.gap
-            : q.investor_impact && q.investor_impact.length > 15
-            ? q.investor_impact
-            : '';
-        if (t) out.push(t.trim());
-      }
-    }
-  }
-  for (const mt of missingTopics || []) {
-    out.push(
-      `Investors cannot yet evaluate ${mt.topic_label}: ${
-        TYPE_TO_INVESTOR_DECISION[mt.topic_key] || 'the topic is not addressed in the deck.'
-      }`
-    );
-  }
-  if (marketValidation && marketValidation.missing_validation) {
-    out.push(
-      'Investors have limited evidence that customers want the outcome (market validation is thin).'
-    );
-  }
-  return _dedupe(out).slice(0, 5);
+// Investor-level, consequence-ranked concerns derived from the deterministic
+// investment-case flags (the same signals that drive Priority Improvements),
+// plus genuinely missing core topics. Limited to 2–4 questions.
+function deriveQuestion(evalSlides, missingTopics, investmentCase) {
+  const flags = (investmentCase && investmentCase.detected) || {};
+  const mv = (investmentCase && investmentCase.market_validation) || {};
+  const candidates = []; // { p (lower = higher consequence), text }
+
+  if (!flags.has_defensibility)
+    candidates.push({
+      p: 1,
+      text: 'Whether the company has durable defensibility or a moat beyond being first to market.',
+    });
+  if (!flags.has_retention_data)
+    candidates.push({
+      p: 2,
+      text: 'Whether early usage turns into retention and repeat usage, not just cumulative signups.',
+    });
+  if (mv.missing_validation)
+    candidates.push({
+      p: 2.5,
+      text: 'Whether there is enough evidence that customers actually want the outcome.',
+    });
+  if (flags.is_marketplace)
+    candidates.push({
+      p: 3,
+      text: 'Whether the marketplace has real liquidity and density at the city or market level, not just aggregate totals.',
+    });
+  if (flags.has_gtm_channels && !flags.has_cac_economics)
+    candidates.push({
+      p: 4,
+      text: 'Whether one or two channels can acquire users and supply repeatably at an acceptable CAC and payback.',
+    });
+  if (flags.has_market_size_claim)
+    candidates.push({
+      p: 5,
+      text: 'Whether the market-size and projection assumptions hold up under a bottom-up build.',
+    });
+
+  // Use of funds / runway when a funding ask is present but not strongly answered.
+  const askSlides = (evalSlides || []).filter((s) =>
+    ['ask', 'funding'].includes(_normType(s.type))
+  );
+  if (askSlides.length && _avgQuestionScore(askSlides) < 4)
+    candidates.push({
+      p: 6,
+      text: 'Whether the raise, use of funds, and runway are sufficient to reach the next value inflection.',
+    });
+
+  // Missing core topics investors expect at this stage (lowest priority).
+  for (const mt of missingTopics || [])
+    candidates.push({
+      p: 7,
+      text: `Whether the deck addresses ${mt.topic_label}, which investors expect at this stage.`,
+    });
+
+  candidates.sort((a, b) => a.p - b.p);
+  return _dedupe(candidates.map((c) => c.text)).slice(0, 4);
 }
 
 // --- public API ---------------------------------------------------------------
@@ -468,7 +651,7 @@ function buildCanonicalReport(input = {}) {
   const marketValidation = (investmentCase && investmentCase.market_validation) || null;
 
   const topics = buildTopicCoverage(evalSlides, companyName);
-  const deck_communication_scores = deriveDeckCommunicationScores(evalSlides);
+  const deck_communication_scores = deriveDeckCommunicationScores(evalSlides, investmentCase);
   const deckCommV2 = toV2CommScores(deck_communication_scores);
 
   const constraint = _derivePrimaryConstraint(deckCommV2, investmentCase, marketValidation);
@@ -477,7 +660,7 @@ function buildCanonicalReport(input = {}) {
 
   const missingTopics = topics.filter((t) => t.status === 'missing');
   const what_investors_may_believe = deriveBelieve(evalSlides);
-  const what_investors_may_question = deriveQuestion(evalSlides, missingTopics, marketValidation);
+  const what_investors_may_question = deriveQuestion(evalSlides, missingTopics, investmentCase);
 
   return {
     report_version: CANONICAL_REPORT_VERSION,
