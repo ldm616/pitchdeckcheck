@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { Download } from 'lucide-react'
+import { Download, Copy, Check } from 'lucide-react'
 import { getReport, getReportByCode, isAdmin } from '../lib/api'
 import { ROUTES } from '../lib/routes'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -42,6 +42,8 @@ export function ReportPage() {
   const [slides, setSlides] = useState<SlideData[]>([])
   const [reportCreatedAt, setReportCreatedAt] = useState<string | null>(null)
   const [showContact, setShowContact] = useState(false)
+  // Admin-only: transient "Copied" state for the copy-report affordance.
+  const [copied, setCopied] = useState(false)
   // Track secure credentials for email save flow
   const [secureCredentials, setSecureCredentials] = useState<{
     deckId: string
@@ -184,17 +186,47 @@ export function ReportPage() {
   // the button itself is hidden from the printed output.
   const handleDownload = () => window.print()
 
-  // A small "Download" button pinned to the report container's upper-right.
-  const downloadButton = (
-    <button
-      type="button"
-      onClick={handleDownload}
-      className="print:hidden absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
-      aria-label="Download report as PDF"
-    >
-      <Download className="w-4 h-4" />
-      Download
-    </button>
+  // Admin-only: copy the entire report content (as JSON) to the clipboard for
+  // inspecting/sharing the artifact-based output.
+  const handleCopyReport = async () => {
+    if (!report) return
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(report, null, 2))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy report failed:', err)
+    }
+  }
+
+  const buttonClass =
+    'print:hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors'
+
+  // Actions pinned to the report container's upper-right. The Copy button is
+  // admin-only; Download is available to everyone.
+  const reportActions = (
+    <div className="print:hidden absolute top-4 right-4 flex items-center gap-2">
+      {isAdmin() && (
+        <button
+          type="button"
+          onClick={handleCopyReport}
+          className={buttonClass}
+          aria-label="Copy entire report to clipboard"
+        >
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleDownload}
+        className={buttonClass}
+        aria-label="Download report as PDF"
+      >
+        <Download className="w-4 h-4" />
+        Download
+      </button>
+    </div>
   )
 
   // Prefer the new V2 report when present; otherwise fall back to the existing
@@ -208,7 +240,7 @@ export function ReportPage() {
         <main className="flex-1 px-6 pb-16">
           <div className="max-w-2xl mx-auto">
             <div className="relative bg-white rounded-xl shadow-sm p-8 sm:p-10">
-              {downloadButton}
+              {reportActions}
               <V2Report report={reportV2} />
 
               {secureCredentials && (
@@ -267,7 +299,7 @@ export function ReportPage() {
       <main className="flex-1 px-6 pb-16">
         <div className="max-w-2xl mx-auto">
           <div className="relative bg-white rounded-xl shadow-sm p-8 sm:p-10">
-            {downloadButton}
+            {reportActions}
             {/* 1. Overall Investor Readout */}
             <ReportHeader
               report={v1Report}
