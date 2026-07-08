@@ -38,6 +38,12 @@ const DASH_LABEL: Record<Grade, string> = {
 // Rank for choosing the default (most important) selection. Lower = worse.
 const RANK: Record<Grade, number> = { D: 0, C: 1, B: 2, A: 3, neutral: 4 }
 
+// Color hierarchy: A/B stay quiet (neutral border, colored badge only); C/D get
+// a stronger tinted border to draw the eye. Selected state adds the tone ring.
+function cardBorderClass(grade: Grade): string {
+  return grade === 'C' || grade === 'D' ? TONE[grade].border : 'border-gray-200'
+}
+
 // Canonical slide assessment -> A/B/C/D. Uses the investor-facing assessment,
 // not the raw backend grade.
 function slideAssessmentToGrade(a?: string): Grade {
@@ -117,7 +123,7 @@ function DeckScoreCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`text-left w-full rounded-lg border ${t.border} bg-white px-3 py-2.5 transition-shadow hover:shadow-sm focus:outline-none ${
+      className={`text-left w-full rounded-lg border ${cardBorderClass(grade)} bg-white px-3 py-2.5 transition-shadow hover:shadow-sm focus:outline-none ${
         selected ? `ring-2 ${t.ring} ring-offset-1` : ''
       }`}
     >
@@ -147,7 +153,7 @@ function SlideScoreCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`text-left w-full rounded-lg border ${t.border} bg-white px-2.5 py-2 transition-shadow hover:shadow-sm focus:outline-none ${
+      className={`text-left w-full rounded-lg border ${cardBorderClass(grade)} bg-white px-2.5 py-2 transition-shadow hover:shadow-sm focus:outline-none ${
         selected ? `ring-2 ${t.ring} ring-offset-1` : ''
       }`}
     >
@@ -187,13 +193,8 @@ function DetailHeading({ children }: { children: React.ReactNode }) {
 
 // --- selection ---------------------------------------------------------------
 
-type InsightKey =
-  | 'investment_case'
-  | 'priority'
-  | 'beliefs'
-  | 'questions'
-  | 'context'
-  | 'next_steps'
+// Deck-level feedback cards that are not communication scores.
+type InsightKey = 'investment_case' | 'priority' | 'questions' | 'beliefs' | 'context'
 
 type Selected =
   | { type: 'deck_score'; key: string; label: string }
@@ -251,21 +252,32 @@ export function V2Report({ report }: V2ReportProps) {
   const question = report.what_investors_may_question || []
   const priorities = report.priority_improvements || []
   const slides = report.slide_level_feedback || []
-  const nextSteps = report.suggested_next_steps || []
-
   const deckDims = useMemo(() => DIMENSIONS.filter((d) => dcs && dcs[d.key]), [dcs])
 
-  // Available insight cards, in display order (only those with data).
-  const insights = useMemo<Array<{ key: InsightKey; title: string; subtitle?: string }>>(() => {
+  // Deck-level feedback cards (beyond the four communication scores), in order.
+  const deckCards = useMemo<Array<{ key: InsightKey; title: string; subtitle?: string }>>(() => {
     const out: Array<{ key: InsightKey; title: string; subtitle?: string }> = []
     if (ic) out.push({ key: 'investment_case', title: 'Investment Case', subtitle: (ic.opportunity_strength as InvestmentCaseAssessmentV2 | undefined)?.label })
-    if (priorities.length > 0) out.push({ key: 'priority', title: 'Priority Improvements', subtitle: `${priorities.length} to address` })
-    if (believe.length > 0) out.push({ key: 'beliefs', title: 'Investors May Believe', subtitle: `${believe.length} points` })
-    if (question.length > 0) out.push({ key: 'questions', title: 'Investors May Question', subtitle: `${question.length} points` })
+    if (priorities.length > 0) out.push({ key: 'priority', title: 'Priority Fixes', subtitle: `${priorities.length} to fix` })
+    if (question.length > 0) out.push({ key: 'questions', title: 'Investor Questions', subtitle: `${question.length} points` })
+    if (believe.length > 0) out.push({ key: 'beliefs', title: 'Investor Beliefs', subtitle: `${believe.length} points` })
     if (cs) out.push({ key: 'context', title: 'Context', subtitle: cs.company_context })
-    if (nextSteps.length > 0) out.push({ key: 'next_steps', title: 'Next Steps', subtitle: `${nextSteps.length} steps` })
     return out
-  }, [ic, priorities, believe, question, cs, nextSteps])
+  }, [ic, priorities, believe, question, cs])
+
+  // Optional hero chips for the biggest themes, derived from priority fixes.
+  const keyIssues = useMemo<string[]>(() => {
+    const text = priorities
+      .map((p) => `${p.title} ${p.why_it_matters || ''} ${p.what_to_add_or_change || ''}`)
+      .join(' ')
+      .toLowerCase()
+    const chips: string[] = []
+    if (/defensib|moat/.test(text)) chips.push('Defensibility')
+    if (/retention|repeat usage|repeat use/.test(text)) chips.push('Retention')
+    if (/liquidity|marketplace/.test(text)) chips.push('Marketplace liquidity')
+    if (/\bcac\b|payback|acquisition cost/.test(text)) chips.push('CAC / payback')
+    return chips.slice(0, 4)
+  }, [priorities])
 
   // Default selection: Priority Improvements if present, else the lowest-scoring
   // slide, else the lowest deck score, else the first insight, else nothing.
@@ -295,9 +307,9 @@ export function V2Report({ report }: V2ReportProps) {
       }
       return { type: 'deck_score', key: worst.key as string, label: worst.label }
     }
-    if (insights.length > 0) return { type: 'insight', key: insights[0].key }
+    if (deckCards.length > 0) return { type: 'insight', key: deckCards[0].key }
     return null
-  }, [priorities, slides, deckDims, dcs, insights])
+  }, [priorities, slides, deckDims, dcs, deckCards])
 
   const [selected, setSelected] = useState<Selected>(defaultSelected)
   const detailRef = useRef<HTMLDivElement | null>(null)
@@ -305,7 +317,7 @@ export function V2Report({ report }: V2ReportProps) {
   // --- desktop workspace: resizable two-pane split (>= 1280px) ---------------
   const LEFT_MIN = 600
   const RIGHT_MIN = 420
-  const DIVIDER_W = 12
+  const DIVIDER_W = 18
 
   const [isDesktop, setIsDesktop] = useState(false)
   useEffect(() => {
@@ -408,8 +420,6 @@ export function V2Report({ report }: V2ReportProps) {
         return <ListDetail title="What Investors May Question" items={question} marker="?" markerClass="text-amber-500" />
       case 'context':
         return cs ? <ContextDetail cs={cs} /> : null
-      case 'next_steps':
-        return <NextStepsDetail steps={nextSteps} />
       default:
         return null
     }
@@ -423,26 +433,41 @@ export function V2Report({ report }: V2ReportProps) {
 
   const leftContent = (
     <div className="space-y-5">
-      {deckDims.length > 0 && (
+      {(deckDims.length > 0 || deckCards.length > 0) && (
         <div>
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Deck Scores</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {deckDims.map(({ key, label }) => (
-              <DeckScoreCard
-                key={key}
-                label={label}
-                data={dcs[key]!}
-                selected={selected?.type === 'deck_score' && selected.key === key}
-                onSelect={() => select({ type: 'deck_score', key: key as string, label })}
-              />
-            ))}
-          </div>
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Deck Feedback</h2>
+          {deckDims.length > 0 && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+              {deckDims.map(({ key, label }) => (
+                <DeckScoreCard
+                  key={key}
+                  label={label}
+                  data={dcs[key]!}
+                  selected={selected?.type === 'deck_score' && selected.key === key}
+                  onSelect={() => select({ type: 'deck_score', key: key as string, label })}
+                />
+              ))}
+            </div>
+          )}
+          {deckCards.length > 0 && (
+            <div style={SLIDE_GRID_STYLE} className={deckDims.length > 0 ? 'mt-2.5' : ''}>
+              {deckCards.map((c) => (
+                <InsightCard
+                  key={c.key}
+                  title={c.title}
+                  subtitle={c.subtitle}
+                  selected={selected?.type === 'insight' && selected.key === c.key}
+                  onSelect={() => select({ type: 'insight', key: c.key })}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {slides.length > 0 && (
         <div>
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Slide Scores</h2>
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Slide Feedback</h2>
           <div style={SLIDE_GRID_STYLE}>
             {slides.map((s, i) => (
               <SlideScoreCard
@@ -455,28 +480,24 @@ export function V2Report({ report }: V2ReportProps) {
           </div>
         </div>
       )}
-
-      {insights.length > 0 && (
-        <div>
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Insights</h2>
-          <div style={SLIDE_GRID_STYLE}>
-            {insights.map((ins) => (
-              <InsightCard
-                key={ins.key}
-                title={ins.title}
-                subtitle={ins.subtitle}
-                selected={selected?.type === 'insight' && selected.key === ins.key}
-                onSelect={() => select({ type: 'insight', key: ins.key })}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 
+  // Detail pane border subtly reflects the selected card's grade tone.
+  let detailTone: Grade = 'neutral'
+  if (selected?.type === 'deck_score') {
+    const d = dcs[selected.key as keyof typeof dcs]
+    detailTone = d ? deckScoreToGrade(d.score, d.label) : 'neutral'
+  } else if (selected?.type === 'slide') {
+    const s = slides[selected.index]
+    detailTone = s ? slideAssessmentToGrade(s.assessment) : 'neutral'
+  }
+
   const detailPane = (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">{renderDetail()}</div>
+    <div className={`rounded-xl border-2 ${TONE[detailTone].border} bg-white p-5 sm:p-6`}>
+      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-3">Selected</p>
+      {renderDetail()}
+    </div>
   )
 
   return (
@@ -496,6 +517,18 @@ export function V2Report({ report }: V2ReportProps) {
               <span className="font-medium text-gray-700">Primary constraint:</span> {og.primary_constraint}
             </p>
           )}
+          {keyIssues.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {keyIssues.map((chip) => (
+                <span
+                  key={chip}
+                  className="inline-block text-[11px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -511,11 +544,19 @@ export function V2Report({ report }: V2ReportProps) {
           <div
             role="separator"
             aria-orientation="vertical"
+            title="Drag to resize"
             onPointerDown={onDividerDown}
-            className="group shrink-0 flex items-center justify-center cursor-col-resize select-none"
+            className="group relative shrink-0 flex items-center justify-center cursor-col-resize select-none touch-none"
             style={{ width: DIVIDER_W }}
           >
-            <div className="w-1 h-10 rounded-full bg-gray-200 group-hover:bg-gray-400 transition-colors" />
+            {/* full-height subtle rule */}
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-gray-200 group-hover:bg-gray-300 transition-colors" />
+            {/* grab handle with dots */}
+            <div className="relative z-10 flex flex-col items-center gap-[3px] rounded border border-gray-200 bg-white px-[3px] py-1.5 shadow-sm group-hover:border-gray-400 group-active:border-gray-500 group-active:shadow transition-colors">
+              <span className="w-1 h-1 rounded-full bg-gray-300 group-hover:bg-gray-500" />
+              <span className="w-1 h-1 rounded-full bg-gray-300 group-hover:bg-gray-500" />
+              <span className="w-1 h-1 rounded-full bg-gray-300 group-hover:bg-gray-500" />
+            </div>
           </div>
           {selected && (
             <div className="flex-1 min-w-0">
@@ -622,7 +663,7 @@ function InvestmentCaseDetail({ ic }: { ic: PitchDeckCheckReportV2['investment_c
 function PriorityDetail({ items }: { items: PitchDeckCheckReportV2['priority_improvements'] }) {
   return (
     <div>
-      <DetailHeading>Priority Improvements</DetailHeading>
+      <DetailHeading>Priority Fixes</DetailHeading>
       <div className="space-y-3">
         {items.map((p, idx) => (
           <div key={idx} className="rounded-lg border border-gray-100 bg-white p-3">
@@ -702,21 +743,3 @@ function ContextDetail({ cs }: { cs: PitchDeckCheckReportV2['context_summary'] }
   )
 }
 
-function NextStepsDetail({ steps }: { steps: PitchDeckCheckReportV2['suggested_next_steps'] }) {
-  return (
-    <div>
-      <DetailHeading>Suggested Next Steps</DetailHeading>
-      <ol className="space-y-2.5">
-        {steps.map((step, idx) => (
-          <li key={idx} className="flex gap-2">
-            <span className="text-gray-400 flex-shrink-0">{idx + 1}.</span>
-            <span className="text-sm text-gray-700 leading-relaxed">
-              <span className="font-medium text-gray-900">{step.title}</span>
-              {step.detail ? ` — ${step.detail}` : ''}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
-}
