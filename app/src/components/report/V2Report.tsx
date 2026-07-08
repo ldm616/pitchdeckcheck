@@ -6,7 +6,11 @@ import type {
 } from '../../lib/types'
 
 // V2 report renderer — dashboard-first layout with a simple three-level
-// hierarchy: Deck Score (top) -> Deck Feedback (4 cards) -> Slide Feedback.
+// hierarchy. The left/dashboard side is scannable navigation only; ALL detailed
+// reading happens in the right-side detail pane:
+//   1. Deck Score      (one selectable summary card, selected by default)
+//   2. Deck Feedback   (4 selectable dimension cards)
+//   3. Slide Feedback  (one selectable card per slide/topic)
 // Reads only whitelisted report_v2 fields; never surfaces gate terminology,
 // debug data, or raw *.signals. Every section tolerates missing/partial data.
 
@@ -44,9 +48,6 @@ const DASH_LABEL: Record<Grade, string> = {
   D: 'Missing / weak',
   neutral: 'Not assessed',
 }
-
-// Rank for choosing the default (most important) selection. Lower = worse.
-const RANK: Record<Grade, number> = { D: 0, C: 1, B: 2, A: 3, neutral: 4 }
 
 // Canonical slide assessment -> A/B/C/D. Uses the investor-facing assessment,
 // not the raw backend grade.
@@ -89,15 +90,23 @@ function overallLetterToGrade(letter?: string): Grade {
   return 'neutral'
 }
 
+// Low-risk display cleanup: strip an awkward machine prefix that sometimes leads
+// slide "what is missing" text, and re-capitalize the remainder.
+function cleanFeedbackText(s?: string): string | undefined {
+  if (!s) return s
+  const stripped = s.replace(/^\s*Investors still need stronger answers to:\s*/i, '').trim()
+  if (!stripped) return stripped
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1)
+}
+
 // --- small components ---------------------------------------------------------
 
 // Grade as a bold letter with a strong colored underline (dashboard metric
-// style), not a pill. Sizes: md (cards), lg (detail), xl (hero).
-function GradeMark({ grade, size = 'md' }: { grade: Grade; size?: 'md' | 'lg' | 'xl' }) {
+// style), not a pill. Sizes: md (cards), lg (detail).
+function GradeMark({ grade, size = 'md' }: { grade: Grade; size?: 'md' | 'lg' }) {
   const letter = grade === 'neutral' ? '–' : grade
-  const textCls = size === 'xl' ? 'text-3xl' : size === 'lg' ? 'text-2xl' : 'text-[15px]'
-  const underlineCls =
-    size === 'xl' ? 'mt-1 h-0.5 w-8' : size === 'lg' ? 'mt-0.5 h-0.5 w-7' : 'mt-0.5 h-0.5 w-6'
+  const textCls = size === 'lg' ? 'text-2xl' : 'text-[15px]'
+  const underlineCls = size === 'lg' ? 'mt-0.5 h-0.5 w-7' : 'mt-0.5 h-0.5 w-6'
   return (
     <span className="inline-flex flex-col items-center leading-none shrink-0">
       <span className={`${textCls} font-semibold text-monarch-ink`}>{letter}</span>
@@ -106,49 +115,29 @@ function GradeMark({ grade, size = 'md' }: { grade: Grade; size?: 'md' | 'lg' | 
   )
 }
 
-function DeckScoreCard({
-  label,
-  data,
+// Compact selectable card shared shape: title + grade on one row, one short
+// status line below. No detailed text.
+function TriageCard({
+  title,
+  status,
+  grade,
   selected,
   onSelect,
 }: {
-  label: string
-  data: DeckCommunicationScoreV2
+  title: string
+  status?: string
+  grade: Grade
   selected: boolean
   onSelect: () => void
 }) {
-  const grade = deckScoreToGrade(data.score, data.label)
   return (
     <button type="button" onClick={onSelect} className={cardClass(selected)}>
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[14px] font-medium text-monarch-ink">{label}</span>
+        <span className="text-[14px] font-medium text-monarch-ink truncate">{title}</span>
         <GradeMark grade={grade} />
       </div>
-      <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight">{data.label || DASH_LABEL[grade]}</p>
-    </button>
-  )
-}
-
-function SlideScoreCard({
-  slide,
-  selected,
-  onSelect,
-}: {
-  slide: SlideLevelFeedbackV2
-  selected: boolean
-  onSelect: () => void
-}) {
-  const grade = slideAssessmentToGrade(slide.assessment)
-  const title = slide.slide_title_or_section || 'Section'
-  const heading = typeof slide.slide_number === 'number' ? `${slide.slide_number}: ${title}` : title
-  return (
-    <button type="button" onClick={onSelect} className={cardClass(selected)}>
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-[14px] font-medium text-monarch-ink truncate">{heading}</span>
-        <GradeMark grade={grade} />
-      </div>
-      {slide.assessment && (
-        <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{slide.assessment}</p>
+      {status && (
+        <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{status}</p>
       )}
     </button>
   )
@@ -173,9 +162,28 @@ function IssueTag({ issueType }: { issueType?: string }) {
   )
 }
 
+// Bulleted list used only inside the detail pane (Deck Score detail).
+function LikelyList({ label, items, markerClass }: { label: string; items: string[]; markerClass: string }) {
+  if (items.length === 0) return null
+  return (
+    <div>
+      <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-1">{label}</p>
+      <ul className="space-y-1">
+        {items.map((it, idx) => (
+          <li key={idx} className="flex gap-2">
+            <span className={`${markerClass} flex-shrink-0`}>•</span>
+            <span className="text-[14px] text-monarch-body leading-normal">{it}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 // --- selection ---------------------------------------------------------------
 
 type Selected =
+  | { type: 'deck_summary' }
   | { type: 'deck_score'; key: string; label: string }
   | { type: 'slide'; index: number }
   | null
@@ -185,8 +193,7 @@ type Selected =
 // Deck Feedback is intentionally limited to the four deck-level
 // communication/narrative dimensions. Investment Case, Priority Fixes, Investor
 // Questions/Beliefs, and Context are no longer standalone dashboard cards —
-// their content is incorporated into the top Deck Score assessment and the
-// relevant detail panes instead.
+// their content is folded into the Deck Score detail pane or omitted for now.
 const DIMENSIONS: Array<{ key: keyof PitchDeckCheckReportV2['deck_communication_scores']; label: string }> = [
   { key: 'completeness', label: 'Completeness' },
   { key: 'clarity', label: 'Clarity' },
@@ -203,6 +210,10 @@ export function V2Report({ report }: V2ReportProps) {
   const slides = report.slide_level_feedback || []
   const deckDims = useMemo(() => DIMENSIONS.filter((d) => dcs && dcs[d.key]), [dcs])
 
+  const overallGrade = overallLetterToGrade(og?.letter)
+  const companyName = report.header?.company_name
+  const summaryLine = og?.concise_interpretation || 'Assessment not available.'
+
   // Compact, secondary "Evaluated as" line built from inferred context.
   // TODO: replace inferred context display with explicit user-provided context
   // from the upload/report setup flow (stage, target raise, audience, business
@@ -215,37 +226,9 @@ export function V2Report({ report }: V2ReportProps) {
       .join(' · ')
   }, [cs])
 
-  // Default selection: the lowest/most concerning slide if present, else the
-  // lowest deck-feedback dimension. No Priority Fixes card exists anymore.
-  const defaultSelected = useMemo<Selected>(() => {
-    if (slides.length > 0) {
-      let worst = 0
-      let worstRank = 99
-      slides.forEach((s, i) => {
-        const r = RANK[slideAssessmentToGrade(s.assessment)]
-        if (r < worstRank) {
-          worstRank = r
-          worst = i
-        }
-      })
-      return { type: 'slide', index: worst }
-    }
-    if (deckDims.length > 0) {
-      let worst = deckDims[0]
-      let worstRank = 99
-      for (const d of deckDims) {
-        const r = RANK[deckScoreToGrade(dcs[d.key]!.score, dcs[d.key]!.label)]
-        if (r < worstRank) {
-          worstRank = r
-          worst = d
-        }
-      }
-      return { type: 'deck_score', key: worst.key as string, label: worst.label }
-    }
-    return null
-  }, [slides, deckDims, dcs])
-
-  const [selected, setSelected] = useState<Selected>(defaultSelected)
+  // Deck Score is selected by default; the detail pane opens on the overall
+  // assessment.
+  const [selected, setSelected] = useState<Selected>({ type: 'deck_summary' })
   const detailRef = useRef<HTMLDivElement | null>(null)
 
   // --- desktop workspace: resizable two-pane split (>= 1280px) ---------------
@@ -283,14 +266,14 @@ export function V2Report({ report }: V2ReportProps) {
   })
   const leftWidthRef = useRef<number | null>(leftWidth)
 
-  // Applied (clamped) left-pane width. Falls back to 60% before measured.
+  // Applied (clamped) left-pane width. Falls back to 50% before measured.
   const maxLeft = Math.max(LEFT_MIN, containerW - RIGHT_MIN - DIVIDER_W)
   const appliedLeft =
     containerW === 0
       ? null
       : leftWidth != null
       ? Math.min(Math.max(leftWidth, LEFT_MIN), maxLeft)
-      : Math.round(containerW * 0.6)
+      : Math.round(containerW * 0.5)
 
   const onDividerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -330,11 +313,20 @@ export function V2Report({ report }: V2ReportProps) {
     }
   }
 
-  const overallGrade = overallLetterToGrade(og?.letter)
-  const companyName = report.header?.company_name
-
   const renderDetail = () => {
     if (!selected) return null
+    if (selected.type === 'deck_summary') {
+      return (
+        <SelectedDeckSummaryDetail
+          overallGrade={overallGrade}
+          companyName={companyName}
+          assessment={summaryLine}
+          believe={believe}
+          question={question}
+          evaluatedAs={evaluatedAs}
+        />
+      )
+    }
     if (selected.type === 'deck_score') {
       const d = dcs[selected.key as keyof typeof dcs]
       return d ? <SelectedDeckDetail label={selected.label} data={d} /> : null
@@ -351,19 +343,35 @@ export function V2Report({ report }: V2ReportProps) {
 
   const leftContent = (
     <div className="space-y-5">
+      {/* Deck Score — one compact selectable summary card */}
+      <div>
+        <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck Score</h2>
+        <TriageCard
+          title={companyName || 'Overall Deck Score'}
+          status={summaryLine}
+          grade={overallGrade}
+          selected={selected?.type === 'deck_summary'}
+          onSelect={() => select({ type: 'deck_summary' })}
+        />
+      </div>
+
       {deckDims.length > 0 && (
         <div>
           <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck Feedback</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {deckDims.map(({ key, label }) => (
-              <DeckScoreCard
-                key={key}
-                label={label}
-                data={dcs[key]!}
-                selected={selected?.type === 'deck_score' && selected.key === key}
-                onSelect={() => select({ type: 'deck_score', key: key as string, label })}
-              />
-            ))}
+            {deckDims.map(({ key, label }) => {
+              const d = dcs[key]!
+              return (
+                <TriageCard
+                  key={key}
+                  title={label}
+                  status={d.label || DASH_LABEL[deckScoreToGrade(d.score, d.label)]}
+                  grade={deckScoreToGrade(d.score, d.label)}
+                  selected={selected?.type === 'deck_score' && selected.key === key}
+                  onSelect={() => select({ type: 'deck_score', key: key as string, label })}
+                />
+              )
+            })}
           </div>
         </div>
       )}
@@ -372,14 +380,20 @@ export function V2Report({ report }: V2ReportProps) {
         <div>
           <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slide Feedback</h2>
           <div style={SLIDE_GRID_STYLE}>
-            {slides.map((s, i) => (
-              <SlideScoreCard
-                key={i}
-                slide={s}
-                selected={selected?.type === 'slide' && selected.index === i}
-                onSelect={() => select({ type: 'slide', index: i })}
-              />
-            ))}
+            {slides.map((s, i) => {
+              const title = s.slide_title_or_section || 'Section'
+              const heading = typeof s.slide_number === 'number' ? `${s.slide_number}: ${title}` : title
+              return (
+                <TriageCard
+                  key={i}
+                  title={heading}
+                  status={s.assessment}
+                  grade={slideAssessmentToGrade(s.assessment)}
+                  selected={selected?.type === 'slide' && selected.index === i}
+                  onSelect={() => select({ type: 'slide', index: i })}
+                />
+              )
+            })}
           </div>
         </div>
       )}
@@ -395,52 +409,12 @@ export function V2Report({ report }: V2ReportProps) {
 
   return (
     <div className="font-sans text-monarch-body">
-      {/* Deck Score — one plain-language investor assessment */}
-      <div className="flex items-start gap-4 pb-2">
-        <GradeMark grade={overallGrade} size="xl" />
-        <div className="min-w-0">
-          <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-0.5">
-            {companyName || report.header?.report_title || 'Pitch Deck Check Report'}
-          </p>
-          <p className="text-[16px] md:text-[17px] font-medium text-monarch-ink leading-snug">
-            {og?.concise_interpretation || 'Assessment not available.'}
-          </p>
-
-          {(believe.length > 0 || question.length > 0) && (
-            <div className="mt-3 space-y-2.5">
-              {believe.length > 0 && (
-                <LikelyList
-                  label="Investors will likely like"
-                  items={believe}
-                  markerClass="text-grade-a"
-                />
-              )}
-              {question.length > 0 && (
-                <LikelyList
-                  label="Investors will likely question"
-                  items={question}
-                  markerClass="text-grade-c"
-                />
-              )}
-            </div>
-          )}
-
-          {evaluatedAs && (
-            // TODO: replace inferred context with explicit user-provided context
-            // from the upload/report setup flow. Kept secondary and compact.
-            <p className="mt-3 text-[14px] text-monarch-muted leading-normal">
-              <span className="font-medium">Evaluated as:</span> {evaluatedAs}
-            </p>
-          )}
-        </div>
-      </div>
-
       {isDesktop ? (
         /* Desktop workspace: resizable two-pane split */
-        <div ref={containerRef} className="mt-5 flex items-stretch">
+        <div ref={containerRef} className="flex items-stretch">
           <div
             className="min-w-0 shrink-0"
-            style={{ width: appliedLeft != null ? `${appliedLeft}px` : '60%' }}
+            style={{ width: appliedLeft != null ? `${appliedLeft}px` : '50%' }}
           >
             {leftContent}
           </div>
@@ -469,7 +443,7 @@ export function V2Report({ report }: V2ReportProps) {
         </div>
       ) : (
         /* Stacked layout (tablet / mobile) */
-        <div className="mt-5 space-y-5">
+        <div className="space-y-5">
           {leftContent}
           {selected && <div ref={detailRef}>{detailPane}</div>}
         </div>
@@ -482,29 +456,50 @@ export function V2Report({ report }: V2ReportProps) {
   )
 }
 
-// Two short lines under the Deck Score: what investors will likely like /
-// question. Compact bulleted list, capped so the top stays scannable.
-function LikelyList({ label, items, markerClass }: { label: string; items: string[]; markerClass: string }) {
-  const shown = items.slice(0, 4)
-  return (
-    <div>
-      <p className="text-[14px] font-medium text-monarch-ink">{label}:</p>
-      <ul className="mt-1 space-y-1">
-        {shown.map((it, idx) => (
-          <li key={idx} className="flex gap-2">
-            <span className={`${markerClass} flex-shrink-0`}>•</span>
-            <span className="text-[14px] text-monarch-body leading-normal">{it}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 // --- selected-detail renderers ------------------------------------------------
 
 // Every detail view uses the same simple structure:
 // What's working / What needs help / Recommended changes.
+
+function SelectedDeckSummaryDetail({
+  overallGrade,
+  companyName,
+  assessment,
+  believe,
+  question,
+  evaluatedAs,
+}: {
+  overallGrade: Grade
+  companyName?: string
+  assessment: string
+  believe: string[]
+  question: string[]
+  evaluatedAs: string
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-4 mb-4">
+        <GradeMark grade={overallGrade} size="lg" />
+        <div className="min-w-0">
+          <p className="text-base font-semibold text-monarch-ink">{companyName || 'Overall Deck Score'}</p>
+          <p className="text-[14px] text-monarch-sub">Overall assessment</p>
+        </div>
+      </div>
+      <p className="text-[15px] text-monarch-body leading-normal mb-4">{assessment}</p>
+      <div className="space-y-4">
+        <LikelyList label="Investors will likely like" items={believe} markerClass="text-grade-a" />
+        <LikelyList label="Investors will likely question" items={question} markerClass="text-grade-c" />
+      </div>
+      {evaluatedAs && (
+        // TODO: replace inferred context display with explicit user-provided
+        // context from the upload/report setup flow. Kept secondary and compact.
+        <p className="mt-4 text-[14px] text-monarch-muted leading-normal">
+          <span className="font-medium">Evaluated as:</span> {evaluatedAs}
+        </p>
+      )}
+    </div>
+  )
+}
 
 function SelectedDeckDetail({ label, data }: { label: string; data: DeckCommunicationScoreV2 }) {
   const grade = deckScoreToGrade(data.score, data.label)
@@ -528,6 +523,8 @@ function SelectedDeckDetail({ label, data }: { label: string; data: DeckCommunic
 
 function SelectedSlideDetail({ slide }: { slide: SlideLevelFeedbackV2 }) {
   const grade = slideAssessmentToGrade(slide.assessment)
+  const missing = cleanFeedbackText(slide.what_is_missing)
+  const recommended = cleanFeedbackText(slide.recommended_improvement)
   return (
     <div>
       <div className="flex items-center gap-4 mb-4">
@@ -546,10 +543,10 @@ function SelectedSlideDetail({ slide }: { slide: SlideLevelFeedbackV2 }) {
         </div>
       </div>
       <div className="space-y-3">
-        <DetailRow label="What's working">{slide.what_works}</DetailRow>
-        <DetailRow label="What needs help">{slide.what_is_missing}</DetailRow>
-        {slide.recommended_improvement && slide.recommended_improvement !== slide.what_is_missing && (
-          <DetailRow label="Recommended changes">{slide.recommended_improvement}</DetailRow>
+        <DetailRow label="What's working">{cleanFeedbackText(slide.what_works)}</DetailRow>
+        <DetailRow label="What needs help">{missing}</DetailRow>
+        {recommended && recommended !== missing && (
+          <DetailRow label="Recommended changes">{recommended}</DetailRow>
         )}
         {slide.investor_decision && (
           <p className="text-[14px] text-monarch-muted leading-normal pt-1">
