@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { Download, Copy } from 'lucide-react'
+import { Download, Copy, Loader2 } from 'lucide-react'
 import { getReport, getReportByCode, isAdmin } from '../lib/api'
 import { ROUTES } from '../lib/routes'
-import { LoadingSpinner } from '../components/LoadingSpinner'
 import { FounderHeader } from '../components/FounderHeader'
 import { FounderFooter } from '../components/FounderFooter'
 import { ContactModal } from '../components/ContactModal'
@@ -106,7 +105,8 @@ export function ReportPage() {
         <FounderHeader />
         <main className="flex-1 flex items-center justify-center px-6 pb-16">
           <div className="bg-white rounded-xl shadow-sm p-12 max-w-md w-full flex flex-col items-center">
-            <LoadingSpinner size="lg" />
+            {/* Small lucide loading icon, pulsing once per second */}
+            <Loader2 className="w-6 h-6 text-gray-400 animate-[pulse_1s_ease-in-out_infinite]" />
             <p className="mt-4 text-gray-500">Loading your report...</p>
           </div>
         </main>
