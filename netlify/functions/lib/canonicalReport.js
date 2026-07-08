@@ -159,6 +159,11 @@ const VALUE_GAP_DECISION = {
   product: 'Does the product prove the solution can reliably deliver the promised value?',
 };
 
+// Signals that a Product slide is about the consumer/demand side vs the
+// supply/provider side, so two Product slides get side-specific feedback.
+const PRODUCT_SUPPLY_SIDE_RE = /\b(detailer|provider|supplier|seller|driver|host|merchant|earnings|payout|job|accept|onboard|supply[- ]side)\b/i;
+const PRODUCT_CONSUMER_SIDE_RE = /\b(consumer|customer|booking|book|order|checkout|convert|conversion|activation|rating|review|demand[- ]side)\b/i;
+
 // A slide-local ask for a product visual (screenshot/mockup/workflow diagram).
 // On a Solution slide this is a false negative when a Product slide already
 // shows it.
@@ -180,6 +185,11 @@ function _isNoGap(gap) {
 // Caveat language that disqualifies a statement from positive-only sections
 // (investor beliefs / recommended investment highlights).
 const CAVEAT_RE = /\b(however|but|lacks?|missing|without|not provided|unclear|though|although|yet to|need to|needs? more)\b/i;
+
+// Weak "criterion satisfied" signals that are not investor-exciting conclusions
+// (product stage clear, name/tagline/contact present, slide clarity, assumptions
+// merely visible) — excluded from beliefs.
+const WEAK_SIGNAL_RE = /\b(stage of the product|product stage|implicitly clear|company name|tagline|contact info|assumptions? (?:are |is )?(?:visible|shown|present)|clearly (?:presented|labeled|labelled|organized|organised|structured)|easy to (?:read|understand|follow)|legible|readable)\b/i;
 
 // Market is only fully answered when the size is externally sourced AND there is
 // a credible capture pathway. These detect those signals in the rubric evidence.
@@ -241,23 +251,58 @@ function _beliefEvidence(assessment) {
 
 // Detect a concrete marketplace supply-side label (e.g. "detailers") from the
 // deck evidence so wording can prefer it over the generic "supply".
+// Preferred marketplace supply-side labels, in priority order. Concrete deck
+// terms (detailers) win over generic ones (professionals, providers) even when
+// the generic term appears earlier in the text. Always returned PLURAL.
+const SUPPLY_ROLE_PRIORITY = [
+  'detailers',
+  'drivers',
+  'hosts',
+  'sellers',
+  'providers',
+  'suppliers',
+  'merchants',
+  'couriers',
+  'creators',
+  'freelancers',
+  'contractors',
+  'vendors',
+  'caterers',
+  'cleaners',
+  'tutors',
+  'stylists',
+  'shoppers',
+  'renters',
+  'professionals',
+];
+
 function _detectSupplyLabel(evalSlides) {
-  for (const s of evalSlides || []) {
-    for (const q of s.questions || []) {
-      const m = SUPPLY_ROLE_RE.exec(`${q.assessment || ''} ${q.gap || ''}`);
-      if (m) return m[1].toLowerCase();
-    }
+  const text = (evalSlides || [])
+    .flatMap((s) => (s.questions || []).map((q) => `${q.assessment || ''} ${q.gap || ''}`))
+    .join(' ')
+    .toLowerCase();
+  if (!text) return null;
+  for (const plural of SUPPLY_ROLE_PRIORITY) {
+    const singular = plural.replace(/s$/, '');
+    // match singular or plural, return the plural form
+    if (new RegExp(`\\b${singular}s?\\b`, 'i').test(text)) return plural;
   }
   return null;
 }
 
-// Replace generic "users and supply" phrasing with the detected side label.
+// Replace generic "user(s) and supply" phrasing with the detected side label,
+// using the natural plural for the actors ("users and detailers") and the
+// singular form when it modifies a following noun ("user and detailer growth").
 function _applySupplyLabel(text, label) {
   if (!text || !label) return text;
+  const plural = label; // already plural from _detectSupplyLabel
   const singular = label.replace(/s$/, '');
-  return text
-    .replace(/\busers and supply\b/gi, `users and ${label}`)
-    .replace(/\buser and supply\b/gi, `user and ${singular}`);
+  return text.replace(/\b(users?)\s+and\s+supply\b(\s+\w+)?/gi, (_m, users, tail) => {
+    if (tail && /^\s+(growth|acquisition|retention|density|liquidity)\b/i.test(tail)) {
+      return `${users} and ${singular}${tail}`;
+    }
+    return `${users} and ${plural}${tail || ''}`;
+  });
 }
 
 // --- small numeric helpers ----------------------------------------------------
@@ -586,7 +631,26 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
   // present in the rubric evidence (no invention). Avoid repeating the exact
   // what_works sentence at the start of what_is_missing (issue 5).
   if (!notAssessed && SPECIFIC_TOPIC_GAP[effectiveTypeKey] && (missing || forceSpecific)) {
-    const gap = SPECIFIC_TOPIC_GAP[effectiveTypeKey];
+    let gap = SPECIFIC_TOPIC_GAP[effectiveTypeKey];
+    let rec = SPECIFIC_TOPIC_RECOMMENDED[effectiveTypeKey];
+
+    // Product: give consumer- vs supply-facing Product slides side-specific
+    // proof asks so multiple Product slides don't repeat the same generic gap.
+    if (effectiveTypeKey === 'product') {
+      const ev = questions.map((q) => `${q.assessment || ''} ${q.gap || ''} ${q.question || ''}`).join(' ');
+      const supplySide = PRODUCT_SUPPLY_SIDE_RE.test(ev);
+      const consumerSide = PRODUCT_CONSUMER_SIDE_RE.test(ev);
+      const sideActor = supplyLabel ? supplyLabel.replace(/s$/, '') : 'provider';
+      if (supplySide && !consumerSide) {
+        gap = `investors need proof the supply side delivers value: ${sideActor} activation, job acceptance, earnings impact, retention, and supply-side reliability`;
+        rec = `Show supply-side proof — ${sideActor} activation, job acceptance, earnings impact, and retention.`;
+      } else if (consumerSide && !supplySide) {
+        gap =
+          'investors need proof the consumer side delivers value: activation, completed bookings, conversion, repeat usage, and preference';
+        rec = 'Show consumer-side proof — activation, completed bookings, conversion, and repeat usage.';
+      }
+    }
+
     const lead = _strongLead(questions);
     const worksStripped = String(whatWorks || '').trim().replace(/\.+$/, '');
     if (lead && lead !== worksStripped) {
@@ -597,7 +661,7 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
       // what_works already states the grounded lead — don't repeat it.
       missing = `${_capitalize(gap)}.`;
     }
-    recommended = SPECIFIC_TOPIC_RECOMMENDED[effectiveTypeKey];
+    recommended = rec;
   }
 
   // Roadmap should not read as fully answered just because it lists milestones.
@@ -813,7 +877,12 @@ function deriveBelieve(evalSlides) {
         const existing = byTopic.get(typeKey);
         // Keep the highest-scoring grounded statement per topic. Beliefs are
         // positive-only, so skip any evidence fragment carrying a caveat.
-        if (evidence && !CAVEAT_RE.test(evidence) && (!existing || q.score > existing.score)) {
+        if (
+          evidence &&
+          !CAVEAT_RE.test(evidence) &&
+          !WEAK_SIGNAL_RE.test(evidence) &&
+          (!existing || q.score > existing.score)
+        ) {
           byTopic.set(typeKey, { evidence, score: q.score, priority: BELIEF_TOPIC_PRIORITY[typeKey], typeKey });
         }
       }

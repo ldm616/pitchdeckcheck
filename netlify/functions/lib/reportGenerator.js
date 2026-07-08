@@ -1132,6 +1132,11 @@ For each thesis question, evaluate how well the COMPLETE DECK answers it. Look a
 // highlights. Caveats belong in gaps / priority improvements / questions.
 const HIGHLIGHT_CAVEAT_RE = /\b(however|but|lacks?|missing|without|not provided|unclear|though|although)\b/i
 
+// Weak "criterion satisfied" signals that are not investor-exciting highlights
+// (product stage clear, name/tagline/contact present, assumptions visible, slide
+// clarity/presentation). These get filtered out of the highlights.
+const WEAK_HIGHLIGHT_RE = /\b(stage of the product|product stage|implicitly clear|company name|tagline|contact info|assumptions? (?:are |is )?(?:visible|shown|present)|clearly (?:presented|labeled|labelled|laid out|organized|organised|structured)|easy to (?:read|understand|follow)|well[- ](?:organized|organised|structured|laid out)|legible|readable|(?:is|are) present on the (?:cover|slide)|criterion (?:met|fully met))\b/i
+
 function generateRecommendedInvestmentHighlights(slideEvaluations, investmentThesis) {
   const highlights = []
 
@@ -1147,9 +1152,14 @@ function generateRecommendedInvestmentHighlights(slideEvaluations, investmentThe
     const strongQuestions = slide.questions.filter((q) => q.score >= 4 && q.confidence !== 'low')
 
     for (const q of strongQuestions) {
-      // Extract key insight from assessment. Skip caveated statements —
-      // investment highlights are positive-only.
-      if (q.assessment && q.assessment !== 'Not addressed in slide' && !HIGHLIGHT_CAVEAT_RE.test(q.assessment)) {
+      // Extract key insight from assessment. Skip caveated statements and weak
+      // "criterion satisfied" signals — highlights are positive investor signals.
+      if (
+        q.assessment &&
+        q.assessment !== 'Not addressed in slide' &&
+        !HIGHLIGHT_CAVEAT_RE.test(q.assessment) &&
+        !WEAK_HIGHLIGHT_RE.test(q.assessment)
+      ) {
         highlights.push({
           category: slideType,
           signal: q.assessment,
@@ -1163,7 +1173,7 @@ function generateRecommendedInvestmentHighlights(slideEvaluations, investmentThe
   // Add strong thesis elements (score >= 4), positive-only.
   if (investmentThesis) {
     for (const [key, thesis] of Object.entries(investmentThesis)) {
-      if (thesis.score >= 4 && thesis.verdict && !HIGHLIGHT_CAVEAT_RE.test(thesis.verdict)) {
+      if (thesis.score >= 4 && thesis.verdict && !HIGHLIGHT_CAVEAT_RE.test(thesis.verdict) && !WEAK_HIGHLIGHT_RE.test(thesis.verdict)) {
         highlights.push({
           category: key.replace('why_', '').replace('_', ' '),
           signal: thesis.verdict,
