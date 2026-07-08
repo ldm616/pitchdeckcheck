@@ -81,17 +81,18 @@ function overallLetterToGrade(letter?: string): Grade {
 
 // --- small components ---------------------------------------------------------
 
-function GradeBadge({ grade, size = 'sm' }: { grade: Grade; size?: 'sm' | 'lg' | 'xl' }) {
+function GradeBadge({ grade, size = 'sm' }: { grade: Grade; size?: 'xs' | 'sm' | 'lg' | 'xl' }) {
   const t = TONE[grade]
   const letter = grade === 'neutral' ? '–' : grade
   if (size === 'xl') {
     return (
-      <span className={`inline-flex items-center justify-center w-20 h-20 rounded-2xl text-5xl font-semibold ${t.badge}`}>
+      <span className={`inline-flex items-center justify-center w-14 h-14 rounded-xl text-3xl font-semibold ${t.badge}`}>
         {letter}
       </span>
     )
   }
-  const dims = size === 'lg' ? 'w-9 h-9 text-lg' : 'w-7 h-7 text-sm'
+  const dims =
+    size === 'lg' ? 'w-8 h-8 text-base' : size === 'xs' ? 'w-6 h-6 text-xs' : 'w-7 h-7 text-sm'
   return (
     <span className={`inline-flex items-center justify-center ${dims} rounded-lg font-semibold ${t.badge}`}>
       {letter}
@@ -116,17 +117,17 @@ function DeckScoreCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`text-left w-full rounded-xl border ${t.border} bg-white p-4 transition-shadow hover:shadow-sm focus:outline-none ${
+      className={`text-left w-full rounded-lg border ${t.border} bg-white px-3 py-2.5 transition-shadow hover:shadow-sm focus:outline-none ${
         selected ? `ring-2 ${t.ring} ring-offset-1` : ''
       }`}
     >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
-        <GradeBadge grade={grade} size="lg" />
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide truncate">{label}</span>
+        <GradeBadge grade={grade} size="sm" />
       </div>
-      <p className={`text-sm font-medium ${t.text}`}>{data.label || DASH_LABEL[grade]}</p>
+      <p className={`text-xs font-medium ${t.text}`}>{data.label || DASH_LABEL[grade]}</p>
       {data.explanation && (
-        <p className="mt-1 text-xs text-gray-500 leading-relaxed line-clamp-3">{data.explanation}</p>
+        <p className="mt-0.5 text-[11px] text-gray-400 leading-snug line-clamp-1">{data.explanation}</p>
       )}
     </button>
   )
@@ -147,21 +148,21 @@ function SlideScoreCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`text-left w-full rounded-xl border ${t.border} bg-white p-3 transition-shadow hover:shadow-sm focus:outline-none ${
+      className={`text-left w-full rounded-lg border ${t.border} bg-white px-2.5 py-2 transition-shadow hover:shadow-sm focus:outline-none ${
         selected ? `ring-2 ${t.ring} ring-offset-1` : ''
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <span className="text-xs font-medium text-gray-500">
+      <div className="flex items-center justify-between gap-1.5 mb-0.5">
+        <span className="text-[11px] font-medium text-gray-400">
           {typeof slide.slide_number === 'number' ? `Slide ${slide.slide_number}` : 'Section'}
         </span>
-        <GradeBadge grade={grade} />
+        <GradeBadge grade={grade} size="xs" />
       </div>
-      <p className="text-sm font-medium text-gray-900 leading-snug line-clamp-2">
+      <p className="text-xs font-medium text-gray-900 leading-snug line-clamp-1">
         {slide.slide_title_or_section || 'Section'}
       </p>
       {slide.assessment && (
-        <p className={`mt-1 text-xs ${t.text}`}>{slide.assessment}</p>
+        <p className={`text-[11px] leading-snug line-clamp-1 ${t.text}`}>{slide.assessment}</p>
       )}
     </button>
   )
@@ -277,74 +278,77 @@ export function V2Report({ report }: V2ReportProps) {
 
   return (
     <div>
-      {/* Hero */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-5 pb-6 border-b border-gray-100">
+      {/* Hero (compact) */}
+      <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
         <GradeBadge grade={overallGrade} size="xl" />
         <div className="min-w-0">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
+          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-0.5">
             {companyName || report.header?.report_title || 'Pitch Deck Check Report'}
           </p>
-          <p className="text-lg font-semibold text-gray-900 leading-snug">
+          <p className="text-sm sm:text-base font-semibold text-gray-900 leading-snug">
             {og?.concise_interpretation || 'Assessment not available.'}
           </p>
           {og?.primary_constraint && og.primary_constraint !== 'None' && (
-            <p className="mt-1.5 text-sm text-gray-600">
+            <p className="mt-1 text-xs sm:text-sm text-gray-600">
               <span className="font-medium text-gray-900">Primary constraint:</span>{' '}
               {og.primary_constraint}
             </p>
           )}
-          {og?.what_this_means && og.what_this_means !== og.concise_interpretation && (
-            <p className="mt-1 text-sm text-gray-500 leading-relaxed">{og.what_this_means}</p>
-          )}
         </div>
       </div>
 
-      {/* Deck Scores */}
-      {deckDims.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Deck Scores</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {deckDims.map(({ key, label }) => (
-              <DeckScoreCard
-                key={key}
-                label={label}
-                data={dcs[key]!}
-                selected={selected?.type === 'deck_score' && selected.key === key}
-                onSelect={() => select({ type: 'deck_score', key: key as string, label })}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Slide Scores */}
-      {slides.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Slide Scores</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {slides.map((s, i) => (
-              <SlideScoreCard
-                key={i}
-                slide={s}
-                selected={selected?.type === 'slide' && selected.index === i}
-                onSelect={() => select({ type: 'slide', index: i })}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Selected Detail */}
-      {selected && (
-        <div ref={detailRef} className="mt-6 rounded-xl border border-gray-200 bg-gray-50/60 p-5 sm:p-6">
-          {selected.type === 'deck_score' && dcs[selected.key as keyof typeof dcs] && (
-            <SelectedDeckDetail label={selected.label} data={dcs[selected.key as keyof typeof dcs]!} />
+      {/* Dashboard: scorecard grids (left) + selected detail (right/sticky on wide screens) */}
+      <div className="mt-6 xl:grid xl:grid-cols-3 xl:gap-6">
+        <div className="xl:col-span-2 space-y-6">
+          {deckDims.length > 0 && (
+            <div>
+              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Deck Scores</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                {deckDims.map(({ key, label }) => (
+                  <DeckScoreCard
+                    key={key}
+                    label={label}
+                    data={dcs[key]!}
+                    selected={selected?.type === 'deck_score' && selected.key === key}
+                    onSelect={() => select({ type: 'deck_score', key: key as string, label })}
+                  />
+                ))}
+              </div>
+            </div>
           )}
-          {selected.type === 'slide' && slides[selected.index] && (
-            <SelectedSlideDetail slide={slides[selected.index]} />
+
+          {slides.length > 0 && (
+            <div>
+              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Slide Scores</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                {slides.map((s, i) => (
+                  <SlideScoreCard
+                    key={i}
+                    slide={s}
+                    selected={selected?.type === 'slide' && selected.index === i}
+                    onSelect={() => select({ type: 'slide', index: i })}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </div>
-      )}
+
+        {/* Selected Detail */}
+        {selected && (
+          <div ref={detailRef} className="mt-5 xl:mt-0 xl:col-span-1">
+            <div className="xl:sticky xl:top-6 rounded-xl border border-gray-200 bg-gray-50/70 p-4 sm:p-5">
+              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-3">Details</p>
+              {selected.type === 'deck_score' && dcs[selected.key as keyof typeof dcs] && (
+                <SelectedDeckDetail label={selected.label} data={dcs[selected.key as keyof typeof dcs]!} />
+              )}
+              {selected.type === 'slide' && slides[selected.index] && (
+                <SelectedSlideDetail slide={slides[selected.index]} />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Secondary narrative sections — arranged wide to reduce scrolling. */}
       <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-10">
