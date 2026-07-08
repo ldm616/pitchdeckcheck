@@ -30,8 +30,10 @@ const GRADE_UNDERLINE: Record<Grade, string> = {
 // Card border: default calm neutral; selected gets a bold orange border. Always
 // border-2 so selection never shifts layout.
 function cardClass(selected: boolean): string {
-  return `border-2 bg-monarch-card rounded-xl px-3 py-2.5 text-left w-full transition focus:outline-none focus-visible:border-monarch-accent ${
-    selected ? 'border-monarch-accent shadow-sm' : 'border-monarch-border hover:border-monarch-border-strong'
+  return `border-2 bg-monarch-card rounded-xl px-3 py-2.5 text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-accent ${
+    selected
+      ? 'border-monarch-accent shadow-[0_1px_3px_rgba(255,90,31,0.12)]'
+      : 'border-monarch-border hover:border-monarch-border-strong'
   }`
 }
 
@@ -93,12 +95,12 @@ function overallLetterToGrade(letter?: string): Grade {
 // style), not a pill. Sizes: md (cards, >=16px), lg (detail), xl (hero).
 function GradeMark({ grade, size = 'md' }: { grade: Grade; size?: 'md' | 'lg' | 'xl' }) {
   const letter = grade === 'neutral' ? '–' : grade
-  const textCls = size === 'xl' ? 'text-4xl' : size === 'lg' ? 'text-2xl' : 'text-base'
+  const textCls = size === 'xl' ? 'text-3xl' : size === 'lg' ? 'text-2xl' : 'text-base'
   const underlineCls =
-    size === 'xl' ? 'mt-1.5 h-[3px] w-8' : size === 'lg' ? 'mt-1 h-[3px] w-6' : 'mt-0.5 h-[3px] w-5'
+    size === 'xl' ? 'mt-1 h-0.5 w-8' : size === 'lg' ? 'mt-0.5 h-0.5 w-7' : 'mt-0.5 h-0.5 w-6'
   return (
     <span className="inline-flex flex-col items-center leading-none shrink-0">
-      <span className={`${textCls} font-bold text-monarch-ink`}>{letter}</span>
+      <span className={`${textCls} font-semibold text-monarch-ink`}>{letter}</span>
       <span className={`rounded-full ${underlineCls} ${GRADE_UNDERLINE[grade]}`} />
     </span>
   )
@@ -119,10 +121,10 @@ function DeckScoreCard({
   return (
     <button type="button" onClick={onSelect} className={cardClass(selected)}>
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-monarch-body uppercase tracking-wide">{label}</span>
+        <span className="text-[14px] font-medium text-monarch-ink">{label}</span>
         <GradeMark grade={grade} />
       </div>
-      <p className="mt-1 text-sm text-monarch-sub">{data.label || DASH_LABEL[grade]}</p>
+      <p className="mt-1 text-[14px] font-normal text-monarch-sub">{data.label || DASH_LABEL[grade]}</p>
     </button>
   )
 }
@@ -142,11 +144,11 @@ function SlideScoreCard({
   return (
     <button type="button" onClick={onSelect} className={cardClass(selected)}>
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-semibold text-monarch-ink truncate">{heading}</span>
+        <span className="text-[14px] font-medium text-monarch-ink truncate">{heading}</span>
         <GradeMark grade={grade} />
       </div>
       {slide.assessment && (
-        <p className="mt-1 text-sm text-monarch-sub leading-snug truncate">{slide.assessment}</p>
+        <p className="mt-1 text-[14px] font-normal text-monarch-sub leading-snug truncate">{slide.assessment}</p>
       )}
     </button>
   )
@@ -156,8 +158,8 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   if (!children) return null
   return (
     <div>
-      <p className="text-sm font-medium text-monarch-muted uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-sm text-monarch-body leading-relaxed">{children}</p>
+      <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-[14px] text-monarch-body leading-normal">{children}</p>
     </div>
   )
 }
@@ -165,14 +167,14 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function IssueTag({ issueType }: { issueType?: string }) {
   if (!issueType || issueType === 'None') return null
   return (
-    <span className="inline-block text-sm font-medium text-monarch-sub bg-monarch-fill rounded px-2 py-0.5">
+    <span className="inline-block text-[14px] font-medium text-monarch-sub bg-monarch-fill rounded-lg px-2 py-0.5">
       {issueType}
     </span>
   )
 }
 
 function DetailHeading({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm font-semibold text-monarch-ink mb-3">{children}</p>
+  return <p className="text-base font-semibold text-monarch-ink mb-3">{children}</p>
 }
 
 // --- selection ---------------------------------------------------------------
@@ -200,8 +202,8 @@ function InsightCard({
 }) {
   return (
     <button type="button" onClick={onSelect} className={cardClass(selected)}>
-      <p className="text-sm font-semibold text-monarch-ink leading-snug">{title}</p>
-      {subtitle && <p className="mt-1 text-sm text-monarch-sub leading-snug line-clamp-1">{subtitle}</p>}
+      <p className="text-[14px] font-medium text-monarch-ink leading-snug">{title}</p>
+      {subtitle && <p className="mt-1 text-[14px] font-normal text-monarch-sub leading-snug line-clamp-1">{subtitle}</p>}
     </button>
   )
 }
@@ -413,7 +415,7 @@ export function V2Report({ report }: V2ReportProps) {
     <div className="space-y-5">
       {(deckDims.length > 0 || deckCards.length > 0) && (
         <div>
-          <h2 className="text-sm font-medium text-monarch-muted uppercase tracking-wide mb-2.5">Deck Feedback</h2>
+          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck Feedback</h2>
           {deckDims.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
               {deckDims.map(({ key, label }) => (
@@ -445,7 +447,7 @@ export function V2Report({ report }: V2ReportProps) {
 
       {slides.length > 0 && (
         <div>
-          <h2 className="text-sm font-medium text-monarch-muted uppercase tracking-wide mb-2.5">Slide Feedback</h2>
+          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slide Feedback</h2>
           <div style={SLIDE_GRID_STYLE}>
             {slides.map((s, i) => (
               <SlideScoreCard
@@ -462,8 +464,8 @@ export function V2Report({ report }: V2ReportProps) {
   )
 
   const detailPane = (
-    <div className="rounded-xl border border-monarch-border bg-monarch-card p-5 sm:p-6">
-      <p className="text-sm font-semibold text-monarch-muted uppercase tracking-wide mb-3">Selected</p>
+    <div className="rounded-xl border border-monarch-border bg-monarch-card p-5 sm:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+      <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-3">Selected</p>
       {renderDetail()}
     </div>
   )
@@ -471,17 +473,17 @@ export function V2Report({ report }: V2ReportProps) {
   return (
     <div className="font-sans text-monarch-body">
       {/* Hero (compact) */}
-      <div className="flex items-center gap-4 pb-4 border-b border-monarch-border">
+      <div className="flex items-center gap-4 pb-2">
         <GradeMark grade={overallGrade} size="xl" />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-monarch-muted uppercase tracking-wide mb-0.5">
+          <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-0.5">
             {companyName || report.header?.report_title || 'Pitch Deck Check Report'}
           </p>
-          <p className="text-base font-medium text-monarch-ink leading-snug">
+          <p className="text-[16px] md:text-[17px] font-medium text-monarch-ink leading-snug">
             {og?.concise_interpretation || 'Assessment not available.'}
           </p>
           {og?.primary_constraint && og.primary_constraint !== 'None' && (
-            <p className="mt-1 text-sm text-monarch-sub">
+            <p className="mt-1 text-[14px] text-monarch-sub leading-normal">
               <span className="font-medium text-monarch-body">Primary constraint:</span> {og.primary_constraint}
             </p>
           )}
@@ -490,7 +492,7 @@ export function V2Report({ report }: V2ReportProps) {
               {keyIssues.map((chip) => (
                 <span
                   key={chip}
-                  className="inline-block text-sm font-medium text-monarch-sub bg-monarch-fill rounded-full px-2 py-0.5"
+                  className="inline-block text-[14px] font-medium text-monarch-sub bg-monarch-fill rounded-lg px-2 py-0.5"
                 >
                   {chip}
                 </span>
@@ -517,10 +519,10 @@ export function V2Report({ report }: V2ReportProps) {
             className="group relative shrink-0 flex items-center justify-center cursor-col-resize select-none touch-none"
             style={{ width: DIVIDER_W }}
           >
-            {/* full-height rule, visible at rest, orange on hover */}
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-monarch-border-strong group-hover:bg-monarch-accent transition-colors" />
+            {/* thin resting rule; orange only on hover/drag */}
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-monarch-border group-hover:bg-monarch-accent group-active:bg-monarch-accent transition-colors" />
             {/* grab handle with dots */}
-            <div className="relative z-10 flex flex-col items-center gap-[3px] rounded-md border border-monarch-border-strong bg-monarch-card px-1 py-2 shadow-sm group-hover:border-monarch-accent group-active:border-monarch-accent group-active:shadow transition-colors">
+            <div className="relative z-10 flex flex-col items-center gap-1 rounded-lg border border-monarch-border-strong bg-monarch-card px-1 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] group-hover:border-monarch-accent group-active:border-monarch-accent transition-colors">
               <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-monarch-accent" />
               <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-monarch-accent" />
               <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-monarch-accent" />
@@ -540,7 +542,7 @@ export function V2Report({ report }: V2ReportProps) {
         </div>
       )}
 
-      <p className="mt-8 text-sm text-monarch-muted leading-relaxed">
+      <p className="mt-8 text-sm text-monarch-muted leading-normal">
         This report evaluates the deck as presented. It does not predict fundraising success.
       </p>
     </div>
@@ -613,14 +615,14 @@ function InvestmentCaseDetail({ ic }: { ic: PitchDeckCheckReportV2['investment_c
               <p className="text-sm font-medium text-monarch-ink">
                 {label}: <span className="font-normal text-monarch-sub">{a.label || 'Not Enough Information'}</span>
               </p>
-              {a.interpretation && <p className="text-sm text-monarch-sub leading-relaxed">{a.interpretation}</p>}
+              {a.interpretation && <p className="text-sm text-monarch-sub leading-normal">{a.interpretation}</p>}
             </div>
           )
         })}
         {typeof ic.market_validation === 'string' && ic.market_validation && (
           <div>
             <p className="text-sm font-medium text-monarch-ink">Market Validation</p>
-            <p className="text-sm text-monarch-sub leading-relaxed">{ic.market_validation}</p>
+            <p className="text-sm text-monarch-sub leading-normal">{ic.market_validation}</p>
           </div>
         )}
       </div>
@@ -642,12 +644,12 @@ function PriorityDetail({ items }: { items: PitchDeckCheckReportV2['priority_imp
               <IssueTag issueType={p.issue_type} />
             </div>
             {p.why_it_matters && (
-              <p className="text-sm text-monarch-sub leading-relaxed">
+              <p className="text-sm text-monarch-sub leading-normal">
                 <span className="font-medium text-monarch-body">Why it matters:</span> {p.why_it_matters}
               </p>
             )}
             {p.what_to_add_or_change && (
-              <p className="text-sm text-monarch-sub leading-relaxed mt-1">
+              <p className="text-sm text-monarch-sub leading-normal mt-1">
                 <span className="font-medium text-monarch-body">What to add:</span> {p.what_to_add_or_change}
               </p>
             )}
@@ -676,7 +678,7 @@ function ListDetail({
         {items.map((it, idx) => (
           <li key={idx} className="flex gap-2">
             <span className={`${markerClass} flex-shrink-0`}>{marker}</span>
-            <span className="text-sm text-monarch-body leading-relaxed">{it}</span>
+            <span className="text-sm text-monarch-body leading-normal">{it}</span>
           </li>
         ))}
       </ul>
@@ -705,7 +707,7 @@ function ContextDetail({ cs }: { cs: PitchDeckCheckReportV2['context_summary'] }
             <span className="font-medium text-monarch-ink">Target raise:</span> {cs.target_raise}
           </p>
         )}
-        {cs.evaluation_note && <p className="text-monarch-sub leading-relaxed pt-1">{cs.evaluation_note}</p>}
+        {cs.evaluation_note && <p className="text-monarch-sub leading-normal pt-1">{cs.evaluation_note}</p>}
       </div>
     </div>
   )

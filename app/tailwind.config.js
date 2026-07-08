@@ -29,8 +29,8 @@ export default {
         monarch: {
           canvas: '#F5F5F3',
           card: '#FFFFFF',
-          border: '#E4E3E0',
-          'border-strong': '#CFCEC9',
+          border: '#E6E2DE',
+          'border-strong': '#D4D0CB',
           fill: '#EFEEEB',
           ink: '#171717',
           body: '#404040',
