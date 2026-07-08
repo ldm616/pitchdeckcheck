@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   PitchDeckCheckReportV2,
   DeckCommunicationScoreV2,
-  InvestmentCaseAssessmentV2,
   SlideLevelFeedbackV2,
 } from '../../lib/types'
 
-// V2 report renderer — dashboard-first layout. Reads only whitelisted
-// report_v2 fields; never surfaces gate terminology, debug data, or raw
-// *.signals. Every section tolerates missing/partial data.
+// V2 report renderer — dashboard-first layout with a simple three-level
+// hierarchy: Deck Score (top) -> Deck Feedback (4 cards) -> Slide Feedback.
+// Reads only whitelisted report_v2 fields; never surfaces gate terminology,
+// debug data, or raw *.signals. Every section tolerates missing/partial data.
 
 interface V2ReportProps {
   report: PitchDeckCheckReportV2
@@ -92,7 +92,7 @@ function overallLetterToGrade(letter?: string): Grade {
 // --- small components ---------------------------------------------------------
 
 // Grade as a bold letter with a strong colored underline (dashboard metric
-// style), not a pill. Sizes: md (cards, >=16px), lg (detail), xl (hero).
+// style), not a pill. Sizes: md (cards), lg (detail), xl (hero).
 function GradeMark({ grade, size = 'md' }: { grade: Grade; size?: 'md' | 'lg' | 'xl' }) {
   const letter = grade === 'neutral' ? '–' : grade
   const textCls = size === 'xl' ? 'text-3xl' : size === 'lg' ? 'text-2xl' : 'text-[15px]'
@@ -173,43 +173,20 @@ function IssueTag({ issueType }: { issueType?: string }) {
   )
 }
 
-function DetailHeading({ children }: { children: React.ReactNode }) {
-  return <p className="text-base font-semibold text-monarch-ink mb-3">{children}</p>
-}
-
 // --- selection ---------------------------------------------------------------
-
-// Deck-level feedback cards that are not communication scores.
-type InsightKey = 'investment_case' | 'priority' | 'questions' | 'beliefs' | 'context'
 
 type Selected =
   | { type: 'deck_score'; key: string; label: string }
   | { type: 'slide'; index: number }
-  | { type: 'insight'; key: InsightKey }
   | null
-
-// Compact selectable insight tile (no grade badge).
-function InsightCard({
-  title,
-  subtitle,
-  selected,
-  onSelect,
-}: {
-  title: string
-  subtitle?: string
-  selected: boolean
-  onSelect: () => void
-}) {
-  return (
-    <button type="button" onClick={onSelect} className={cardClass(selected)}>
-      <p className="text-[14px] font-medium text-monarch-ink leading-snug">{title}</p>
-      {subtitle && <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight line-clamp-1">{subtitle}</p>}
-    </button>
-  )
-}
 
 // --- component ----------------------------------------------------------------
 
+// Deck Feedback is intentionally limited to the four deck-level
+// communication/narrative dimensions. Investment Case, Priority Fixes, Investor
+// Questions/Beliefs, and Context are no longer standalone dashboard cards —
+// their content is incorporated into the top Deck Score assessment and the
+// relevant detail panes instead.
 const DIMENSIONS: Array<{ key: keyof PitchDeckCheckReportV2['deck_communication_scores']; label: string }> = [
   { key: 'completeness', label: 'Completeness' },
   { key: 'clarity', label: 'Clarity' },
@@ -217,52 +194,30 @@ const DIMENSIONS: Array<{ key: keyof PitchDeckCheckReportV2['deck_communication_
   { key: 'flow', label: 'Flow' },
 ]
 
-const INVESTMENT_AREAS: Array<{ key: keyof PitchDeckCheckReportV2['investment_case']; label: string }> = [
-  { key: 'opportunity_strength', label: 'Opportunity Strength' },
-  { key: 'execution_credibility', label: 'Execution Credibility' },
-  { key: 'investor_fit', label: 'Investor Fit' },
-]
-
 export function V2Report({ report }: V2ReportProps) {
   const og = report.overall_grade
   const cs = report.context_summary
   const dcs = report.deck_communication_scores
-  const ic = report.investment_case
   const believe = report.what_investors_may_believe || []
   const question = report.what_investors_may_question || []
-  const priorities = report.priority_improvements || []
   const slides = report.slide_level_feedback || []
   const deckDims = useMemo(() => DIMENSIONS.filter((d) => dcs && dcs[d.key]), [dcs])
 
-  // Deck-level feedback cards (beyond the four communication scores), in order.
-  const deckCards = useMemo<Array<{ key: InsightKey; title: string; subtitle?: string }>>(() => {
-    const out: Array<{ key: InsightKey; title: string; subtitle?: string }> = []
-    if (ic) out.push({ key: 'investment_case', title: 'Investment Case', subtitle: (ic.opportunity_strength as InvestmentCaseAssessmentV2 | undefined)?.label })
-    if (priorities.length > 0) out.push({ key: 'priority', title: 'Priority Fixes', subtitle: `${priorities.length} to fix` })
-    if (question.length > 0) out.push({ key: 'questions', title: 'Investor Questions', subtitle: `${question.length} points` })
-    if (believe.length > 0) out.push({ key: 'beliefs', title: 'Investor Beliefs', subtitle: `${believe.length} points` })
-    if (cs) out.push({ key: 'context', title: 'Context', subtitle: cs.company_context })
-    return out
-  }, [ic, priorities, believe, question, cs])
+  // Compact, secondary "Evaluated as" line built from inferred context.
+  // TODO: replace inferred context display with explicit user-provided context
+  // from the upload/report setup flow (stage, target raise, audience, business
+  // type, deck purpose). Until then this stays secondary and is not presented as
+  // user-confirmed truth.
+  const evaluatedAs = useMemo<string>(() => {
+    if (!cs) return ''
+    return [cs.company_context, cs.target_raise, cs.intended_investor_audience]
+      .filter((v) => typeof v === 'string' && v.trim())
+      .join(' · ')
+  }, [cs])
 
-  // Optional hero chips for the biggest themes, derived from priority fixes.
-  const keyIssues = useMemo<string[]>(() => {
-    const text = priorities
-      .map((p) => `${p.title} ${p.why_it_matters || ''} ${p.what_to_add_or_change || ''}`)
-      .join(' ')
-      .toLowerCase()
-    const chips: string[] = []
-    if (/defensib|moat/.test(text)) chips.push('Defensibility')
-    if (/retention|repeat usage|repeat use/.test(text)) chips.push('Retention')
-    if (/liquidity|marketplace/.test(text)) chips.push('Marketplace liquidity')
-    if (/\bcac\b|payback|acquisition cost/.test(text)) chips.push('CAC / payback')
-    return chips.slice(0, 4)
-  }, [priorities])
-
-  // Default selection: Priority Improvements if present, else the lowest-scoring
-  // slide, else the lowest deck score, else the first insight, else nothing.
+  // Default selection: the lowest/most concerning slide if present, else the
+  // lowest deck-feedback dimension. No Priority Fixes card exists anymore.
   const defaultSelected = useMemo<Selected>(() => {
-    if (priorities.length > 0) return { type: 'insight', key: 'priority' }
     if (slides.length > 0) {
       let worst = 0
       let worstRank = 99
@@ -287,9 +242,8 @@ export function V2Report({ report }: V2ReportProps) {
       }
       return { type: 'deck_score', key: worst.key as string, label: worst.label }
     }
-    if (deckCards.length > 0) return { type: 'insight', key: deckCards[0].key }
     return null
-  }, [priorities, slides, deckDims, dcs, deckCards])
+  }, [slides, deckDims, dcs])
 
   const [selected, setSelected] = useState<Selected>(defaultSelected)
   const detailRef = useRef<HTMLDivElement | null>(null)
@@ -385,24 +339,8 @@ export function V2Report({ report }: V2ReportProps) {
       const d = dcs[selected.key as keyof typeof dcs]
       return d ? <SelectedDeckDetail label={selected.label} data={d} /> : null
     }
-    if (selected.type === 'slide') {
-      const s = slides[selected.index]
-      return s ? <SelectedSlideDetail slide={s} /> : null
-    }
-    switch (selected.key) {
-      case 'investment_case':
-        return ic ? <InvestmentCaseDetail ic={ic} /> : null
-      case 'priority':
-        return <PriorityDetail items={priorities} />
-      case 'beliefs':
-        return <ListDetail title="What Investors May Believe" items={believe} marker="+" markerClass="text-emerald-500" />
-      case 'questions':
-        return <ListDetail title="What Investors May Question" items={question} marker="?" markerClass="text-amber-500" />
-      case 'context':
-        return cs ? <ContextDetail cs={cs} /> : null
-      default:
-        return null
-    }
+    const s = slides[selected.index]
+    return s ? <SelectedSlideDetail slide={s} /> : null
   }
 
   const SLIDE_GRID_STYLE: React.CSSProperties = {
@@ -413,35 +351,20 @@ export function V2Report({ report }: V2ReportProps) {
 
   const leftContent = (
     <div className="space-y-5">
-      {(deckDims.length > 0 || deckCards.length > 0) && (
+      {deckDims.length > 0 && (
         <div>
           <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck Feedback</h2>
-          {deckDims.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-              {deckDims.map(({ key, label }) => (
-                <DeckScoreCard
-                  key={key}
-                  label={label}
-                  data={dcs[key]!}
-                  selected={selected?.type === 'deck_score' && selected.key === key}
-                  onSelect={() => select({ type: 'deck_score', key: key as string, label })}
-                />
-              ))}
-            </div>
-          )}
-          {deckCards.length > 0 && (
-            <div style={SLIDE_GRID_STYLE} className={deckDims.length > 0 ? 'mt-2.5' : ''}>
-              {deckCards.map((c) => (
-                <InsightCard
-                  key={c.key}
-                  title={c.title}
-                  subtitle={c.subtitle}
-                  selected={selected?.type === 'insight' && selected.key === c.key}
-                  onSelect={() => select({ type: 'insight', key: c.key })}
-                />
-              ))}
-            </div>
-          )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            {deckDims.map(({ key, label }) => (
+              <DeckScoreCard
+                key={key}
+                label={label}
+                data={dcs[key]!}
+                selected={selected?.type === 'deck_score' && selected.key === key}
+                onSelect={() => select({ type: 'deck_score', key: key as string, label })}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -472,8 +395,8 @@ export function V2Report({ report }: V2ReportProps) {
 
   return (
     <div className="font-sans text-monarch-body">
-      {/* Hero (compact) */}
-      <div className="flex items-center gap-4 pb-2">
+      {/* Deck Score — one plain-language investor assessment */}
+      <div className="flex items-start gap-4 pb-2">
         <GradeMark grade={overallGrade} size="xl" />
         <div className="min-w-0">
           <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-0.5">
@@ -482,22 +405,32 @@ export function V2Report({ report }: V2ReportProps) {
           <p className="text-[16px] md:text-[17px] font-medium text-monarch-ink leading-snug">
             {og?.concise_interpretation || 'Assessment not available.'}
           </p>
-          {og?.primary_constraint && og.primary_constraint !== 'None' && (
-            <p className="mt-1 text-[14px] text-monarch-sub leading-normal">
-              <span className="font-medium text-monarch-body">Primary constraint:</span> {og.primary_constraint}
-            </p>
-          )}
-          {keyIssues.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {keyIssues.map((chip) => (
-                <span
-                  key={chip}
-                  className="inline-block text-[14px] font-medium text-monarch-sub bg-monarch-fill rounded-lg px-2 py-0.5"
-                >
-                  {chip}
-                </span>
-              ))}
+
+          {(believe.length > 0 || question.length > 0) && (
+            <div className="mt-3 space-y-2.5">
+              {believe.length > 0 && (
+                <LikelyList
+                  label="Investors will likely like"
+                  items={believe}
+                  markerClass="text-grade-a"
+                />
+              )}
+              {question.length > 0 && (
+                <LikelyList
+                  label="Investors will likely question"
+                  items={question}
+                  markerClass="text-grade-c"
+                />
+              )}
             </div>
+          )}
+
+          {evaluatedAs && (
+            // TODO: replace inferred context with explicit user-provided context
+            // from the upload/report setup flow. Kept secondary and compact.
+            <p className="mt-3 text-[14px] text-monarch-muted leading-normal">
+              <span className="font-medium">Evaluated as:</span> {evaluatedAs}
+            </p>
           )}
         </div>
       </div>
@@ -542,14 +475,36 @@ export function V2Report({ report }: V2ReportProps) {
         </div>
       )}
 
-      <p className="mt-8 text-sm text-monarch-muted leading-normal">
+      <p className="mt-8 text-[14px] text-monarch-muted leading-normal">
         This report evaluates the deck as presented. It does not predict fundraising success.
       </p>
     </div>
   )
 }
 
+// Two short lines under the Deck Score: what investors will likely like /
+// question. Compact bulleted list, capped so the top stays scannable.
+function LikelyList({ label, items, markerClass }: { label: string; items: string[]; markerClass: string }) {
+  const shown = items.slice(0, 4)
+  return (
+    <div>
+      <p className="text-[14px] font-medium text-monarch-ink">{label}:</p>
+      <ul className="mt-1 space-y-1">
+        {shown.map((it, idx) => (
+          <li key={idx} className="flex gap-2">
+            <span className={`${markerClass} flex-shrink-0`}>•</span>
+            <span className="text-[14px] text-monarch-body leading-normal">{it}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 // --- selected-detail renderers ------------------------------------------------
+
+// Every detail view uses the same simple structure:
+// What's working / What needs help / Recommended changes.
 
 function SelectedDeckDetail({ label, data }: { label: string; data: DeckCommunicationScoreV2 }) {
   const grade = deckScoreToGrade(data.score, data.label)
@@ -559,13 +514,13 @@ function SelectedDeckDetail({ label, data }: { label: string; data: DeckCommunic
         <GradeMark grade={grade} size="lg" />
         <div>
           <p className="text-base font-semibold text-monarch-ink">{label}</p>
-          <p className="text-sm text-monarch-sub">{data.label || DASH_LABEL[grade]}</p>
+          <p className="text-[14px] text-monarch-sub">{data.label || DASH_LABEL[grade]}</p>
         </div>
       </div>
       <div className="space-y-3">
-        <DetailRow label="Explanation">{data.explanation}</DetailRow>
-        <DetailRow label="Primary reason">{data.primary_reason}</DetailRow>
-        <DetailRow label="Priority improvement">{data.priority_improvement}</DetailRow>
+        <DetailRow label="What's working">{data.explanation}</DetailRow>
+        <DetailRow label="What needs help">{data.primary_reason}</DetailRow>
+        <DetailRow label="Recommended changes">{data.priority_improvement}</DetailRow>
       </div>
     </div>
   )
@@ -582,7 +537,7 @@ function SelectedSlideDetail({ slide }: { slide: SlideLevelFeedbackV2 }) {
             {typeof slide.slide_number === 'number' ? `Slide ${slide.slide_number} · ` : ''}
             {slide.slide_title_or_section || 'Section'}
           </p>
-          <p className="text-sm text-monarch-sub">
+          <p className="text-[14px] text-monarch-sub">
             {slide.assessment || DASH_LABEL[grade]}
           </p>
         </div>
@@ -591,125 +546,17 @@ function SelectedSlideDetail({ slide }: { slide: SlideLevelFeedbackV2 }) {
         </div>
       </div>
       <div className="space-y-3">
-        <DetailRow label="Investor decision">{slide.investor_decision}</DetailRow>
-        <DetailRow label="What works">{slide.what_works}</DetailRow>
-        <DetailRow label="What is missing">{slide.what_is_missing}</DetailRow>
+        <DetailRow label="What's working">{slide.what_works}</DetailRow>
+        <DetailRow label="What needs help">{slide.what_is_missing}</DetailRow>
         {slide.recommended_improvement && slide.recommended_improvement !== slide.what_is_missing && (
-          <DetailRow label="Recommended improvement">{slide.recommended_improvement}</DetailRow>
+          <DetailRow label="Recommended changes">{slide.recommended_improvement}</DetailRow>
         )}
-      </div>
-    </div>
-  )
-}
-
-function InvestmentCaseDetail({ ic }: { ic: PitchDeckCheckReportV2['investment_case'] }) {
-  return (
-    <div>
-      <DetailHeading>Investment Case as Presented</DetailHeading>
-      <div className="space-y-3">
-        {INVESTMENT_AREAS.map(({ key, label }) => {
-          const a = ic[key] as InvestmentCaseAssessmentV2 | undefined
-          if (!a) return null
-          return (
-            <div key={key}>
-              <p className="text-sm font-medium text-monarch-ink">
-                {label}: <span className="font-normal text-monarch-sub">{a.label || 'Not Enough Information'}</span>
-              </p>
-              {a.interpretation && <p className="text-sm text-monarch-sub leading-normal">{a.interpretation}</p>}
-            </div>
-          )
-        })}
-        {typeof ic.market_validation === 'string' && ic.market_validation && (
-          <div>
-            <p className="text-sm font-medium text-monarch-ink">Market Validation</p>
-            <p className="text-sm text-monarch-sub leading-normal">{ic.market_validation}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function PriorityDetail({ items }: { items: PitchDeckCheckReportV2['priority_improvements'] }) {
-  return (
-    <div>
-      <DetailHeading>Priority Fixes</DetailHeading>
-      <div className="space-y-3">
-        {items.map((p, idx) => (
-          <div key={idx} className="rounded-lg border border-monarch-border bg-white px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-sm font-medium text-monarch-ink">
-                {idx + 1}. {p.title}
-              </span>
-              <IssueTag issueType={p.issue_type} />
-            </div>
-            {p.why_it_matters && (
-              <p className="text-sm text-monarch-sub leading-normal">
-                <span className="font-medium text-monarch-body">Why it matters:</span> {p.why_it_matters}
-              </p>
-            )}
-            {p.what_to_add_or_change && (
-              <p className="text-sm text-monarch-sub leading-normal mt-1">
-                <span className="font-medium text-monarch-body">What to add:</span> {p.what_to_add_or_change}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ListDetail({
-  title,
-  items,
-  marker,
-  markerClass,
-}: {
-  title: string
-  items: string[]
-  marker: string
-  markerClass: string
-}) {
-  return (
-    <div>
-      <DetailHeading>{title}</DetailHeading>
-      <ul className="space-y-2.5">
-        {items.map((it, idx) => (
-          <li key={idx} className="flex gap-2">
-            <span className={`${markerClass} flex-shrink-0`}>{marker}</span>
-            <span className="text-sm text-monarch-body leading-normal">{it}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function ContextDetail({ cs }: { cs: PitchDeckCheckReportV2['context_summary'] }) {
-  return (
-    <div>
-      <DetailHeading>Context</DetailHeading>
-      <div className="space-y-2 text-sm text-monarch-body">
-        {cs.company_context && (
-          <p>
-            <span className="font-medium text-monarch-ink">Detected stage:</span> {cs.company_context}
-            {cs.context_confidence ? ` (${cs.context_confidence} confidence)` : ''}
+        {slide.investor_decision && (
+          <p className="text-[14px] text-monarch-muted leading-normal pt-1">
+            <span className="font-medium text-monarch-sub">Investor read:</span> {slide.investor_decision}
           </p>
         )}
-        {cs.intended_investor_audience && (
-          <p>
-            <span className="font-medium text-monarch-ink">Investor audience:</span> {cs.intended_investor_audience}
-          </p>
-        )}
-        {cs.target_raise && (
-          <p>
-            <span className="font-medium text-monarch-ink">Target raise:</span> {cs.target_raise}
-          </p>
-        )}
-        {cs.evaluation_note && <p className="text-monarch-sub leading-normal pt-1">{cs.evaluation_note}</p>}
       </div>
     </div>
   )
 }
-
