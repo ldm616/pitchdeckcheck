@@ -618,7 +618,7 @@ export function AdminApp() {
         >
           <div
             style={{
-              maxWidth: '1152px',
+              maxWidth: '1536px',
               margin: '0 auto',
               padding: '12px 24px',
               display: 'flex',
@@ -702,15 +702,11 @@ export function AdminApp() {
         )}
 
         {/* Report Content */}
-        <div style={{ padding: '32px 24px' }}>
+        <div style={{ padding: '24px 24px 48px' }}>
           <div
             style={{
-              maxWidth: '1152px',
+              maxWidth: '1536px',
               margin: '0 auto',
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-              padding: '32px 32px',
             }}
           >
             {/* Render the full canonical report when present; otherwise fall

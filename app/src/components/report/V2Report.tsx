@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   PitchDeckCheckReportV2,
   DeckCommunicationScoreV2,
@@ -122,13 +122,10 @@ function DeckScoreCard({
       }`}
     >
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide truncate">{label}</span>
+        <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">{label}</span>
         <GradeBadge grade={grade} size="sm" />
       </div>
       <p className={`text-xs font-medium ${t.text}`}>{data.label || DASH_LABEL[grade]}</p>
-      {data.explanation && (
-        <p className="mt-0.5 text-[11px] text-gray-400 leading-snug line-clamp-1">{data.explanation}</p>
-      )}
     </button>
   )
 }
@@ -144,6 +141,8 @@ function SlideScoreCard({
 }) {
   const grade = slideAssessmentToGrade(slide.assessment)
   const t = TONE[grade]
+  const title = slide.slide_title_or_section || 'Section'
+  const heading = typeof slide.slide_number === 'number' ? `${slide.slide_number}: ${title}` : title
   return (
     <button
       type="button"
@@ -152,17 +151,12 @@ function SlideScoreCard({
         selected ? `ring-2 ${t.ring} ring-offset-1` : ''
       }`}
     >
-      <div className="flex items-center justify-between gap-1.5 mb-0.5">
-        <span className="text-[11px] font-medium text-gray-400">
-          {typeof slide.slide_number === 'number' ? `Slide ${slide.slide_number}` : 'Section'}
-        </span>
+      <div className="flex items-center justify-between gap-1.5">
+        <span className="text-xs font-medium text-gray-900 truncate">{heading}</span>
         <GradeBadge grade={grade} size="xs" />
       </div>
-      <p className="text-xs font-medium text-gray-900 leading-snug line-clamp-1">
-        {slide.slide_title_or_section || 'Section'}
-      </p>
       {slide.assessment && (
-        <p className={`text-[11px] leading-snug line-clamp-1 ${t.text}`}>{slide.assessment}</p>
+        <p className="mt-0.5 text-[11px] text-gray-400 leading-snug truncate">{slide.assessment}</p>
       )}
     </button>
   )
@@ -308,10 +302,84 @@ export function V2Report({ report }: V2ReportProps) {
   const [selected, setSelected] = useState<Selected>(defaultSelected)
   const detailRef = useRef<HTMLDivElement | null>(null)
 
+  // --- desktop workspace: resizable two-pane split (>= 1280px) ---------------
+  const LEFT_MIN = 600
+  const RIGHT_MIN = 420
+  const DIVIDER_W = 12
+
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1280px)')
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [containerW, setContainerW] = useState(0)
+  useEffect(() => {
+    if (!isDesktop) return
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => setContainerW(entries[0].contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [isDesktop])
+
+  const [leftWidth, setLeftWidth] = useState<number | null>(() => {
+    try {
+      const v = localStorage.getItem('pdc_report_split')
+      return v ? parseInt(v, 10) : null
+    } catch {
+      return null
+    }
+  })
+  const leftWidthRef = useRef<number | null>(leftWidth)
+
+  // Applied (clamped) left-pane width. Falls back to 60% before measured.
+  const maxLeft = Math.max(LEFT_MIN, containerW - RIGHT_MIN - DIVIDER_W)
+  const appliedLeft =
+    containerW === 0
+      ? null
+      : leftWidth != null
+      ? Math.min(Math.max(leftWidth, LEFT_MIN), maxLeft)
+      : Math.round(containerW * 0.6)
+
+  const onDividerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      const el = containerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const onMove = (ev: PointerEvent) => {
+        const w = Math.max(LEFT_MIN, Math.min(ev.clientX - rect.left, rect.width - RIGHT_MIN - DIVIDER_W))
+        leftWidthRef.current = w
+        setLeftWidth(w)
+      }
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove)
+        window.removeEventListener('pointerup', onUp)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
+        try {
+          if (leftWidthRef.current != null) localStorage.setItem('pdc_report_split', String(Math.round(leftWidthRef.current)))
+        } catch {
+          /* ignore */
+        }
+      }
+      document.body.style.userSelect = 'none'
+      document.body.style.cursor = 'col-resize'
+      window.addEventListener('pointermove', onMove)
+      window.addEventListener('pointerup', onUp)
+    },
+    []
+  )
+
   const select = (next: Selected) => {
     setSelected(next)
-    // On small screens, bring the detail panel into view.
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    // On stacked (non-desktop) layouts, bring the detail panel into view.
+    if (!isDesktop) {
       window.setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50)
     }
   }
@@ -347,6 +415,70 @@ export function V2Report({ report }: V2ReportProps) {
     }
   }
 
+  const SLIDE_GRID_STYLE: React.CSSProperties = {
+    display: 'grid',
+    gap: '0.625rem',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+  }
+
+  const leftContent = (
+    <div className="space-y-5">
+      {deckDims.length > 0 && (
+        <div>
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Deck Scores</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            {deckDims.map(({ key, label }) => (
+              <DeckScoreCard
+                key={key}
+                label={label}
+                data={dcs[key]!}
+                selected={selected?.type === 'deck_score' && selected.key === key}
+                onSelect={() => select({ type: 'deck_score', key: key as string, label })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {slides.length > 0 && (
+        <div>
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Slide Scores</h2>
+          <div style={SLIDE_GRID_STYLE}>
+            {slides.map((s, i) => (
+              <SlideScoreCard
+                key={i}
+                slide={s}
+                selected={selected?.type === 'slide' && selected.index === i}
+                onSelect={() => select({ type: 'slide', index: i })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {insights.length > 0 && (
+        <div>
+          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Insights</h2>
+          <div style={SLIDE_GRID_STYLE}>
+            {insights.map((ins) => (
+              <InsightCard
+                key={ins.key}
+                title={ins.title}
+                subtitle={ins.subtitle}
+                selected={selected?.type === 'insight' && selected.key === ins.key}
+                onSelect={() => select({ type: 'insight', key: ins.key })}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  const detailPane = (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">{renderDetail()}</div>
+  )
+
   return (
     <div>
       {/* Hero (compact) */}
@@ -356,84 +488,50 @@ export function V2Report({ report }: V2ReportProps) {
           <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-0.5">
             {companyName || report.header?.report_title || 'Pitch Deck Check Report'}
           </p>
-          <p className="text-sm sm:text-base font-semibold text-gray-900 leading-snug">
+          <p className="text-base font-medium text-gray-900 leading-snug">
             {og?.concise_interpretation || 'Assessment not available.'}
           </p>
           {og?.primary_constraint && og.primary_constraint !== 'None' && (
-            <p className="mt-1 text-xs sm:text-sm text-gray-600">
-              <span className="font-medium text-gray-900">Primary constraint:</span>{' '}
-              {og.primary_constraint}
+            <p className="mt-1 text-xs text-gray-500">
+              <span className="font-medium text-gray-700">Primary constraint:</span> {og.primary_constraint}
             </p>
           )}
         </div>
       </div>
 
-      {/* Dashboard: scorecard + insight grids (left) · selected detail (right) */}
-      <div className="mt-5 lg:grid lg:grid-cols-5 lg:gap-6 lg:items-start">
-        {/* Left: cards */}
-        <div className="lg:col-span-3 space-y-5">
-          {deckDims.length > 0 && (
-            <div>
-              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Deck Scores</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                {deckDims.map(({ key, label }) => (
-                  <DeckScoreCard
-                    key={key}
-                    label={label}
-                    data={dcs[key]!}
-                    selected={selected?.type === 'deck_score' && selected.key === key}
-                    onSelect={() => select({ type: 'deck_score', key: key as string, label })}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {slides.length > 0 && (
-            <div>
-              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Slide Scores</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {slides.map((s, i) => (
-                  <SlideScoreCard
-                    key={i}
-                    slide={s}
-                    selected={selected?.type === 'slide' && selected.index === i}
-                    onSelect={() => select({ type: 'slide', index: i })}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {insights.length > 0 && (
-            <div>
-              <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Insights</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {insights.map((ins) => (
-                  <InsightCard
-                    key={ins.key}
-                    title={ins.title}
-                    subtitle={ins.subtitle}
-                    selected={selected?.type === 'insight' && selected.key === ins.key}
-                    onSelect={() => select({ type: 'insight', key: ins.key })}
-                  />
-                ))}
-              </div>
+      {isDesktop ? (
+        /* Desktop workspace: resizable two-pane split */
+        <div ref={containerRef} className="mt-5 flex items-stretch">
+          <div
+            className="min-w-0 shrink-0"
+            style={{ width: appliedLeft != null ? `${appliedLeft}px` : '60%' }}
+          >
+            {leftContent}
+          </div>
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            onPointerDown={onDividerDown}
+            className="group shrink-0 flex items-center justify-center cursor-col-resize select-none"
+            style={{ width: DIVIDER_W }}
+          >
+            <div className="w-1 h-10 rounded-full bg-gray-200 group-hover:bg-gray-400 transition-colors" />
+          </div>
+          {selected && (
+            <div className="flex-1 min-w-0">
+              <div className="sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto">{detailPane}</div>
             </div>
           )}
         </div>
+      ) : (
+        /* Stacked layout (tablet / mobile) */
+        <div className="mt-5 space-y-5">
+          {leftContent}
+          {selected && <div ref={detailRef}>{detailPane}</div>}
+        </div>
+      )}
 
-        {/* Right: selected detail (sticky on desktop, scrolls internally) */}
-        {selected && (
-          <div ref={detailRef} className="mt-5 lg:mt-0 lg:col-span-2">
-            <div className="lg:sticky lg:top-6 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/70 p-5 sm:p-6">
-              {renderDetail()}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <p className="mt-10 text-xs text-gray-400 leading-relaxed">
+      <p className="mt-8 text-xs text-gray-400 leading-relaxed">
         This report evaluates the deck as presented. It does not predict fundraising success.
       </p>
     </div>
