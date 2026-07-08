@@ -606,7 +606,7 @@ export function AdminApp() {
       <div
         style={{
           minHeight: '100vh',
-          backgroundColor: '#f8f9fa',
+          backgroundColor: '#F7F6F4',
           fontFamily,
         }}
       >

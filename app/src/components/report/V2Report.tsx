@@ -18,14 +18,17 @@ interface V2ReportProps {
 
 type Grade = 'A' | 'B' | 'C' | 'D' | 'neutral'
 
-// Restrained tone palette. A: positive, B: neutral/slate, C: amber, D: red.
-const TONE: Record<Grade, { text: string; badge: string; border: string; ring: string; dot: string }> = {
-  A: { text: 'text-emerald-700', badge: 'bg-emerald-50 text-emerald-700', border: 'border-emerald-200', ring: 'ring-emerald-400', dot: 'bg-emerald-500' },
-  B: { text: 'text-slate-700', badge: 'bg-slate-100 text-slate-700', border: 'border-slate-200', ring: 'ring-slate-400', dot: 'bg-slate-400' },
-  C: { text: 'text-amber-700', badge: 'bg-amber-50 text-amber-700', border: 'border-amber-200', ring: 'ring-amber-400', dot: 'bg-amber-500' },
-  D: { text: 'text-red-700', badge: 'bg-red-50 text-red-700', border: 'border-red-200', ring: 'ring-red-400', dot: 'bg-red-500' },
-  neutral: { text: 'text-gray-500', badge: 'bg-gray-100 text-gray-500', border: 'border-gray-200', ring: 'ring-gray-300', dot: 'bg-gray-300' },
+// Monarch-inspired semantic grade palette (soft tinted badge + darker ink).
+const TONE: Record<Grade, { text: string; badge: string; border: string }> = {
+  A: { text: 'text-grade-a-ink', badge: 'bg-grade-a-bg text-grade-a-ink', border: 'border-grade-a-border' },
+  B: { text: 'text-grade-b-ink', badge: 'bg-grade-b-bg text-grade-b-ink', border: 'border-grade-b-border' },
+  C: { text: 'text-grade-c-ink', badge: 'bg-grade-c-bg text-grade-c-ink', border: 'border-grade-c-border' },
+  D: { text: 'text-grade-d-ink', badge: 'bg-grade-d-bg text-grade-d-ink', border: 'border-grade-d-border' },
+  neutral: { text: 'text-monarch-muted', badge: 'bg-monarch-fill text-monarch-muted', border: 'border-monarch-border' },
 }
+
+// Orange accent ring for the selected card (consistent active-UI accent).
+const SELECTED_RING = 'ring-2 ring-monarch-accent ring-offset-2 ring-offset-monarch-canvas'
 
 const DASH_LABEL: Record<Grade, string> = {
   A: 'Strong',
@@ -38,10 +41,10 @@ const DASH_LABEL: Record<Grade, string> = {
 // Rank for choosing the default (most important) selection. Lower = worse.
 const RANK: Record<Grade, number> = { D: 0, C: 1, B: 2, A: 3, neutral: 4 }
 
-// Color hierarchy: A/B stay quiet (neutral border, colored badge only); C/D get
-// a stronger tinted border to draw the eye. Selected state adds the tone ring.
+// Color hierarchy: A/B stay quiet (warm-gray border, colored badge only); C/D
+// get a tinted border to draw the eye. Selected state adds the orange ring.
 function cardBorderClass(grade: Grade): string {
-  return grade === 'C' || grade === 'D' ? TONE[grade].border : 'border-gray-200'
+  return grade === 'C' || grade === 'D' ? TONE[grade].border : 'border-monarch-border'
 }
 
 // Canonical slide assessment -> A/B/C/D. Uses the investor-facing assessment,
@@ -123,12 +126,12 @@ function DeckScoreCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`text-left w-full rounded-lg border ${cardBorderClass(grade)} bg-white px-3 py-2.5 transition-shadow hover:shadow-sm focus:outline-none ${
-        selected ? `ring-2 ${t.ring} ring-offset-1` : ''
+      className={`text-left w-full rounded-xl border ${cardBorderClass(grade)} bg-monarch-card px-3 py-2.5 shadow-sm transition-shadow hover:shadow focus:outline-none ${
+        selected ? SELECTED_RING : ''
       }`}
     >
       <div className="flex items-center justify-between gap-2 mb-1">
-        <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wide">{label}</span>
+        <span className="text-[11px] font-medium text-monarch-muted uppercase tracking-wide">{label}</span>
         <GradeBadge grade={grade} size="sm" />
       </div>
       <p className={`text-xs font-medium ${t.text}`}>{data.label || DASH_LABEL[grade]}</p>
@@ -146,23 +149,22 @@ function SlideScoreCard({
   onSelect: () => void
 }) {
   const grade = slideAssessmentToGrade(slide.assessment)
-  const t = TONE[grade]
   const title = slide.slide_title_or_section || 'Section'
   const heading = typeof slide.slide_number === 'number' ? `${slide.slide_number}: ${title}` : title
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`text-left w-full rounded-lg border ${cardBorderClass(grade)} bg-white px-2.5 py-2 transition-shadow hover:shadow-sm focus:outline-none ${
-        selected ? `ring-2 ${t.ring} ring-offset-1` : ''
+      className={`text-left w-full rounded-xl border ${cardBorderClass(grade)} bg-monarch-card px-2.5 py-2 shadow-sm transition-shadow hover:shadow focus:outline-none ${
+        selected ? SELECTED_RING : ''
       }`}
     >
       <div className="flex items-center justify-between gap-1.5">
-        <span className="text-xs font-medium text-gray-900 truncate">{heading}</span>
+        <span className="text-xs font-medium text-monarch-ink truncate">{heading}</span>
         <GradeBadge grade={grade} size="xs" />
       </div>
       {slide.assessment && (
-        <p className="mt-0.5 text-[11px] text-gray-400 leading-snug truncate">{slide.assessment}</p>
+        <p className="mt-0.5 text-[11px] text-monarch-muted leading-snug truncate">{slide.assessment}</p>
       )}
     </button>
   )
@@ -172,8 +174,8 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   if (!children) return null
   return (
     <div>
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-      <p className="text-sm text-gray-700 leading-relaxed">{children}</p>
+      <p className="text-xs font-medium text-monarch-muted uppercase tracking-wide mb-1">{label}</p>
+      <p className="text-sm text-monarch-body leading-relaxed">{children}</p>
     </div>
   )
 }
@@ -181,14 +183,14 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 function IssueTag({ issueType }: { issueType?: string }) {
   if (!issueType || issueType === 'None') return null
   return (
-    <span className="inline-block text-[11px] font-medium text-gray-500 bg-gray-100 rounded px-2 py-0.5">
+    <span className="inline-block text-[11px] font-medium text-monarch-sub bg-monarch-fill rounded px-2 py-0.5">
       {issueType}
     </span>
   )
 }
 
 function DetailHeading({ children }: { children: React.ReactNode }) {
-  return <p className="text-sm font-semibold text-gray-900 mb-3">{children}</p>
+  return <p className="text-sm font-semibold text-monarch-ink mb-3">{children}</p>
 }
 
 // --- selection ---------------------------------------------------------------
@@ -218,12 +220,12 @@ function InsightCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`text-left w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-shadow hover:shadow-sm focus:outline-none ${
-        selected ? 'ring-2 ring-slate-400 ring-offset-1' : ''
+      className={`text-left w-full rounded-xl border border-monarch-border bg-monarch-card px-3 py-2.5 shadow-sm transition-shadow hover:shadow focus:outline-none ${
+        selected ? SELECTED_RING : ''
       }`}
     >
-      <p className="text-xs font-semibold text-gray-800 leading-snug">{title}</p>
-      {subtitle && <p className="mt-0.5 text-[11px] text-gray-400 leading-snug line-clamp-1">{subtitle}</p>}
+      <p className="text-xs font-semibold text-monarch-ink leading-snug">{title}</p>
+      {subtitle && <p className="mt-0.5 text-[11px] text-monarch-muted leading-snug line-clamp-1">{subtitle}</p>}
     </button>
   )
 }
@@ -435,7 +437,7 @@ export function V2Report({ report }: V2ReportProps) {
     <div className="space-y-5">
       {(deckDims.length > 0 || deckCards.length > 0) && (
         <div>
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Deck Feedback</h2>
+          <h2 className="text-xs font-medium text-monarch-muted uppercase tracking-wide mb-2.5">Deck Feedback</h2>
           {deckDims.length > 0 && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
               {deckDims.map(({ key, label }) => (
@@ -467,7 +469,7 @@ export function V2Report({ report }: V2ReportProps) {
 
       {slides.length > 0 && (
         <div>
-          <h2 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2.5">Slide Feedback</h2>
+          <h2 className="text-xs font-medium text-monarch-muted uppercase tracking-wide mb-2.5">Slide Feedback</h2>
           <div style={SLIDE_GRID_STYLE}>
             {slides.map((s, i) => (
               <SlideScoreCard
@@ -495,26 +497,26 @@ export function V2Report({ report }: V2ReportProps) {
 
   const detailPane = (
     <div className={`rounded-xl border-2 ${TONE[detailTone].border} bg-white p-5 sm:p-6`}>
-      <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-3">Selected</p>
+      <p className="text-[11px] font-medium text-monarch-muted uppercase tracking-wide mb-3">Selected</p>
       {renderDetail()}
     </div>
   )
 
   return (
-    <div>
+    <div className="font-sans text-monarch-body">
       {/* Hero (compact) */}
-      <div className="flex items-center gap-4 pb-4 border-b border-gray-100">
+      <div className="flex items-center gap-4 pb-4 border-b border-monarch-border">
         <GradeBadge grade={overallGrade} size="xl" />
         <div className="min-w-0">
-          <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-0.5">
+          <p className="text-[11px] font-medium text-monarch-muted uppercase tracking-wide mb-0.5">
             {companyName || report.header?.report_title || 'Pitch Deck Check Report'}
           </p>
-          <p className="text-base font-medium text-gray-900 leading-snug">
+          <p className="text-base font-medium text-monarch-ink leading-snug">
             {og?.concise_interpretation || 'Assessment not available.'}
           </p>
           {og?.primary_constraint && og.primary_constraint !== 'None' && (
-            <p className="mt-1 text-xs text-gray-500">
-              <span className="font-medium text-gray-700">Primary constraint:</span> {og.primary_constraint}
+            <p className="mt-1 text-xs text-monarch-sub">
+              <span className="font-medium text-monarch-body">Primary constraint:</span> {og.primary_constraint}
             </p>
           )}
           {keyIssues.length > 0 && (
@@ -522,7 +524,7 @@ export function V2Report({ report }: V2ReportProps) {
               {keyIssues.map((chip) => (
                 <span
                   key={chip}
-                  className="inline-block text-[11px] font-medium text-gray-600 bg-gray-100 rounded-full px-2 py-0.5"
+                  className="inline-block text-[11px] font-medium text-monarch-sub bg-monarch-fill rounded-full px-2 py-0.5"
                 >
                   {chip}
                 </span>
@@ -549,13 +551,13 @@ export function V2Report({ report }: V2ReportProps) {
             className="group relative shrink-0 flex items-center justify-center cursor-col-resize select-none touch-none"
             style={{ width: DIVIDER_W }}
           >
-            {/* full-height subtle rule */}
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-gray-200 group-hover:bg-gray-300 transition-colors" />
+            {/* full-height warm-gray rule, orange on hover */}
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-monarch-border group-hover:bg-monarch-accent/50 transition-colors" />
             {/* grab handle with dots */}
-            <div className="relative z-10 flex flex-col items-center gap-[3px] rounded border border-gray-200 bg-white px-[3px] py-1.5 shadow-sm group-hover:border-gray-400 group-active:border-gray-500 group-active:shadow transition-colors">
-              <span className="w-1 h-1 rounded-full bg-gray-300 group-hover:bg-gray-500" />
-              <span className="w-1 h-1 rounded-full bg-gray-300 group-hover:bg-gray-500" />
-              <span className="w-1 h-1 rounded-full bg-gray-300 group-hover:bg-gray-500" />
+            <div className="relative z-10 flex flex-col items-center gap-[3px] rounded-md border border-monarch-border bg-monarch-card px-[3px] py-1.5 shadow-sm group-hover:border-monarch-accent group-active:border-monarch-accent group-active:shadow transition-colors">
+              <span className="w-1 h-1 rounded-full bg-[#C9C4BE] group-hover:bg-monarch-accent" />
+              <span className="w-1 h-1 rounded-full bg-[#C9C4BE] group-hover:bg-monarch-accent" />
+              <span className="w-1 h-1 rounded-full bg-[#C9C4BE] group-hover:bg-monarch-accent" />
             </div>
           </div>
           {selected && (
@@ -572,7 +574,7 @@ export function V2Report({ report }: V2ReportProps) {
         </div>
       )}
 
-      <p className="mt-8 text-xs text-gray-400 leading-relaxed">
+      <p className="mt-8 text-xs text-monarch-muted leading-relaxed">
         This report evaluates the deck as presented. It does not predict fundraising success.
       </p>
     </div>
@@ -588,7 +590,7 @@ function SelectedDeckDetail({ label, data }: { label: string; data: DeckCommunic
       <div className="flex items-center gap-3 mb-4">
         <GradeBadge grade={grade} size="lg" />
         <div>
-          <p className="text-sm font-semibold text-gray-900">{label}</p>
+          <p className="text-sm font-semibold text-monarch-ink">{label}</p>
           <p className={`text-xs ${TONE[grade].text}`}>{data.label || DASH_LABEL[grade]}</p>
         </div>
       </div>
@@ -608,7 +610,7 @@ function SelectedSlideDetail({ slide }: { slide: SlideLevelFeedbackV2 }) {
       <div className="flex items-center gap-3 mb-4">
         <GradeBadge grade={grade} size="lg" />
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900">
+          <p className="text-sm font-semibold text-monarch-ink">
             {typeof slide.slide_number === 'number' ? `Slide ${slide.slide_number} · ` : ''}
             {slide.slide_title_or_section || 'Section'}
           </p>
@@ -642,17 +644,17 @@ function InvestmentCaseDetail({ ic }: { ic: PitchDeckCheckReportV2['investment_c
           if (!a) return null
           return (
             <div key={key}>
-              <p className="text-sm font-medium text-gray-900">
-                {label}: <span className="font-normal text-gray-600">{a.label || 'Not Enough Information'}</span>
+              <p className="text-sm font-medium text-monarch-ink">
+                {label}: <span className="font-normal text-monarch-sub">{a.label || 'Not Enough Information'}</span>
               </p>
-              {a.interpretation && <p className="text-sm text-gray-500 leading-relaxed">{a.interpretation}</p>}
+              {a.interpretation && <p className="text-sm text-monarch-sub leading-relaxed">{a.interpretation}</p>}
             </div>
           )
         })}
         {typeof ic.market_validation === 'string' && ic.market_validation && (
           <div>
-            <p className="text-sm font-medium text-gray-900">Market Validation</p>
-            <p className="text-sm text-gray-500 leading-relaxed">{ic.market_validation}</p>
+            <p className="text-sm font-medium text-monarch-ink">Market Validation</p>
+            <p className="text-sm text-monarch-sub leading-relaxed">{ic.market_validation}</p>
           </div>
         )}
       </div>
@@ -666,21 +668,21 @@ function PriorityDetail({ items }: { items: PitchDeckCheckReportV2['priority_imp
       <DetailHeading>Priority Fixes</DetailHeading>
       <div className="space-y-3">
         {items.map((p, idx) => (
-          <div key={idx} className="rounded-lg border border-gray-100 bg-white p-3">
+          <div key={idx} className="rounded-lg border border-monarch-border bg-white p-3">
             <div className="flex items-center justify-between gap-2 mb-1">
-              <span className="text-sm font-medium text-gray-900">
+              <span className="text-sm font-medium text-monarch-ink">
                 {idx + 1}. {p.title}
               </span>
               <IssueTag issueType={p.issue_type} />
             </div>
             {p.why_it_matters && (
-              <p className="text-sm text-gray-600 leading-relaxed">
-                <span className="font-medium text-gray-700">Why it matters:</span> {p.why_it_matters}
+              <p className="text-sm text-monarch-sub leading-relaxed">
+                <span className="font-medium text-monarch-body">Why it matters:</span> {p.why_it_matters}
               </p>
             )}
             {p.what_to_add_or_change && (
-              <p className="text-sm text-gray-600 leading-relaxed mt-1">
-                <span className="font-medium text-gray-700">What to add:</span> {p.what_to_add_or_change}
+              <p className="text-sm text-monarch-sub leading-relaxed mt-1">
+                <span className="font-medium text-monarch-body">What to add:</span> {p.what_to_add_or_change}
               </p>
             )}
           </div>
@@ -708,7 +710,7 @@ function ListDetail({
         {items.map((it, idx) => (
           <li key={idx} className="flex gap-2">
             <span className={`${markerClass} flex-shrink-0`}>{marker}</span>
-            <span className="text-sm text-gray-700 leading-relaxed">{it}</span>
+            <span className="text-sm text-monarch-body leading-relaxed">{it}</span>
           </li>
         ))}
       </ul>
@@ -720,24 +722,24 @@ function ContextDetail({ cs }: { cs: PitchDeckCheckReportV2['context_summary'] }
   return (
     <div>
       <DetailHeading>Context</DetailHeading>
-      <div className="space-y-2 text-sm text-gray-700">
+      <div className="space-y-2 text-sm text-monarch-body">
         {cs.company_context && (
           <p>
-            <span className="font-medium text-gray-900">Detected stage:</span> {cs.company_context}
+            <span className="font-medium text-monarch-ink">Detected stage:</span> {cs.company_context}
             {cs.context_confidence ? ` (${cs.context_confidence} confidence)` : ''}
           </p>
         )}
         {cs.intended_investor_audience && (
           <p>
-            <span className="font-medium text-gray-900">Investor audience:</span> {cs.intended_investor_audience}
+            <span className="font-medium text-monarch-ink">Investor audience:</span> {cs.intended_investor_audience}
           </p>
         )}
         {cs.target_raise && (
           <p>
-            <span className="font-medium text-gray-900">Target raise:</span> {cs.target_raise}
+            <span className="font-medium text-monarch-ink">Target raise:</span> {cs.target_raise}
           </p>
         )}
-        {cs.evaluation_note && <p className="text-gray-500 leading-relaxed pt-1">{cs.evaluation_note}</p>}
+        {cs.evaluation_note && <p className="text-monarch-sub leading-relaxed pt-1">{cs.evaluation_note}</p>}
       </div>
     </div>
   )

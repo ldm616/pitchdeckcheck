@@ -245,7 +245,7 @@ export function ReportPage() {
   const reportV2 = report.report_v2
   if (reportV2) {
     return (
-      <div className="flex flex-col flex-1">
+      <div className="flex flex-col flex-1 bg-monarch-canvas">
         <FounderHeader />
         {adminBar}
         <main className="flex-1 px-4 sm:px-6 lg:px-8 pb-16">
