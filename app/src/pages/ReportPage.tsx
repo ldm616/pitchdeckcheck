@@ -168,19 +168,6 @@ export function ReportPage() {
     )
   }
 
-  // Admin-only affordance: a link back to the admin area, shown only when an
-  // admin has verified their password this session.
-  const adminBar = isAdmin() ? (
-    <div className="max-w-screen-2xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-3">
-      <Link
-        to={ROUTES.ADMIN}
-        className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
-      >
-        ← Admin
-      </Link>
-    </div>
-  ) : null
-
   // Download the report as a PDF via the browser's native print-to-PDF.
   // No PDF dependency/backend is required; the report container is styled so
   // the button itself is hidden from the printed output.
@@ -247,7 +234,6 @@ export function ReportPage() {
     return (
       <div className="flex flex-col flex-1 bg-monarch-canvas">
         <FounderHeader />
-        {adminBar}
         <main className="flex-1 px-4 sm:px-6 lg:px-8 pb-16">
           <div className="relative max-w-screen-2xl mx-auto">
             {reportActions}
@@ -305,7 +291,6 @@ export function ReportPage() {
   return (
     <div className="flex flex-col flex-1">
       <FounderHeader />
-      {adminBar}
 
       <main className="flex-1 px-6 pb-16">
         <div className="max-w-2xl mx-auto">

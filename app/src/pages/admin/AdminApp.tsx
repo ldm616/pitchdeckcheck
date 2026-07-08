@@ -623,21 +623,9 @@ export function AdminApp() {
               padding: '12px 24px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
             }}
           >
-            <h1
-              style={{
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#9ca3af',
-                margin: 0,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}
-            >
-              Admin
-            </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <button
                 onClick={handleCopyReport}
@@ -654,24 +642,6 @@ export function AdminApp() {
                 }}
               >
                 <Copy size={16} />
-              </button>
-              <button
-                onClick={() => {
-                  setViewingReport(false)
-                  setReport(null)
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  fontFamily,
-                  color: '#6b7280',
-                  cursor: 'pointer',
-                }}
-              >
-                Back to Reports
               </button>
             </div>
           </div>
