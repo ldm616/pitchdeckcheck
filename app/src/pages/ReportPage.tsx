@@ -171,7 +171,7 @@ export function ReportPage() {
   // Admin-only affordance: a link back to the admin area, shown only when an
   // admin has verified their password this session.
   const adminBar = isAdmin() ? (
-    <div className="max-w-2xl mx-auto w-full px-6 pt-3">
+    <div className="max-w-6xl mx-auto w-full px-6 pt-3">
       <Link
         to={ROUTES.ADMIN}
         className="text-xs font-medium text-gray-400 hover:text-gray-600 transition-colors"
@@ -249,8 +249,8 @@ export function ReportPage() {
         <FounderHeader />
         {adminBar}
         <main className="flex-1 px-6 pb-16">
-          <div className="max-w-2xl mx-auto">
-            <div className="relative bg-white rounded-xl shadow-sm p-8 sm:p-10">
+          <div className="max-w-6xl mx-auto">
+            <div className="relative bg-white rounded-xl shadow-sm p-6 sm:p-8">
               {reportActions}
               <V2Report report={reportV2} />
 
