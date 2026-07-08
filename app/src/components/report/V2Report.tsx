@@ -30,7 +30,7 @@ const GRADE_UNDERLINE: Record<Grade, string> = {
 // Card border: default calm neutral; selected gets a bold orange border. Always
 // border-2 so selection never shifts layout.
 function cardClass(selected: boolean): string {
-  return `border-2 bg-monarch-card rounded-xl px-3 py-2.5 text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-accent ${
+  return `border-2 bg-monarch-card rounded-xl px-3 py-2 text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-accent ${
     selected
       ? 'border-monarch-accent shadow-[0_1px_3px_rgba(255,90,31,0.12)]'
       : 'border-monarch-border hover:border-monarch-border-strong'
@@ -95,7 +95,7 @@ function overallLetterToGrade(letter?: string): Grade {
 // style), not a pill. Sizes: md (cards, >=16px), lg (detail), xl (hero).
 function GradeMark({ grade, size = 'md' }: { grade: Grade; size?: 'md' | 'lg' | 'xl' }) {
   const letter = grade === 'neutral' ? '–' : grade
-  const textCls = size === 'xl' ? 'text-3xl' : size === 'lg' ? 'text-2xl' : 'text-base'
+  const textCls = size === 'xl' ? 'text-3xl' : size === 'lg' ? 'text-2xl' : 'text-[15px]'
   const underlineCls =
     size === 'xl' ? 'mt-1 h-0.5 w-8' : size === 'lg' ? 'mt-0.5 h-0.5 w-7' : 'mt-0.5 h-0.5 w-6'
   return (
@@ -124,7 +124,7 @@ function DeckScoreCard({
         <span className="text-[14px] font-medium text-monarch-ink">{label}</span>
         <GradeMark grade={grade} />
       </div>
-      <p className="mt-1 text-[14px] font-normal text-monarch-sub">{data.label || DASH_LABEL[grade]}</p>
+      <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight">{data.label || DASH_LABEL[grade]}</p>
     </button>
   )
 }
@@ -148,7 +148,7 @@ function SlideScoreCard({
         <GradeMark grade={grade} />
       </div>
       {slide.assessment && (
-        <p className="mt-1 text-[14px] font-normal text-monarch-sub leading-snug truncate">{slide.assessment}</p>
+        <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{slide.assessment}</p>
       )}
     </button>
   )
@@ -203,7 +203,7 @@ function InsightCard({
   return (
     <button type="button" onClick={onSelect} className={cardClass(selected)}>
       <p className="text-[14px] font-medium text-monarch-ink leading-snug">{title}</p>
-      {subtitle && <p className="mt-1 text-[14px] font-normal text-monarch-sub leading-snug line-clamp-1">{subtitle}</p>}
+      {subtitle && <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight line-clamp-1">{subtitle}</p>}
     </button>
   )
 }
@@ -636,7 +636,7 @@ function PriorityDetail({ items }: { items: PitchDeckCheckReportV2['priority_imp
       <DetailHeading>Priority Fixes</DetailHeading>
       <div className="space-y-3">
         {items.map((p, idx) => (
-          <div key={idx} className="rounded-lg border border-monarch-border bg-white p-3">
+          <div key={idx} className="rounded-lg border border-monarch-border bg-white px-3 py-2.5">
             <div className="flex items-center justify-between gap-2 mb-1">
               <span className="text-sm font-medium text-monarch-ink">
                 {idx + 1}. {p.title}
