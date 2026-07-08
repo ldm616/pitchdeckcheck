@@ -107,9 +107,13 @@ const SPECIFIC_TOPIC_GAP = {
   financials:
     'investors need the bridge from the current run rate to the target: transaction volume, take rate, user and supply growth, CAC/payback, burn, and operating assumptions',
   product:
-    'investors need proof that the product delivers value: activation, conversion, completed transactions, repeat usage, reliability, or clear preference over alternatives',
+    'investors need proof the product reliably delivers the promised value — activation, conversion, completed transactions, repeat usage, reliability, or clear preference — and that the workflow shows that value being delivered',
   market:
     'investors still need stronger external sourcing for the market size and a clearer path to capturing meaningful share',
+  problem:
+    'investors need a sharper value gap: who feels it, what they do today, why current alternatives are inadequate, and how painful, frequent, or expensive it is',
+  solution:
+    'investors need to see the solution directly closes the value gap and why customers would switch from the current alternatives',
 };
 const SPECIFIC_TOPIC_RECOMMENDED = {
   business_model:
@@ -120,9 +124,13 @@ const SPECIFIC_TOPIC_RECOMMENDED = {
   financials:
     'Show the bridge from the current run rate to the target with the underlying growth and cost assumptions.',
   product:
-    'Add proof of value delivery — activation, completed transactions, repeat usage, or reliability — beyond describing what the product does.',
+    'Add proof of value delivery — activation, completed transactions, repeat usage, or reliability — and show the workflow delivering that value on both sides.',
   market:
     'Add external sourcing for the market size and show a credible path to capturing meaningful share.',
+  problem:
+    'Sharpen the value gap: who feels it, what they do today, and why the status quo is inadequate and costly.',
+  solution:
+    'Show how the solution closes the value gap and why it is meaningfully better than the current alternatives.',
 };
 // Neutral lead-ins for the specific gap wording when no strong grounded evidence
 // exists to lead with (contains no invented facts/numbers).
@@ -134,9 +142,27 @@ const SPECIFIC_TOPIC_NEUTRAL_LEAD = {
   financials: 'The headline targets are stated',
   product: 'The product and workflow are explained',
   market: 'The market is defined and sized',
+  problem: 'The problem is described',
+  solution: 'The solution is described',
 };
 // Evidence that a roadmap connects milestones to value/defensibility/financing.
 const ROADMAP_LINKAGE_RE = /(customer value|retention|repeat|defensib|moat|revenue growth|revenue|financing|next round|runway|milestone[^.]*fund|fund[^.]*milestone|value inflection)/i;
+
+// Value-gap-centric investor decisions for Problem/Solution/Product (override
+// the generic per-type investor decision so the report follows the value-gap
+// chain: is there a gap → does the solution close it → does the product prove it).
+const VALUE_GAP_DECISION = {
+  problem:
+    'Is there a meaningful value gap — who feels it, what they do today, and why current alternatives are inadequate?',
+  solution:
+    'Does the solution directly close the value gap and give customers a reason to switch?',
+  product: 'Does the product prove the solution can reliably deliver the promised value?',
+};
+
+// A slide-local ask for a product visual (screenshot/mockup/workflow diagram).
+// On a Solution slide this is a false negative when a Product slide already
+// shows it.
+const VISUAL_ASK_RE = /screenshot|mock-?up|wireframe|flow-?chart|workflow (?:diagram|graphic|screenshot)|product (?:visual|shot|screenshot)|add (?:a )?(?:visual|diagram)/i;
 
 // Slide types exempt from the "Strong must have no gap" cap. team/traction can
 // stay Strong with a forward-looking next-proof caveat; cover/contact are
@@ -470,7 +496,7 @@ function toV2CommScores(dims) {
 // --- slide / topic feedback (rubric-derived, no V1) ---------------------------
 
 function buildSlideFeedbackEntry(slide, opts = {}) {
-  const { companyName = null, supplyLabel = null } = opts;
+  const { companyName = null, supplyLabel = null, hasProductSlide = false } = opts;
   const typeKey = _normType(slide.type);
   const grade = slide.grade || null;
   const questions = Array.isArray(slide.questions) ? slide.questions : [];
@@ -546,6 +572,15 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
     }
   }
 
+  // Capture whether the Solution feedback (as produced by the evaluator) asked
+  // for a product visual while a Product slide already shows it — that is a
+  // slide-local false negative answered elsewhere in the deck.
+  const solutionVisualElsewhere =
+    !notAssessed &&
+    effectiveTypeKey === 'solution' &&
+    hasProductSlide &&
+    VISUAL_ASK_RE.test(`${missing} ${recommended}`);
+
   // Make selected topic feedback more specific: lead with grounded evidence from
   // the deck, then name the concrete remaining gap. Only using facts already
   // present in the rubric evidence (no invention). Avoid repeating the exact
@@ -611,13 +646,32 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
   // investor friction — do not let them downgrade a strong team.
   if (!notAssessed && effectiveTypeKey === 'team' && missing) {
     const g = String(grade || '').trim().toUpperCase()[0];
-    if (g === 'A' || g === 'B') {
+    // Clearly strong founder-market fit = at least one strongly-answered team
+    // question (relevant companies/roles/domain).
+    const hasStrongFmf = questions.some((q) => typeof q.score === 'number' && q.score >= 4);
+    if ((g === 'A' || g === 'B') && hasStrongFmf) {
+      // Founder-market fit is strong and only a strengthening opportunity
+      // remains, so the slide reads Strong (not Mostly answered) with an
+      // optional strengthening note rather than a friction gap.
+      assessment = 'Strong';
       missing =
         'The founders are directly relevant to this market; adding specific role-level outcomes or metrics would strengthen the case further.';
       recommended =
         "Add concrete outcomes or metrics from the founders' most relevant prior roles.";
       issueType = 'None';
     }
+  }
+
+  // Solution slide-local false negative: a product visual was asked for here but
+  // a Product slide already shows it. Suppress the visual ask and reframe the
+  // Solution around whether it closes the value gap. (Runs after the value-gap
+  // reframe above, using the pre-reframe detection.)
+  if (solutionVisualElsewhere) {
+    missing =
+      'The solution is shown (product visuals appear on the Product slide); investors still need it framed as directly closing the value gap and why customers would switch from the current alternatives.';
+    recommended =
+      'Frame the solution around closing the value gap and why it is meaningfully better than the status quo, not around adding screenshots the deck already shows.';
+    issueType = 'Evidence';
   }
 
   // Prefer a concrete marketplace side label (e.g. "detailers") over generic
@@ -645,7 +699,8 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
   return {
     slide_number: slide.slide_number,
     slide_title_or_section: displayTitle,
-    investor_decision: TYPE_TO_INVESTOR_DECISION[effectiveTypeKey] || '',
+    investor_decision:
+      VALUE_GAP_DECISION[effectiveTypeKey] || TYPE_TO_INVESTOR_DECISION[effectiveTypeKey] || '',
     assessment,
     what_works: whatWorks,
     what_is_missing: missing,
@@ -654,8 +709,12 @@ function buildSlideFeedbackEntry(slide, opts = {}) {
   };
 }
 
-function deriveTopicFeedback(representativeSlide, companyName, supplyLabel) {
-  const e = buildSlideFeedbackEntry(representativeSlide, { companyName, supplyLabel });
+function deriveTopicFeedback(representativeSlide, companyName, supplyLabel, hasProductSlide) {
+  const e = buildSlideFeedbackEntry(representativeSlide, {
+    companyName,
+    supplyLabel,
+    hasProductSlide,
+  });
   return {
     assessment: e.assessment,
     what_works: e.what_works,
@@ -674,6 +733,8 @@ function buildTopicCoverage(evalSlides, companyName, supplyLabel) {
     if (!byType.has(key)) byType.set(key, []);
     byType.get(key).push(s);
   }
+
+  const hasProductSlide = (evalSlides || []).some((s) => _normType(s.type) === 'product');
 
   const topics = [];
 
@@ -695,7 +756,7 @@ function buildTopicCoverage(evalSlides, companyName, supplyLabel) {
       status,
       topic_communication_scores: deriveTopicCommunicationScores(group),
       questions,
-      topic_feedback: deriveTopicFeedback(rep, companyName, supplyLabel),
+      topic_feedback: deriveTopicFeedback(rep, companyName, supplyLabel, hasProductSlide),
     });
   }
 
@@ -890,11 +951,12 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
   const companyName = (investmentCase && investmentCase.company_name) || null;
   const evalSlides = Array.isArray(fullReport.slides) ? fullReport.slides : [];
   const supplyLabel = _detectSupplyLabel(evalSlides);
+  const hasProductSlide = evalSlides.some((s) => _normType(s.type) === 'product');
 
   const slide_level_feedback = evalSlides
     .slice()
     .sort((a, b) => _num(a.slide_number) - _num(b.slide_number))
-    .map((s) => buildSlideFeedbackEntry(s, { companyName, supplyLabel }));
+    .map((s) => buildSlideFeedbackEntry(s, { companyName, supplyLabel, hasProductSlide }));
 
   return {
     report_version: 'v2',

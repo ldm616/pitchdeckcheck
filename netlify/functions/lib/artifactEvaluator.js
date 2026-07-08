@@ -200,6 +200,12 @@ const TOPIC_SCORING_GUIDANCE = {
     "Weight direct founder-market fit heavily: relevant companies, roles, and domain experience are strong evidence. Do NOT heavily penalize the absence of specific role-level accomplishments or metrics when the founders' backgrounds are clearly relevant to this business — treat that as a strengthening opportunity, not core investor friction. Directly relevant founder-market fit can score Strong even without detailed accomplishments.",
   traction:
     'Concrete growth across users, supply, and revenue over multiple periods is STRONG traction and can score Strong. Missing retention or repeat-usage evidence is an important next proof point, but it must not erase or heavily discount strong, concrete growth evidence.',
+  problem:
+    'Evaluate the VALUE GAP: is there a meaningful gap, who experiences it, what they do today, why current alternatives are inadequate, how painful/frequent/expensive it is, and why the gap creates urgency now. Judge the strength of the value gap, not slide polish.',
+  solution:
+    'Evaluate whether the solution DIRECTLY CLOSES the value gap: what better customer/provider outcome it creates, why the approach is meaningfully better than current alternatives, and why customers (and suppliers) would switch. Do NOT ask this slide for screenshots/mockups/workflow visuals if the Product slide(s) already show them — that is answered elsewhere; focus on whether the solution closes the value gap.',
+  product:
+    'Evaluate whether the product PROVES the solution can reliably deliver the promised value: does the workflow show the value being delivered, and is there proof of activation, conversion, completed transactions, repeat usage, reliability, or preference? Credit a product that reduces friction on both sides of the marketplace.',
 }
 
 // --- prompt builder -----------------------------------------------------------
