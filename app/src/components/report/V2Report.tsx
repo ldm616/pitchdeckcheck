@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   PitchDeckCheckReportV2,
   DashboardEvaluatedContextV2,
+  InvestmentCaseV2,
+  InvestmentCaseAssessmentV2,
+  PriorityImprovementV2,
+  SuggestedNextStepV2,
 } from '../../lib/types'
 
 // V2 report renderer — dashboard-first layout with a simple three-level
@@ -103,6 +107,27 @@ interface VMContext {
   confidence: string
   note: string
 }
+// Investment Case as Presented — qualitative area assessments plus the free-text
+// Market Validation evidence line. Rendered verbatim from report_v2.investment_case.
+interface VMICArea {
+  label: string
+  interpretation: string
+}
+interface VMInvestmentCase {
+  investor_fit: VMICArea | null
+  market_validation: string
+  opportunity_strength: VMICArea | null
+  execution_credibility: VMICArea | null
+}
+interface VMPriorityImprovement {
+  title: string
+  why_it_matters: string
+  what_to_add_or_change: string
+}
+interface VMNextStep {
+  title: string
+  detail: string
+}
 interface VMDeckScore {
   grade: Grade
   title: string
@@ -111,6 +136,9 @@ interface VMDeckScore {
   question: string[]
   pass: string[]
   focus: string
+  investmentCase: VMInvestmentCase | null
+  priorityImprovements: VMPriorityImprovement[]
+  nextSteps: VMNextStep[]
   context: VMContext | null
 }
 interface VMFlowExtras {
@@ -163,7 +191,80 @@ function ctxHasAny(c: VMContext | null): boolean {
   return Boolean(c.stage || c.audience || c.target_raise || c.business_type || c.deck_purpose || c.note)
 }
 
+// Build the Investment Case view model directly from report_v2.investment_case.
+// Content is rendered verbatim; nothing is split, reclassified, or reworded.
+function buildInvestmentCase(ic?: InvestmentCaseV2): VMInvestmentCase | null {
+  if (!ic) return null
+  const area = (a?: InvestmentCaseAssessmentV2): VMICArea | null => {
+    if (!a) return null
+    const label = (a.label || '').trim()
+    const interpretation = (a.interpretation || '').trim()
+    if (!label && !interpretation) return null
+    return { label, interpretation }
+  }
+  const vm: VMInvestmentCase = {
+    investor_fit: area(ic.investor_fit),
+    market_validation: (ic.market_validation || '').trim(),
+    opportunity_strength: area(ic.opportunity_strength),
+    execution_credibility: area(ic.execution_credibility),
+  }
+  if (
+    !vm.investor_fit &&
+    !vm.market_validation &&
+    !vm.opportunity_strength &&
+    !vm.execution_credibility
+  ) {
+    return null
+  }
+  return vm
+}
+
+// Top priority improvements, rendered verbatim. Capped at 5 (spec: top 4–5).
+function buildPriorityImprovements(list?: PriorityImprovementV2[]): VMPriorityImprovement[] {
+  return (list || [])
+    .filter((p) => p && (p.title || p.why_it_matters || p.what_to_add_or_change))
+    .slice(0, 5)
+    .map((p) => ({
+      title: (p.title || '').trim(),
+      why_it_matters: (p.why_it_matters || '').trim(),
+      what_to_add_or_change: (p.what_to_add_or_change || '').trim(),
+    }))
+}
+
+function _normForDedup(s: string): string {
+  return (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+// Suggested Next Steps, filtered to those NOT duplicative of a priority
+// improvement (title match or meaningful substring overlap). This is a
+// visibility decision only — surviving steps are rendered verbatim.
+function buildNextSteps(
+  steps: SuggestedNextStepV2[] | undefined,
+  improvements: VMPriorityImprovement[],
+): VMNextStep[] {
+  const impTitles = improvements.map((p) => _normForDedup(p.title)).filter(Boolean)
+  const isDuplicative = (title: string): boolean => {
+    const n = _normForDedup(title)
+    if (!n) return false
+    return impTitles.some((t) => {
+      if (t === n) return true
+      const [short, long] = t.length <= n.length ? [t, n] : [n, t]
+      return short.length >= 8 && long.includes(short)
+    })
+  }
+  return (steps || [])
+    .filter((s) => s && (s.title || s.detail))
+    .filter((s) => !isDuplicative(s.title || ''))
+    .map((s) => ({ title: (s.title || '').trim(), detail: (s.detail || '').trim() }))
+}
+
 function buildViewModel(report: PitchDeckCheckReportV2): ViewModel {
+  // These richer sections come from top-level report_v2 fields, which are
+  // populated on both the dashboard-native and legacy paths.
+  const investmentCase = buildInvestmentCase(report.investment_case)
+  const priorityImprovements = buildPriorityImprovements(report.priority_improvements)
+  const nextSteps = buildNextSteps(report.suggested_next_steps, priorityImprovements)
+
   const df = report.dashboard_feedback
   if (df) {
     const ds = df.deck_score
@@ -204,6 +305,9 @@ function buildViewModel(report: PitchDeckCheckReportV2): ViewModel {
         question: ds.investors_will_question || [],
         pass: ds.what_could_make_investors_pass || [],
         focus: ds.highest_leverage_revision_focus || '',
+        investmentCase,
+        priorityImprovements,
+        nextSteps,
         context: normalizeContext(ec),
       },
       dims,
@@ -257,6 +361,9 @@ function buildViewModel(report: PitchDeckCheckReportV2): ViewModel {
       question: report.what_investors_may_question || [],
       pass: [],
       focus: '',
+      investmentCase,
+      priorityImprovements,
+      nextSteps,
       context: cs
         ? {
             stage: cs.company_context && cs.company_context !== 'Unknown' ? cs.company_context : '',
@@ -372,6 +479,22 @@ function DetailList({
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+// One Investment Case area: "Name — Label" heading + verbatim interpretation.
+function InvestmentArea({ name, area }: { name: string; area: VMICArea | null }) {
+  if (!area || (!area.label && !area.interpretation)) return null
+  return (
+    <div>
+      <p className="text-[14px] font-medium text-monarch-body">
+        {name}
+        {area.label ? ` — ${area.label}` : ''}
+      </p>
+      {area.interpretation && (
+        <p className="text-[14px] text-monarch-body leading-normal">{area.interpretation}</p>
+      )}
     </div>
   )
 }
@@ -633,6 +756,70 @@ function DeckScoreDetail({ ds }: { ds: VMDeckScore }) {
         <DetailList label="Investors will likely question" items={ds.question} markerClass="text-grade-c" />
         <DetailList label="What could make investors pass" items={ds.pass} markerClass="text-grade-d" />
       </div>
+      {ds.investmentCase && (
+        <div className="mt-4">
+          <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2">
+            Investment Case as Presented
+          </p>
+          <div className="space-y-2.5">
+            <InvestmentArea name="Investor Fit" area={ds.investmentCase.investor_fit} />
+            {ds.investmentCase.market_validation && (
+              <div>
+                <p className="text-[14px] font-medium text-monarch-body">Market Validation</p>
+                <p className="text-[14px] text-monarch-body leading-normal">
+                  {ds.investmentCase.market_validation}
+                </p>
+              </div>
+            )}
+            <InvestmentArea name="Opportunity Strength" area={ds.investmentCase.opportunity_strength} />
+            <InvestmentArea name="Execution Credibility" area={ds.investmentCase.execution_credibility} />
+          </div>
+        </div>
+      )}
+      {ds.priorityImprovements.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2">
+            Top Priority Improvements
+          </p>
+          <div className="space-y-3">
+            {ds.priorityImprovements.map((p, i) => (
+              <div key={i}>
+                {p.title && <p className="text-[14px] font-medium text-monarch-body">{p.title}</p>}
+                {p.why_it_matters && (
+                  <p className="text-[14px] text-monarch-body leading-normal">
+                    <span className="text-monarch-sub">Why it matters: </span>
+                    {p.why_it_matters}
+                  </p>
+                )}
+                {p.what_to_add_or_change && (
+                  <p className="text-[14px] text-monarch-body leading-normal">
+                    <span className="text-monarch-sub">What to add or change: </span>
+                    {p.what_to_add_or_change}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {ds.nextSteps.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2">
+            Suggested Next Steps
+          </p>
+          <ul className="space-y-1.5">
+            {ds.nextSteps.map((s, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-monarch-border-strong flex-shrink-0">•</span>
+                <span className="text-[14px] text-monarch-body leading-normal">
+                  {s.title}
+                  {s.detail ? ` — ${s.detail}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {ctxHasAny(ds.context) && ds.context && (
         // Evaluated context — inferred, shown as secondary. See dashboard_feedback
         // note for the explicit-context-capture TODO.
