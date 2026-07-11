@@ -46,6 +46,10 @@ const {
   _buildSuggestedNextSteps,
 } = require('./reportV2Assembler');
 
+// Deck-level synthesis (report_v2.deck_synthesis): deterministic reshaping of
+// already-computed report/deck evidence into a cross-slide investor argument.
+const { buildDeckSynthesis } = require('./deckSynthesis');
+
 const CANONICAL_REPORT_VERSION = 'canonical_v1';
 
 // Framework topics investors expect a stage-appropriate deck to address. Used to
@@ -1127,7 +1131,7 @@ function buildDashboardFeedback(v2, opts = {}) {
   const brevity = dim('brevity');
   const flowBase = dim('flow');
 
-  // Flow narrative arrays — populated only from existing canonical signals.
+  // Flow narrative arrays — seeded from existing canonical signals.
   const flowComm = comm.flow || {};
   const brevityComm = comm.brevity || {};
   const sequencing_notes = [];
@@ -1138,8 +1142,6 @@ function buildDashboardFeedback(v2, opts = {}) {
   if (typeof brevityComm.score === 'number' && brevityComm.score < 4 && brevityComm.primary_reason) {
     redundancy_or_repetition.push(brevityComm.primary_reason);
   }
-  // No canonical field currently localizes scattered evidence; leave empty rather
-  // than fabricate deck-specific scatter claims.
   const misplaced_or_scattered_evidence = [];
   const suggested_moves_or_cuts = _dedupe(
     [
@@ -1152,12 +1154,58 @@ function buildDashboardFeedback(v2, opts = {}) {
     ].filter(Boolean)
   );
 
+  // ---- deck_feedback enrichment from deck_synthesis ---------------------------
+  // Reshape the already-generated deck_synthesis (verbatim strings) into the
+  // EXISTING deck_feedback fields per the product mapping. Shape is unchanged;
+  // when deck_synthesis is empty (old reports), enrichment is a no-op and the
+  // canonical behavior above is preserved.
+  const dsyn = v2.deck_synthesis || {};
+  const _pick = (arr, key) => _dedupe((arr || []).map((x) => x && x[key]).filter(Boolean));
+  const objFix = _pick(dsyn.investor_objections, 'recommended_fix');
+  const objIssue = _pick(dsyn.investor_objections, 'issue');
+  const objMissing = _dedupe((dsyn.investor_objections || []).flatMap((o) => (o && o.evidence_missing) || []));
+  const metricFix = _pick(dsyn.metric_ambiguities, 'recommended_fix');
+  const metricIssue = _pick(dsyn.metric_ambiguities, 'term_or_claim');
+  const scatterFix = _pick(dsyn.scattered_or_misplaced_evidence, 'recommended_fix');
+  const scatterIssue = _pick(dsyn.scattered_or_misplaced_evidence, 'issue');
+  const redFix = _pick(dsyn.redundancy_or_low_value_content, 'recommended_fix');
+  const redIssue = _pick(dsyn.redundancy_or_low_value_content, 'issue');
+  const seqFix = _pick(dsyn.sequencing_issues, 'recommended_fix');
+  const seqIssue = _pick(dsyn.sequencing_issues, 'issue');
+  const restrAll = _pick(dsyn.restructuring_recommendations, 'recommendation');
+  const restrTrim = restrAll.filter((r) => /\b(combine|consolidat|cut|replace|rework|remove|trim)\b/i.test(r));
+
+  // Prefer the specific synthesis issues for "what needs help" when present;
+  // otherwise keep the canonical gap. Recommended changes append synthesis fixes.
+  const _needs = (base, issues, n) => {
+    const top = (issues || []).filter(Boolean).slice(0, n);
+    return top.length ? top.join(' ') : base;
+  };
+  const _merge = (parts, cap) => _dedupe(parts.flat().filter(Boolean)).slice(0, cap);
+
+  // Completeness ← investor_objections + evidence_missing + priority_improvements
+  const completenessMissing = objMissing.length
+    ? [`Missing proof investors expect: ${objMissing.slice(0, 4).join('; ')}.`]
+    : [];
+  completeness.what_needs_help = _needs(completeness.what_needs_help, [...objIssue, ...completenessMissing], 2);
+  completeness.recommended_changes = _merge([objFix, priorityAdds], 6);
+
+  // Clarity ← metric_ambiguities + investor_objections + scattered_or_misplaced_evidence
+  clarity.what_needs_help = _needs(clarity.what_needs_help, [...metricIssue, ...scatterIssue], 3);
+  clarity.recommended_changes = _merge([metricFix, objFix, scatterFix], 6);
+
+  // Brevity ← redundancy_or_low_value_content + restructuring_recommendations
+  brevity.what_needs_help = _needs(brevity.what_needs_help, redIssue, 2);
+  brevity.recommended_changes = _merge([redFix, restrTrim], 6);
+
+  // Flow ← sequencing_issues + scattered_or_misplaced_evidence + restructuring_recommendations
+  flowBase.what_needs_help = _needs(flowBase.what_needs_help, seqIssue, 2);
   const flow = {
     ...flowBase,
-    sequencing_notes,
+    sequencing_notes: _merge([sequencing_notes, seqIssue], 6),
     redundancy_or_repetition,
-    misplaced_or_scattered_evidence,
-    suggested_moves_or_cuts,
+    misplaced_or_scattered_evidence: _merge([misplaced_or_scattered_evidence, scatterIssue], 6),
+    suggested_moves_or_cuts: _merge([suggested_moves_or_cuts, restrAll, seqFix], 8),
   };
 
   const deck_feedback = { completeness, clarity, brevity, flow };
@@ -1257,6 +1305,7 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
     fullReport = {},
     companyContext = null,
     investmentCase = null,
+    slides = [],
     generatedAt = new Date().toISOString(),
   } = ctx;
   const companyName = (investmentCase && investmentCase.company_name) || null;
@@ -1290,8 +1339,31 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
     save_share_upgrade: _buildSaveShareUpgrade(),
   };
 
+  // Deck-level synthesis: a cross-slide investor-argument diagnosis, derived
+  // deterministically from the evidence already assembled above. Additive and
+  // non-fatal — a failure here must never break report generation, and it does
+  // NOT feed dashboard_feedback (its shape is unchanged).
+  try {
+    v2.deck_synthesis = buildDeckSynthesis({
+      fullReport,
+      investmentCase,
+      slideFeedback: slide_level_feedback,
+      slides,
+    });
+  } catch (err) {
+    v2.deck_synthesis = {
+      investor_objections: [],
+      metric_ambiguities: [],
+      sequencing_issues: [],
+      redundancy_or_low_value_content: [],
+      scattered_or_misplaced_evidence: [],
+      restructuring_recommendations: [],
+    };
+  }
+
   // Attach dashboard-native feedback (reshaped from the fields above). All
-  // existing report_v2 fields are preserved unchanged.
+  // existing report_v2 fields are preserved unchanged. dashboard_feedback does
+  // NOT consume deck_synthesis in this pass.
   v2.dashboard_feedback = buildDashboardFeedback(v2, { investmentCase });
 
   return v2;

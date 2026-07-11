@@ -1910,6 +1910,7 @@ async function generateFullReport(supabase, deckId) {
         fullReport,
         companyContext,
         investmentCase,
+        slides,
         generatedAt: new Date().toISOString(),
       })
       console.log(
