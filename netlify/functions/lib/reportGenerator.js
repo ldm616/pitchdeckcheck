@@ -50,6 +50,13 @@ const {
 } = require('./canonicalReport')
 // Artifact-grounded slide evaluator — the default/primary evaluation path.
 const { buildArtifactSlidePrompt } = require('./artifactEvaluator')
+// Evaluation-failure guardrails: detect processing-error placeholder evaluations
+// so infra failures never masquerade as legitimate deck weakness.
+const {
+  FAILED_ANALYSIS_MESSAGE,
+  assessDeckFailure,
+  stripForbiddenPlaceholders,
+} = require('./evaluationFailure')
 
 // A satisfied criterion ("None - criterion met" and variants) carries no real
 // gap; such answers are normalized so downstream never treats them as missing.
@@ -1551,6 +1558,10 @@ async function generateFullReport(supabase, deckId) {
     // Evaluate each slide
     const slideEvaluations = []
     const slideDebugInfo = [] // Collect debug info from each slide evaluation
+    // Authoritative per-slide failure signal: slide_numbers whose evaluateSlide
+    // call returned success:false (OpenAI error/timeout/parse failure). Unioned
+    // downstream with placeholder-pattern detection for the failure guardrail.
+    const evalFailedSlideNumbers = new Set()
 
     for (const slide of slides) {
       const slideType = slide.inferred_type || 'other'
@@ -1568,6 +1579,11 @@ async function generateFullReport(supabase, deckId) {
 
       const result = await evaluateSlide(openai, supabase, slide, rubric, deckOutline, evalContext, evalArchitecture)
       const answers = result.answers
+
+      // Record evaluation failure (fallback placeholders were returned).
+      if (result.success === false) {
+        evalFailedSlideNumbers.add(slide.slide_number)
+      }
 
       // Capture debug info for v3
       if (result.debug && evalContext) {
@@ -1607,6 +1623,87 @@ async function generateFullReport(supabase, deckId) {
         questions,
       })
     }
+
+    // ===== Evaluation-failure guardrail =====
+    // Slide evaluations that fell back to processing-error placeholders are an
+    // infrastructure failure, NOT investor critique. Detect them BEFORE any
+    // scoring or synthesis so they can never masquerade as deck weakness.
+    //   - major (>= MAJOR_FAILURE_RATIO of scored slides failed): do not build a
+    //     normal report; return a failed-analysis state (existing 'failed' path).
+    //   - partial (some failed): drop the failed slides so the rest score/synthesize
+    //     normally; record reliability metadata for admin/diagnostics.
+    const failureAssessment = assessDeckFailure(slideEvaluations, {
+      knownFailedNumbers: evalFailedSlideNumbers,
+    })
+    console.log(
+      `[eval-guardrail] scored=${failureAssessment.scoredCount} ` +
+        `failed=${failureAssessment.failedCount} ` +
+        `ratio=${failureAssessment.ratio} level=${failureAssessment.level}` +
+        (failureAssessment.failedCount
+          ? ` failed_slides=[${failureAssessment.failedSlideNumbers.join(', ')}]`
+          : '')
+    )
+
+    if (failureAssessment.level === 'major') {
+      // Major failure: refuse to publish a normal investor-readiness report.
+      // Persist diagnostics for Admin/dev; surface a regenerate message to the
+      // founder via the deck's existing 'failed' processing_status path.
+      console.error(
+        `[eval-guardrail] MAJOR evaluation failure for deck ${deckId} — ` +
+          `${failureAssessment.failedCount}/${failureAssessment.scoredCount} slides failed. ` +
+          `Not producing a scored report.`
+      )
+      await supabase
+        .from('reports')
+        .update({
+          status: 'failed',
+          generation_error: FAILED_ANALYSIS_MESSAGE,
+          content: {
+            analysis_failure: {
+              reason: 'evaluation_failure',
+              message: FAILED_ANALYSIS_MESSAGE,
+              scored_slides: failureAssessment.scoredCount,
+              failed_slides: failureAssessment.failedCount,
+              failed_slide_numbers: failureAssessment.failedSlideNumbers,
+              failure_ratio: failureAssessment.ratio,
+              generated_at: new Date().toISOString(),
+            },
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', reportId)
+
+      return { success: false, error: FAILED_ANALYSIS_MESSAGE }
+    }
+
+    // Partial failure: exclude the failed slides from all scoring and synthesis
+    // (mutating the const array's contents so every downstream reference sees the
+    // filtered set). Their placeholder strings therefore never reach
+    // slide_level_feedback, dashboard_feedback, investment_case,
+    // priority_improvements, suggested_next_steps, or deck_synthesis.
+    let analysisReliability = null
+    if (failureAssessment.level === 'partial') {
+      const failedSet = new Set(failureAssessment.failedSlideNumbers)
+      const kept = slideEvaluations.filter((se) => !failedSet.has(se.slide_number))
+      console.warn(
+        `[eval-guardrail] PARTIAL evaluation failure for deck ${deckId} — ` +
+          `excluding ${failureAssessment.failedCount} failed slide(s) ` +
+          `[${failureAssessment.failedSlideNumbers.join(', ')}] from scoring/synthesis.`
+      )
+      slideEvaluations.length = 0
+      slideEvaluations.push(...kept)
+      analysisReliability = {
+        status: 'partial',
+        message:
+          'Some slides could not be evaluated and were excluded from this analysis. Regenerate for a complete report.',
+        scored_slides: failureAssessment.scoredCount,
+        evaluated_slides: kept.length,
+        failed_slides: failureAssessment.failedCount,
+        failed_slide_numbers: failureAssessment.failedSlideNumbers,
+        failure_ratio: failureAssessment.ratio,
+      }
+    }
+    // ===== End evaluation-failure guardrail =====
 
     // ===== V3 Signal Override Layer =====
     // Post-rubric adjustment that detects when underlying investor signal
@@ -1861,6 +1958,13 @@ async function generateFullReport(supabase, deckId) {
       free_report: freeReport,
     }
 
+    // Additive metadata: partial-failure reliability note (set only when some
+    // slides failed evaluation and were excluded above). Data-only; not read by
+    // scoring/grading and no dashboard UI change consumes it.
+    if (analysisReliability) {
+      reportContent.analysis_reliability = analysisReliability
+    }
+
     // Additive metadata: deterministic Company Context stage inference.
     // Non-fatal — a failure here must never block report generation, and this
     // field is not read by scoring, grading, or the current frontend.
@@ -1913,6 +2017,16 @@ async function generateFullReport(supabase, deckId) {
         slides,
         generatedAt: new Date().toISOString(),
       })
+      // Belt-and-suspenders: guarantee no processing-error placeholder string
+      // survives into the user-facing report_v2. Upstream exclusion normally
+      // makes this a no-op; it defends against any other fallback source (e.g.
+      // thesis fallback) leaking a forbidden string into the founder view.
+      const strippedCount = stripForbiddenPlaceholders(reportContent.report_v2)
+      if (strippedCount > 0) {
+        console.warn(
+          `[eval-guardrail] stripped ${strippedCount} residual placeholder string(s) from report_v2`
+        )
+      }
       console.log(
         `[canonical] report built grade=${reportContent.report_v2.overall_grade.letter} ` +
           `topics=${canonical.topics.length} ` +
