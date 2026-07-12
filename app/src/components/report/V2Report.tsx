@@ -52,14 +52,14 @@ function cardClass(selected: boolean): string {
   // Selection is signalled by a charcoal (near-black) 2px border + subtle shadow,
   // kept independent of the grade rail so it never reads as a grade color (and
   // never red). `relative overflow-hidden` lets the grade rail clip to the card.
-  // Selection = a 2px charcoal border + slightly stronger shadow (never red).
-  // The border is a constant 2px in both states (neutral vs charcoal) so
-  // selecting never shifts layout. Grade color stays on the rail only, so
-  // selection meaning (charcoal) reads independently of grade meaning (rail).
-  return `relative border-2 bg-monarch-card text-left w-full transition focus:outline-none focus-visible:border-[#1f2937] ${
+  // Selection = a soft 1px charcoal border, very light fill, and a subtle
+  // shadow (never red, never a thick outline). The border is a constant 1px in
+  // both states (neutral vs charcoal) so selecting never shifts layout. Grade
+  // color stays on the rail only, independent of the selection border.
+  return `relative border text-left w-full transition focus:outline-none focus-visible:border-[#1f2937] ${
     selected
-      ? 'border-[#1f2937] shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
-      : 'border-monarch-border hover:border-monarch-border-strong shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
+      ? 'border-[#1f2937] bg-[#fafafa] shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
+      : 'border-monarch-border bg-monarch-card hover:border-monarch-border-strong shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
   }`
 }
 
@@ -446,13 +446,11 @@ function TriageCard({
   grade,
   selected,
   onSelect,
-  gradeColumnBg = false,
 }: {
   title: string
   grade: Grade
   selected: boolean
   onSelect: () => void
-  gradeColumnBg?: boolean
 }) {
   const letter = grade === 'neutral' ? '–' : grade
   return (
@@ -462,16 +460,12 @@ function TriageCard({
           at top or bottom. Independent of the selection border. */}
       <span
         aria-hidden
-        className={`absolute top-[-2px] bottom-[-2px] left-[-2px] w-1 ${GRADE_UNDERLINE[grade]}`}
+        className={`absolute top-[-1px] bottom-[-1px] left-[-1px] w-1 ${GRADE_UNDERLINE[grade]}`}
       />
       <div className="flex items-stretch">
-        {/* Grade column: the letter, vertically centered next to the rail, with
-            an optional very-pale-gray fill (used on slide cards). */}
-        <div
-          className={`flex items-center justify-center shrink-0 pl-2.5 pr-2.5 ${
-            gradeColumnBg ? 'bg-gray-100' : ''
-          }`}
-        >
+        {/* Grade column: the letter, vertically centered next to the rail, on a
+            subtle gray fill that separates the grade from the title. */}
+        <div className="flex items-center justify-center shrink-0 pl-2.5 pr-2.5 bg-gray-100">
           <span className="text-[15px] font-semibold leading-none text-monarch-ink">{letter}</span>
         </div>
         <div className="min-w-0 flex-1 py-2 pr-3 pl-3">
@@ -699,7 +693,6 @@ export function V2Report({ report }: V2ReportProps) {
                 grade={s.grade}
                 selected={selected?.type === 'slide' && selected.index === i}
                 onSelect={() => select({ type: 'slide', index: i })}
-                gradeColumnBg
               />
             ))}
           </div>
@@ -880,7 +873,7 @@ function DeckDimDetail({ dim, native }: { dim: VMDim; native: boolean }) {
         <GradeMark grade={dim.grade} size="lg" />
         <div>
           <p className="text-base font-semibold text-monarch-ink">{dim.label}</p>
-          <p className="text-[14px] text-monarch-sub">{dim.assessment || DASH_LABEL[dim.grade]}</p>
+          <p className="text-[14px] text-monarch-sub">{GRADE_CARD_LABEL[dim.grade]}</p>
         </div>
       </div>
       {native ? (
@@ -926,7 +919,7 @@ function SlideDetail({ slide }: { slide: VMSlide }) {
             {typeof slide.slide_number === 'number' && slide.slide_number > 0 ? `Slide ${slide.slide_number} · ` : ''}
             {slide.title}
           </p>
-          <p className="text-[14px] text-monarch-sub">{slide.assessment || DASH_LABEL[slide.grade]}</p>
+          <p className="text-[14px] text-monarch-sub">{GRADE_CARD_LABEL[slide.grade]}</p>
         </div>
         {slide.related_deck_issue && (
           <div className="ml-auto">
