@@ -26,14 +26,26 @@ interface V2ReportProps {
 
 // --- grading -----------------------------------------------------------------
 
-type Grade = 'A' | 'B' | 'C' | 'D' | 'neutral'
+type Grade = 'A' | 'B' | 'C' | 'D' | 'F' | 'neutral'
 
 const GRADE_UNDERLINE: Record<Grade, string> = {
   A: 'bg-grade-a',
   B: 'bg-grade-b',
   C: 'bg-grade-c',
   D: 'bg-grade-d',
+  F: 'bg-grade-d',
   neutral: 'bg-monarch-border-strong',
+}
+
+// Universal card labels shown on every triage card (deeper nuance stays in the
+// detail pane). Keyed by grade so the label reads consistently everywhere.
+const GRADE_CARD_LABEL: Record<Grade, string> = {
+  A: 'Excellent',
+  B: 'Good',
+  C: 'Needs Work',
+  D: 'Weak',
+  F: 'Missing',
+  neutral: '—',
 }
 
 function cardClass(selected: boolean): string {
@@ -56,6 +68,7 @@ const DASH_LABEL: Record<Grade, string> = {
   B: 'Needs refinement',
   C: 'Under-supported',
   D: 'Missing / weak',
+  F: 'Missing',
   neutral: 'Not assessed',
 }
 
@@ -96,7 +109,8 @@ function overallLetterToGrade(letter?: string): Grade {
   if (c === 'A') return 'A'
   if (c === 'B') return 'B'
   if (c === 'C') return 'C'
-  if (c === 'D' || c === 'E' || c === 'F') return 'D'
+  if (c === 'D' || c === 'E') return 'D'
+  if (c === 'F') return 'F'
   return 'neutral'
 }
 
@@ -429,14 +443,12 @@ function GradeMark({ grade, size = 'md' }: { grade: Grade; size?: 'md' | 'lg' })
 
 function TriageCard({
   title,
-  status,
   grade,
   selected,
   onSelect,
   gradeColumnBg = false,
 }: {
   title: string
-  status?: string
   grade: Grade
   selected: boolean
   onSelect: () => void
@@ -464,9 +476,9 @@ function TriageCard({
         </div>
         <div className="min-w-0 flex-1 py-2 pr-3 pl-3">
           <span className="block text-[14px] font-medium text-monarch-ink truncate">{title}</span>
-          {status && (
-            <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{status}</p>
-          )}
+          <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">
+            {GRADE_CARD_LABEL[grade]}
+          </p>
         </div>
       </div>
     </button>
@@ -653,7 +665,6 @@ export function V2Report({ report }: V2ReportProps) {
         <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Overall</h2>
         <TriageCard
           title={deckScore.title}
-          status={deckScore.summary}
           grade={deckScore.grade}
           selected={selected?.type === 'deck_summary'}
           onSelect={() => select({ type: 'deck_summary' })}
@@ -668,7 +679,6 @@ export function V2Report({ report }: V2ReportProps) {
               <TriageCard
                 key={d.key}
                 title={d.label}
-                status={d.assessment}
                 grade={d.grade}
                 selected={selected?.type === 'deck_dim' && selected.index === i}
                 onSelect={() => select({ type: 'deck_dim', index: i })}
@@ -686,7 +696,6 @@ export function V2Report({ report }: V2ReportProps) {
               <TriageCard
                 key={i}
                 title={s.title}
-                status={s.assessment}
                 grade={s.grade}
                 selected={selected?.type === 'slide' && selected.index === i}
                 onSelect={() => select({ type: 'slide', index: i })}
