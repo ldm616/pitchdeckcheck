@@ -55,6 +55,7 @@ const { buildArtifactSlidePrompt } = require('./artifactEvaluator')
 const {
   FAILED_ANALYSIS_MESSAGE,
   assessDeckFailure,
+  classifyEvalErrors,
   stripForbiddenPlaceholders,
 } = require('./evaluationFailure')
 
@@ -1011,7 +1012,14 @@ Evaluate each question. Include assessment, gap, investor_impact, fix, and confi
     return { success: true, answers: guardrailedAnswers, debug }
   } catch (err) {
     console.error(`Slide ${slide.slide_number} evaluation error:`, err.message)
-    return { success: false, answers: generateFallbackAnswers(rubric), debug: null }
+    // Capture a structured error so an infra failure (e.g. OpenAI 429
+    // insufficient_quota) can be classified and reported to admin upstream.
+    const error = {
+      status: err && err.status != null ? err.status : null,
+      code: (err && (err.code || (err.error && err.error.code))) || null,
+      message: err && err.message ? String(err.message) : null,
+    }
+    return { success: false, answers: generateFallbackAnswers(rubric), debug: null, error }
   }
 }
 
@@ -1562,6 +1570,9 @@ async function generateFullReport(supabase, deckId) {
     // call returned success:false (OpenAI error/timeout/parse failure). Unioned
     // downstream with placeholder-pattern detection for the failure guardrail.
     const evalFailedSlideNumbers = new Set()
+    // Structured per-slide errors (status/code/message) for classification and
+    // the admin failure event.
+    const evalErrors = []
 
     for (const slide of slides) {
       const slideType = slide.inferred_type || 'other'
@@ -1583,6 +1594,7 @@ async function generateFullReport(supabase, deckId) {
       // Record evaluation failure (fallback placeholders were returned).
       if (result.success === false) {
         evalFailedSlideNumbers.add(slide.slide_number)
+        evalErrors.push({ slide_number: slide.slide_number, ...(result.error || {}) })
       }
 
       // Capture debug info for v3
@@ -1644,6 +1656,43 @@ async function generateFullReport(supabase, deckId) {
           : '')
     )
 
+    // Classify the underlying cause (e.g. OpenAI 429 insufficient_quota) so the
+    // failure can be reported to admin with a root cause, not just a symptom.
+    const evalErrorSummary = classifyEvalErrors(evalErrors)
+    if (failureAssessment.failedCount > 0) {
+      console.error(
+        `[eval-guardrail] cause=${evalErrorSummary.reason} ` +
+          `status=${evalErrorSummary.status} code=${evalErrorSummary.code} ` +
+          `(${evalErrorSummary.count} failed call(s))`
+      )
+    }
+
+    // Record a persistent admin-visible event for any evaluation failure. Best
+    // effort: an event-insert failure must never affect the report outcome.
+    const recordFailureEvent = async (level) => {
+      try {
+        await supabase.from('events').insert({
+          deck_id: deckId,
+          event_type: 'report_generation_failed',
+          metadata: {
+            level,
+            report_id: reportId,
+            reason: evalErrorSummary.reason,
+            openai_status: evalErrorSummary.status,
+            openai_code: evalErrorSummary.code,
+            sample_message: evalErrorSummary.sample_message,
+            scored_slides: failureAssessment.scoredCount,
+            failed_slides: failureAssessment.failedCount,
+            failed_slide_numbers: failureAssessment.failedSlideNumbers,
+            failure_ratio: failureAssessment.ratio,
+          },
+        })
+        console.log(`[eval-guardrail] recorded report_generation_failed event (level=${level})`)
+      } catch (evErr) {
+        console.error('[eval-guardrail] failed to record failure event (non-fatal):', evErr.message)
+      }
+    }
+
     if (failureAssessment.level === 'major') {
       // Major failure: refuse to publish a normal investor-readiness report.
       // Persist diagnostics for Admin/dev; surface a regenerate message to the
@@ -1661,6 +1710,12 @@ async function generateFullReport(supabase, deckId) {
           content: {
             analysis_failure: {
               reason: 'evaluation_failure',
+              cause: evalErrorSummary.reason,
+              openai_error: {
+                status: evalErrorSummary.status,
+                code: evalErrorSummary.code,
+                sample_message: evalErrorSummary.sample_message,
+              },
               message: FAILED_ANALYSIS_MESSAGE,
               scored_slides: failureAssessment.scoredCount,
               failed_slides: failureAssessment.failedCount,
@@ -1672,6 +1727,8 @@ async function generateFullReport(supabase, deckId) {
           updated_at: new Date().toISOString(),
         })
         .eq('id', reportId)
+
+      await recordFailureEvent('major')
 
       return { success: false, error: FAILED_ANALYSIS_MESSAGE }
     }
@@ -1694,6 +1751,12 @@ async function generateFullReport(supabase, deckId) {
       slideEvaluations.push(...kept)
       analysisReliability = {
         status: 'partial',
+        cause: evalErrorSummary.reason,
+        openai_error: {
+          status: evalErrorSummary.status,
+          code: evalErrorSummary.code,
+          sample_message: evalErrorSummary.sample_message,
+        },
         message:
           'Some slides could not be evaluated and were excluded from this analysis. Regenerate for a complete report.',
         scored_slides: failureAssessment.scoredCount,
@@ -1702,6 +1765,7 @@ async function generateFullReport(supabase, deckId) {
         failed_slide_numbers: failureAssessment.failedSlideNumbers,
         failure_ratio: failureAssessment.ratio,
       }
+      await recordFailureEvent('partial')
     }
     // ===== End evaluation-failure guardrail =====
 

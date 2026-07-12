@@ -174,6 +174,49 @@ function stripForbiddenPlaceholders(node) {
   return stripped;
 }
 
+/**
+ * Classify the per-slide evaluation errors captured during the run into a
+ * single dominant reason, so a failure can be reported to admin with a cause
+ * (e.g. OpenAI quota exhaustion) rather than a generic "processing error".
+ *
+ * @param {Array<{slide_number, status, code, message}>} errors
+ * @returns {{ reason, status, code, count, sample_message }}
+ *   reason ∈ 'openai_quota_exceeded' | 'openai_rate_limited' | 'openai_error' |
+ *            'evaluation_error' | 'unknown'
+ */
+function classifyEvalErrors(errors) {
+  const list = (errors || []).filter(Boolean);
+  if (list.length === 0) {
+    return { reason: 'unknown', status: null, code: null, count: 0, sample_message: null };
+  }
+  const is429 = (e) => Number(e.status) === 429;
+  const isQuota = (e) =>
+    is429(e) &&
+    /quota|insufficient_quota|billing|exceeded your current quota/i.test(
+      `${e.code || ''} ${e.message || ''}`
+    );
+  const quota = list.filter(isQuota);
+  const rateLimited = list.filter((e) => is429(e) && !isQuota(e));
+
+  let reason = 'openai_error';
+  if (quota.length > 0 && quota.length >= rateLimited.length) reason = 'openai_quota_exceeded';
+  else if (rateLimited.length > 0) reason = 'openai_rate_limited';
+  else if (list.every((e) => e.status == null)) reason = 'evaluation_error';
+
+  // Prefer a sample that matches the chosen reason for a representative message.
+  const sample =
+    (reason === 'openai_quota_exceeded' && quota[0]) ||
+    (reason === 'openai_rate_limited' && rateLimited[0]) ||
+    list[0];
+  return {
+    reason,
+    status: sample.status != null ? sample.status : null,
+    code: sample.code || null,
+    count: list.length,
+    sample_message: sample.message || null,
+  };
+}
+
 module.exports = {
   MAJOR_FAILURE_RATIO,
   FAILED_ANALYSIS_MESSAGE,
@@ -181,5 +224,6 @@ module.exports = {
   isFailedAnswer,
   isFailedSlideEvaluation,
   assessDeckFailure,
+  classifyEvalErrors,
   stripForbiddenPlaceholders,
 };
