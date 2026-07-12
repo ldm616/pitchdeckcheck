@@ -50,6 +50,10 @@ const {
 // already-computed report/deck evidence into a cross-slide investor argument.
 const { buildDeckSynthesis } = require('./deckSynthesis');
 
+// Slide-feedback grounding: rewrites generic slide feedback to reference the
+// concrete artifacts present in each slide's raw text. Additive; shape-preserving.
+const { enrichSlideLevelFeedback } = require('./slideFeedbackEnrichment');
+
 const CANONICAL_REPORT_VERSION = 'canonical_v1';
 
 // Framework topics investors expect a stage-appropriate deck to address. Used to
@@ -1455,6 +1459,22 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
       scattered_or_misplaced_evidence: [],
       restructuring_recommendations: [],
     };
+  }
+
+  // Ground slide feedback in the actual slide artifacts. Runs AFTER deck_synthesis
+  // (so that stays computed on the original text) and BEFORE dashboard_feedback
+  // (so slide_feedback inherits the grounded text). Deterministic and non-fatal;
+  // only replaces generic phrasing, never touches grade/assessment/shape.
+  try {
+    v2.slide_level_feedback = enrichSlideLevelFeedback({
+      entries: v2.slide_level_feedback,
+      slides,
+      investmentCase,
+      companyName,
+      supplyLabel,
+    });
+  } catch (err) {
+    // Keep the original (unenriched) slide_level_feedback on any failure.
   }
 
   // Attach dashboard-native feedback (reshaped from the fields above). All
