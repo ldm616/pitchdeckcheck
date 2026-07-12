@@ -604,7 +604,7 @@ function buildMissingMoatSection(params = {}) {
 
   const item = {
     slide_number: null,
-    slide_title_or_section: 'Moat / Defensibility',
+    slide_title_or_section: 'Moat',
     investor_decision: 'Whether the advantage becomes harder to copy as the company scales.',
     assessment: 'Missing',
     what_works: `The deck has some related evidence — ${relatedEvidence} — but these are not organized into a durable moat argument.`,
@@ -613,7 +613,7 @@ function buildMissingMoatSection(params = {}) {
     issue_type: 'Substance',
   };
   const recommendedBullets = [
-    'Add a Moat / Defensibility slide.',
+    'Add a Moat slide.',
     `Explain the durable advantage: ${durable}.`,
     'Connect the moat to named competitors and likely fast followers.',
   ];

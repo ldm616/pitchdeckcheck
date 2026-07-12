@@ -1490,7 +1490,13 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
   let missingMoat = null;
   try {
     missingMoat = buildMissingMoatSection({ slides, investmentCase, companyName });
-    if (missingMoat) v2.slide_level_feedback = [...(v2.slide_level_feedback || []), missingMoat.item];
+    if (missingMoat) {
+      const arr = [...(v2.slide_level_feedback || [])];
+      // Place Moat immediately after the Competition slide (fallback: end).
+      const compIdx = arr.findIndex((s) => /competition/i.test(String((s && s.slide_title_or_section) || '')));
+      arr.splice(compIdx >= 0 ? compIdx + 1 : arr.length, 0, missingMoat.item);
+      v2.slide_level_feedback = arr;
+    }
   } catch (err) {
     missingMoat = null;
   }
@@ -1504,9 +1510,7 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
   // dashboard slide_feedback item (recommended_changes is already an array).
   if (missingMoat) {
     try {
-      const mf = (v2.dashboard_feedback.slide_feedback || []).find(
-        (s) => s.title === 'Moat / Defensibility'
-      );
+      const mf = (v2.dashboard_feedback.slide_feedback || []).find((s) => s.title === 'Moat');
       if (mf) mf.recommended_changes = missingMoat.recommendedBullets;
     } catch (err) {
       /* non-fatal */
