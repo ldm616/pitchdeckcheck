@@ -591,7 +591,9 @@ function buildMissingMoatSection(params = {}) {
 
   const deckText = slides.map((s) => String((s && s.extracted_text) || '')).join('\n');
   const moat = assessMoat(deckText, { companyName, isMarketplace });
-  if (moat.status === 'addressed') return null; // deck explicitly proves a moat
+  // Only a genuinely weak moat (no durable signals) is "missing". Scattered or
+  // addressed durability is surfaced as answered/scattered by buildInvestorTopics.
+  if (moat.status !== 'weak') return null;
 
   const company = companyName || 'the company';
   const hasTraction = slides.some((s) => _normType(s && (s.inferred_type || s.type)) === 'traction');
@@ -618,6 +620,148 @@ function buildMissingMoatSection(params = {}) {
     'Connect the moat to named competitors and likely fast followers.',
   ];
   return { item, recommendedBullets };
+}
+
+// --- investor-topic-first feedback -------------------------------------------
+// PitchDeckCheck evaluates every deck against a FIXED set of investor topics in
+// a preferred investor-readiness sequence. buildInvestorTopics reshapes the
+// per-slide feedback into one card per topic (in this order), merging multi-slide
+// topics, marking absent topics as F/Missing, and recording where each answer
+// came from. Shape-preserving: each item is still a slide_feedback-shaped object
+// with additive topic_* fields.
+const INVESTOR_TOPICS = [
+  { key: 'cover', short: 'Cover', full: 'Cover', types: ['cover'] },
+  { key: 'team', short: 'Team', full: 'Team', types: ['team'] },
+  { key: 'problem', short: 'Problem', full: 'Problem', types: ['problem'] },
+  { key: 'solution', short: 'Solution', full: 'Solution', types: ['solution'] },
+  { key: 'product', short: 'Product', full: 'Product', types: ['product'] },
+  { key: 'market', short: 'Market', full: 'Market', types: ['market'] },
+  { key: 'traction', short: 'Traction', full: 'Traction', types: ['traction'] },
+  { key: 'business_model', short: 'Business Model', full: 'Business Model', types: ['business_model'] },
+  { key: 'competition', short: 'Competition', full: 'Competition', types: ['competition'] },
+  { key: 'moat', short: 'Moat', full: 'Moat / Defensibility', types: ['moat'] },
+  { key: 'go_to_market', short: 'Go-to-Market', full: 'Go-to-Market', types: ['go_to_market'] },
+  { key: 'roadmap', short: 'Roadmap', full: 'Roadmap / Milestones', types: ['roadmap'] },
+  { key: 'financials', short: 'Financials', full: 'Financials', types: ['financials'] },
+  { key: 'ask', short: 'Ask', full: 'Ask', types: ['ask', 'funding'] },
+  { key: 'contact', short: 'Contact', full: 'Contact', types: ['contact'] },
+];
+const _GRADE_RANK = { A: 5, B: 4, C: 3, D: 2, F: 1 };
+const _MOAT_WEAK_TEST = new RegExp(MOAT_WEAK_RE.source, 'i');
+const _MOAT_DURABLE_TEST = new RegExp(MOAT_DURABLE_RE.source, 'i');
+
+function _titleToType() {
+  const inv = {};
+  for (const [k, v] of Object.entries(TYPE_DISPLAY_NAMES)) {
+    const key = _clean(v).toLowerCase();
+    if (!(key in inv)) inv[key] = _normType(k);
+  }
+  return inv;
+}
+const _TITLE_TO_TYPE = _titleToType();
+
+function buildInvestorTopics(params = {}) {
+  const slideFeedback = Array.isArray(params.slideFeedback) ? params.slideFeedback : [];
+  const slides = Array.isArray(params.slides) ? params.slides : [];
+  const companyName = params.companyName || (params.investmentCase && params.investmentCase.company_name) || null;
+  const isMarketplace = !!(params.investmentCase && params.investmentCase.detected && params.investmentCase.detected.is_marketplace);
+
+  const typeByNum = {};
+  for (const s of slides) if (s && s.slide_number != null) typeByNum[s.slide_number] = _normType(s.inferred_type || s.type);
+  const entryType = (e) => {
+    if (_clean(e.title).toLowerCase() === 'moat') return 'moat';
+    return typeByNum[e.slide_number] || _TITLE_TO_TYPE[_clean(e.title).toLowerCase()] || 'other';
+  };
+  const bestOf = (arr) => arr.slice().sort((a, b) => (_GRADE_RANK[b.grade] || 0) - (_GRADE_RANK[a.grade] || 0))[0];
+  const srcLabel = (nums) => (nums.length === 0 ? 'No dedicated section' : nums.length === 1 ? `Slide ${nums[0]}` : `Slides ${nums[0]}–${nums[nums.length - 1]}`);
+
+  // Areas where moat-related evidence appears (for a missing/scattered moat).
+  const moatFoundIn = () => {
+    const labels = [];
+    for (const t of ['product', 'competition', 'traction', 'business_model', 'go_to_market']) {
+      const sl = slides.find((s) => _normType(s && (s.inferred_type || s.type)) === t);
+      const txt = sl ? String(sl.extracted_text || '') : '';
+      if (txt && (_MOAT_WEAK_TEST.test(txt) || _MOAT_DURABLE_TEST.test(txt) || /patent/i.test(txt))) {
+        labels.push(TYPE_DISPLAY_NAMES[t] || t);
+      }
+    }
+    return labels;
+  };
+
+  const topics = [];
+  INVESTOR_TOPICS.forEach((topic, i) => {
+    const recPos = i + 1;
+    const matches = slideFeedback.filter((e) => topic.types.includes(entryType(e)));
+    const nums = _uniq(matches.map((m) => m.slide_number).filter((n) => typeof n === 'number' && n > 0)).sort((a, b) => a - b);
+
+    if (matches.length) {
+      const primary = bestOf(matches);
+      const isMoatMissing = topic.key === 'moat' && !nums.length; // synthetic weak-moat item
+      topics.push({
+        ...primary,
+        title: topic.short,
+        topic_key: topic.key,
+        source_slides: nums,
+        source_label: srcLabel(nums),
+        evidence_status: isMoatMissing ? 'missing' : nums.length > 1 ? 'multiple' : 'dedicated',
+        ...(topic.key === 'moat' ? { evidence_found_in: moatFoundIn() } : {}),
+        actual_position: nums.length ? nums[0] : null,
+        recommended_position: recPos,
+        recommended_changes: _uniq(matches.flatMap((m) => m.recommended_changes || [])).slice(0, 4),
+        evidence_found: _uniq(matches.flatMap((m) => m.evidence_found || [])),
+        evidence_missing: _uniq(matches.flatMap((m) => m.evidence_missing || [])),
+      });
+      return;
+    }
+
+    // Absent topic. Moat gets special treatment (scattered vs truly missing).
+    if (topic.key === 'moat') {
+      const moat = assessMoat(slides.map((s) => String((s && s.extracted_text) || '')).join('\n'), { companyName, isMarketplace });
+      const scattered = moat.status !== 'weak'; // durability shown, just not consolidated
+      const foundIn = moatFoundIn();
+      topics.push({
+        slide_number: 0, title: topic.short, topic_key: topic.key,
+        grade: scattered ? 'C' : 'F', assessment: scattered ? 'Partially answered' : 'Missing',
+        investor_decision: 'Whether the advantage becomes harder to copy as the company scales.',
+        what_works: scattered ? 'The deck shows durability signals across slides, but they are not consolidated into one moat argument.' : '',
+        what_needs_help: scattered
+          ? `${companyName || 'The deck'} shows some durability but has no dedicated Moat / Defensibility section.`
+          : `The deck does not yet explain why ${companyName || 'the company'} becomes harder to copy as it scales.`,
+        recommended_changes: [scattered ? 'Consolidate the durability evidence into one Moat / Defensibility section.' : 'Add a Moat / Defensibility slide.'],
+        evidence_found: [], evidence_missing: [], related_deck_issue: '',
+        source_slides: [], source_label: 'No dedicated section',
+        evidence_status: scattered ? 'scattered' : 'missing',
+        evidence_found_in: foundIn, actual_position: null, recommended_position: recPos,
+      });
+      return;
+    }
+
+    // Any other required topic with no slide → F / Missing.
+    topics.push({
+      slide_number: 0, title: topic.short, topic_key: topic.key,
+      grade: 'F', assessment: 'Missing',
+      investor_decision: '', what_works: '',
+      what_needs_help: `The deck does not include a dedicated ${topic.full} section.`,
+      recommended_changes: [`Add a ${topic.full} section that answers its core investor question.`],
+      evidence_found: [], evidence_missing: [], related_deck_issue: '',
+      source_slides: [], source_label: 'No dedicated section',
+      evidence_status: 'missing', actual_position: null, recommended_position: recPos,
+    });
+  });
+
+  // Flow note: compare submitted order to the preferred sequence (concise, one note).
+  const byKey = {};
+  for (const t of topics) byKey[t.topic_key] = t;
+  let flowNote = null;
+  const trac = byKey.traction;
+  if (trac && trac.actual_position) {
+    const earlier = ['business_model', 'competition'].some((k) => byKey[k] && byKey[k].actual_position && byKey[k].actual_position < trac.actual_position);
+    if (earlier) {
+      flowNote =
+        'Your deck orders topics differently from the sequence that tends to work best for most investors: Traction appears late. Strong traction usually lands best soon after Problem/Solution, because it turns the opportunity from assertion into evidence. An exceptional team or exceptional traction can justify leading with that evidence, but the deck should make that sequencing choice deliberately.';
+    }
+  }
+  return { topics, flowNote };
 }
 
 // --- main enrichment ---------------------------------------------------------
@@ -712,6 +856,8 @@ function enrichSlideLevelFeedback(params = {}) {
 module.exports = {
   enrichSlideLevelFeedback,
   buildMissingMoatSection,
+  buildInvestorTopics,
+  INVESTOR_TOPICS,
   cleanReportCopy,
   cleanDisplayCopy,
   // exported for tests

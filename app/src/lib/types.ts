@@ -374,6 +374,14 @@ export interface DashboardSlideFeedbackV2 {
   evidence_found: string[]
   evidence_missing: string[]
   related_deck_issue: string
+  // Additive investor-topic fields (present on topic-first reports).
+  topic_key?: string
+  source_slides?: number[]
+  source_label?: string
+  evidence_status?: string
+  evidence_found_in?: string[]
+  actual_position?: number | null
+  recommended_position?: number
 }
 
 export interface DashboardFeedbackV2 {

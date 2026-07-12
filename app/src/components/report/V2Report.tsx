@@ -72,6 +72,12 @@ const DASH_LABEL: Record<Grade, string> = {
   neutral: 'Not assessed',
 }
 
+// Short card title -> full detail-pane title (only where they differ).
+const TOPIC_FULL_TITLE: Record<string, string> = {
+  Moat: 'Moat / Defensibility',
+  Roadmap: 'Roadmap / Milestones',
+}
+
 // A/B/C/D string (from dashboard_feedback grades) -> Grade.
 function gradeFromString(s?: string): Grade {
   const c = (s || '').trim().toUpperCase()[0]
@@ -192,6 +198,8 @@ interface VMSlide {
   evidence_found: string[]
   evidence_missing: string[]
   related_deck_issue: string
+  source_label?: string
+  evidence_found_in?: string[]
 }
 interface ViewModel {
   native: boolean
@@ -344,6 +352,8 @@ function buildViewModel(report: PitchDeckCheckReportV2): ViewModel {
         evidence_found: s.evidence_found || [],
         evidence_missing: s.evidence_missing || [],
         related_deck_issue: s.related_deck_issue || '',
+        source_label: s.source_label,
+        evidence_found_in: s.evidence_found_in,
       })),
     }
   }
@@ -684,7 +694,7 @@ export function V2Report({ report }: V2ReportProps) {
 
       {slides.length > 0 && (
         <div>
-          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slide Feedback</h2>
+          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Investor Topics</h2>
           <div style={SLIDE_GRID_STYLE}>
             {slides.map((s, i) => (
               <TriageCard
@@ -904,20 +914,20 @@ function DeckDimDetail({ dim, native }: { dim: VMDim; native: boolean }) {
 }
 
 function SlideDetail({ slide }: { slide: VMSlide }) {
-  // Hide evidence lists when they merely echo the rows above (the canonical
-  // reshaper mirrors what_works/what_needs_help into single-item evidence lists).
-  const echoes = (items: string[], other: string) =>
-    items.length === 1 && items[0].trim() === other.trim()
-  const evidenceFound = echoes(slide.evidence_found, slide.what_works) ? [] : slide.evidence_found
-  const evidenceMissing = echoes(slide.evidence_missing, slide.what_needs_help) ? [] : slide.evidence_missing
+  // Topic detail as three investor-facing sections. All content is remapped from
+  // existing fields; source mapping is folded into "What does the deck answer?".
+  const foundIn = slide.evidence_found_in && slide.evidence_found_in.length > 0
+    ? slide.evidence_found_in.join(', ')
+    : ''
+  const recs = (slide.recommended_changes || []).filter((r) => r && r.trim())
+  const hasMissing = Boolean((slide.what_needs_help && slide.what_needs_help.trim()) || recs.length)
   return (
     <div>
-      <div className="flex items-center gap-4 mb-4">
+      <div className="flex items-center gap-4 mb-5">
         <GradeMark grade={slide.grade} size="lg" />
         <div className="min-w-0">
           <p className="text-base font-semibold text-monarch-ink">
-            {typeof slide.slide_number === 'number' && slide.slide_number > 0 ? `Slide ${slide.slide_number} · ` : ''}
-            {slide.title === 'Moat' ? 'Moat / Defensibility' : slide.title}
+            {TOPIC_FULL_TITLE[slide.title] || slide.title}
           </p>
           <p className="text-[14px] text-monarch-sub">{GRADE_CARD_LABEL[slide.grade]}</p>
         </div>
@@ -927,16 +937,36 @@ function SlideDetail({ slide }: { slide: VMSlide }) {
           </div>
         )}
       </div>
-      <div className="space-y-3">
-        <DetailRow label="What's working">{slide.what_works}</DetailRow>
-        <DetailRow label="What needs help">{slide.what_needs_help}</DetailRow>
-        <DetailList label="Recommended changes" items={slide.recommended_changes} />
-        <DetailList label="Evidence found" items={evidenceFound} markerClass="text-grade-a" />
-        <DetailList label="Evidence missing" items={evidenceMissing} markerClass="text-grade-c" />
+      <div className="space-y-4">
         {slide.investor_decision && (
-          <p className="text-[14px] text-monarch-muted leading-normal pt-1">
-            <span className="font-medium text-monarch-sub">Investor read:</span> {slide.investor_decision}
-          </p>
+          <DetailRow label="What's the investor thinking for this topic?">
+            {slide.investor_decision}
+          </DetailRow>
+        )}
+        <DetailRow label="What does the deck answer?">
+          {slide.source_label ? <span className="font-medium">Source: {slide.source_label}. </span> : null}
+          {slide.what_works}
+          {foundIn ? <span className="text-monarch-sub"> Evidence appears in: {foundIn}.</span> : null}
+        </DetailRow>
+        {hasMissing && (
+          <div>
+            <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-1">
+              What&apos;s missing?
+            </p>
+            {slide.what_needs_help && slide.what_needs_help.trim() && (
+              <p className="text-[14px] text-monarch-body leading-normal">{slide.what_needs_help}</p>
+            )}
+            {recs.length > 0 && (
+              <ul className="mt-1 space-y-1">
+                {recs.map((it, idx) => (
+                  <li key={idx} className="flex gap-2">
+                    <span className="text-monarch-border-strong flex-shrink-0">•</span>
+                    <span className="text-[14px] text-monarch-body leading-normal">{it}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
     </div>

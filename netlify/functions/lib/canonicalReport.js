@@ -56,6 +56,7 @@ const {
   enrichSlideLevelFeedback,
   cleanReportCopy,
   buildMissingMoatSection,
+  buildInvestorTopics,
 } = require('./slideFeedbackEnrichment');
 
 const CANONICAL_REPORT_VERSION = 'canonical_v1';
@@ -1524,6 +1525,25 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
     cleanReportCopy(v2);
   } catch (err) {
     // Keep the un-cleaned copy on any failure.
+  }
+
+  // Reshape slide_feedback into the fixed investor-topic sequence (topic cards,
+  // merged multi-slide topics, F/Missing for absent topics, source mapping).
+  // Shape-preserving (additive topic_* fields); non-fatal.
+  try {
+    const { topics, flowNote } = buildInvestorTopics({
+      slideFeedback: v2.dashboard_feedback.slide_feedback,
+      slides,
+      investmentCase,
+      companyName,
+    });
+    v2.dashboard_feedback.slide_feedback = topics;
+    if (flowNote && v2.dashboard_feedback.deck_feedback && v2.dashboard_feedback.deck_feedback.flow) {
+      const flow = v2.dashboard_feedback.deck_feedback.flow;
+      flow.sequencing_notes = _dedupe([...(flow.sequencing_notes || []), flowNote]);
+    }
+  } catch (err) {
+    // Keep the per-slide feedback on any failure.
   }
 
   return v2;
