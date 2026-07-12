@@ -1013,6 +1013,92 @@ function _dashCommGrade(score) {
   return 'D';
 }
 
+// ---- Deck Feedback grade calibration ----------------------------------------
+// The communication score reflects how *clearly* a dimension reads; it can rate
+// a deck "Strong" while deck_synthesis has surfaced material, repeated issues in
+// that same dimension. These helpers cap (only ever lower, never raise) a
+// dimension grade so it agrees with the severity of the surfaced issues. Grade
+// letters and assessment labels reuse the existing A/B/C/D vocabulary
+// (see _DASH_SLIDE_GRADE) — no new grade format, no shape change.
+const _GRADE_ORDER = { A: 4, B: 3, C: 2, D: 1 };
+const _ORDER_GRADE = { 4: 'A', 3: 'B', 2: 'C', 1: 'D' };
+// Canonical assessment label per grade (inverse of _DASH_SLIDE_GRADE).
+const _GRADE_ASSESSMENT = {
+  A: 'Strong',
+  B: 'Mostly answered',
+  C: 'Partially answered',
+  D: 'Weakly answered',
+};
+
+// Lower `grade` to `capLetter` when the cap is stricter; never raise.
+function _capGrade(grade, capLetter) {
+  const g = _GRADE_ORDER[grade] != null ? _GRADE_ORDER[grade] : 2;
+  const c = _GRADE_ORDER[capLetter];
+  if (c == null) return grade;
+  return _ORDER_GRADE[Math.min(g, c)];
+}
+
+// Apply a cap to a deck_feedback dimension, keeping grade and assessment in sync.
+function _applyDeckFeedbackCap(dim, capLetter) {
+  if (!dim || !capLetter) return;
+  const capped = _capGrade(dim.grade, capLetter);
+  if (capped !== dim.grade) {
+    dim.grade = capped;
+    dim.assessment = _GRADE_ASSESSMENT[capped] || dim.assessment;
+  }
+}
+
+// Derive per-dimension grade caps from deck_synthesis severity signals. Returns
+// { completeness, clarity, brevity, flow } where each value is a cap letter or
+// null (no cap). Thresholds require MULTIPLE, material issues so a strong deck
+// with a stray recommendation is not downgraded.
+function _deckFeedbackGradeCaps(dsyn) {
+  const _re = (arr, re) => (arr || []).some((x) => re.test(String(x || '')));
+  const objs = dsyn.investor_objections || [];
+  const amb = dsyn.metric_ambiguities || [];
+  const redund = dsyn.redundancy_or_low_value_content || [];
+  const seq = dsyn.sequencing_issues || [];
+  const scatter = dsyn.scattered_or_misplaced_evidence || [];
+
+  // Completeness: many objections and/or broad missing-evidence across the core
+  // diligence categories (defensibility, retention, liquidity, CAC, raise).
+  const objText = objs.map((o) => `${(o && o.issue) || ''} ${(o && o.recommended_fix) || ''}`);
+  const missingCount = _dedupe(objs.flatMap((o) => (o && o.evidence_missing) || [])).length;
+  const compCats = [
+    /defensib|moat|first-mover|switching cost|network (effect|densit)/i,
+    /retention|repeat (booking|purchase|usage|transaction)|cohort|churn/i,
+    /liquidity|per[- ]city|active buyers|match.?fill|fill rate/i,
+    /\bcac\b|payback|acquisition economics|channel efficiency/i,
+    /raise|milestone|use of funds/i,
+  ].filter((re) => objText.some((t) => re.test(t))).length;
+  let completeness = null;
+  if (objs.length >= 4) completeness = 'B';
+  if (compCats >= 4 || missingCount >= 5) completeness = 'C';
+
+  // Clarity: repeated metric ambiguity. (Plain A–D scale: 3+ and 5+ both land B.)
+  let clarity = null;
+  if (amb.length >= 3) clarity = 'B';
+
+  // Brevity: repeated redundant / low-value content.
+  let brevity = null;
+  if (redund.length >= 2) brevity = 'B';
+
+  // Flow: multiple sequencing issues; worse when evidence is also scattered or
+  // the classic narrative-order problems all appear.
+  let flow = null;
+  if (seq.length >= 2) flow = 'B';
+  const seqText = seq.map((s) => (s && s.issue) || '');
+  const flowPatterns = [
+    /traction (appears|is)\s+late|traction[^.]*slide \d+ of \d+/i,
+    /market sizing[^.]*(precede|before)|precedes traction/i,
+    /go-to-market[^.]*(does not explain|drove|existing growth)/i,
+    /financial[^.]*(operating bridge|bridge)/i,
+  ].filter((re) => seqText.some((t) => re.test(t))).length;
+  if ((seq.length >= 4 && scatter.length >= 3) || flowPatterns >= 4) flow = 'C';
+
+  return { completeness, clarity, brevity, flow };
+}
+
 const _DASH_SLIDE_GRADE = {
   Strong: 'A',
   'Mostly answered': 'B',
@@ -1208,6 +1294,16 @@ function buildDashboardFeedback(v2, opts = {}) {
     suggested_moves_or_cuts: _merge([suggested_moves_or_cuts, restrAll, seqFix], 8),
   };
 
+  // Calibrate dimension grades to the severity of the surfaced issues so a grade
+  // never disagrees with its own enriched feedback. Caps only lower a grade
+  // (never raise), only fire on multiple material issues, and touch only
+  // grade/assessment — the enriched text and the dashboard shape are unchanged.
+  const _gradeCaps = _deckFeedbackGradeCaps(dsyn);
+  _applyDeckFeedbackCap(completeness, _gradeCaps.completeness);
+  _applyDeckFeedbackCap(clarity, _gradeCaps.clarity);
+  _applyDeckFeedbackCap(brevity, _gradeCaps.brevity);
+  _applyDeckFeedbackCap(flow, _gradeCaps.flow);
+
   const deck_feedback = { completeness, clarity, brevity, flow };
 
   // ---- slide_feedback (reshape existing slide_level_feedback verbatim) ---------
@@ -1382,4 +1478,8 @@ module.exports = {
   deriveDeckCommunicationScores,
   deriveTopicCommunicationScores,
   buildSlideFeedbackEntry,
+  // Deck Feedback grade calibration (exported for tests)
+  _deckFeedbackGradeCaps,
+  _capGrade,
+  _applyDeckFeedbackCap,
 };
