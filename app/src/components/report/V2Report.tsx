@@ -917,7 +917,7 @@ function SlideDetail({ slide }: { slide: VMSlide }) {
         <div className="min-w-0">
           <p className="text-base font-semibold text-monarch-ink">
             {typeof slide.slide_number === 'number' && slide.slide_number > 0 ? `Slide ${slide.slide_number} · ` : ''}
-            {slide.title}
+            {slide.title === 'Moat' ? 'Moat / Defensibility' : slide.title}
           </p>
           <p className="text-[14px] text-monarch-sub">{GRADE_CARD_LABEL[slide.grade]}</p>
         </div>
