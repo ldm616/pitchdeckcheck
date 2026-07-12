@@ -700,7 +700,6 @@ export function V2Report({ report }: V2ReportProps) {
 
   const detailPane = (
     <div className="rounded-xl border border-monarch-border bg-monarch-card p-5 sm:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-      <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-3">Selected</p>
       {renderDetail()}
     </div>
   )
@@ -729,6 +728,9 @@ export function V2Report({ report }: V2ReportProps) {
           </div>
           {selected && (
             <div className="flex-1 min-w-0">
+              {/* Invisible spacer matching the section heading height so the
+                  detail pane's top aligns with the top of the grade card. */}
+              <h2 aria-hidden className="text-[14px] font-medium uppercase tracking-wide mb-2.5 invisible">&nbsp;</h2>
               <div className="sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto">{detailPane}</div>
             </div>
           )}
