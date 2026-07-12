@@ -40,13 +40,14 @@ function cardClass(selected: boolean): string {
   // Selection is signalled by a charcoal (near-black) 2px border + subtle shadow,
   // kept independent of the grade rail so it never reads as a grade color (and
   // never red). `relative overflow-hidden` lets the grade rail clip to the card.
-  // Selection is signalled by a faint fill + soft shadow (not a heavy outline);
-  // the border stays a plain 1px neutral in both states so the card never
-  // competes with the grade rail.
-  return `relative border text-left w-full transition focus:outline-none focus-visible:border-monarch-ink ${
+  // Selection = a 2px charcoal border + slightly stronger shadow (never red).
+  // The border is a constant 2px in both states (neutral vs charcoal) so
+  // selecting never shifts layout. Grade color stays on the rail only, so
+  // selection meaning (charcoal) reads independently of grade meaning (rail).
+  return `relative border-2 bg-monarch-card text-left w-full transition focus:outline-none focus-visible:border-[#1f2937] ${
     selected
-      ? 'border-monarch-border bg-monarch-fill shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
-      : 'border-monarch-border bg-monarch-card hover:border-monarch-border-strong shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
+      ? 'border-[#1f2937] shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
+      : 'border-monarch-border hover:border-monarch-border-strong shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
   }`
 }
 
@@ -449,7 +450,7 @@ function TriageCard({
           at top or bottom. Independent of the selection border. */}
       <span
         aria-hidden
-        className={`absolute top-[-1px] bottom-[-1px] left-[-1px] w-1 ${GRADE_UNDERLINE[grade]}`}
+        className={`absolute top-[-2px] bottom-[-2px] left-[-2px] w-1 ${GRADE_UNDERLINE[grade]}`}
       />
       <div className="flex items-stretch">
         {/* Grade column: the letter, vertically centered next to the rail, with
@@ -649,7 +650,7 @@ export function V2Report({ report }: V2ReportProps) {
     <div className="space-y-5">
       {/* Deck Score — one compact selectable summary card */}
       <div>
-        <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Grade</h2>
+        <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Overall</h2>
         <TriageCard
           title={deckScore.title}
           status={deckScore.summary}
@@ -661,7 +662,7 @@ export function V2Report({ report }: V2ReportProps) {
 
       {dims.length > 0 && (
         <div>
-          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck</h2>
+          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck Feedback</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {dims.map((d, i) => (
               <TriageCard
@@ -679,7 +680,7 @@ export function V2Report({ report }: V2ReportProps) {
 
       {slides.length > 0 && (
         <div>
-          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slides</h2>
+          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slide Feedback</h2>
           <div style={SLIDE_GRID_STYLE}>
             {slides.map((s, i) => (
               <TriageCard
