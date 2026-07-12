@@ -75,7 +75,7 @@ const DASH_LABEL: Record<Grade, string> = {
 // A/B/C/D string (from dashboard_feedback grades) -> Grade.
 function gradeFromString(s?: string): Grade {
   const c = (s || '').trim().toUpperCase()[0]
-  if (c === 'A' || c === 'B' || c === 'C' || c === 'D') return c as Grade
+  if (c === 'A' || c === 'B' || c === 'C' || c === 'D' || c === 'F') return c as Grade
   return 'neutral'
 }
 

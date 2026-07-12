@@ -52,7 +52,11 @@ const { buildDeckSynthesis } = require('./deckSynthesis');
 
 // Slide-feedback grounding: rewrites generic slide feedback to reference the
 // concrete artifacts present in each slide's raw text. Additive; shape-preserving.
-const { enrichSlideLevelFeedback } = require('./slideFeedbackEnrichment');
+const {
+  enrichSlideLevelFeedback,
+  cleanReportCopy,
+  buildMissingMoatSection,
+} = require('./slideFeedbackEnrichment');
 
 const CANONICAL_REPORT_VERSION = 'canonical_v1';
 
@@ -1111,6 +1115,7 @@ const _DASH_SLIDE_GRADE = {
   'Weakly answered': 'D',
   Weak: 'D',
   'Not answered': 'D',
+  Missing: 'F',
 };
 function _dashSlideGrade(assessment) {
   const a = String(assessment || '').trim();
@@ -1477,10 +1482,45 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
     // Keep the original (unenriched) slide_level_feedback on any failure.
   }
 
+  // Moat / Defensibility is a required investor topic. If the deck neither has a
+  // dedicated Moat slide nor explicitly proves durability, append a synthetic
+  // "missing section" item to slide_level_feedback (shape-preserving; runs after
+  // deck_synthesis so that stays unchanged). Its recommended bullets are applied
+  // to the dashboard slide_feedback item below.
+  let missingMoat = null;
+  try {
+    missingMoat = buildMissingMoatSection({ slides, investmentCase, companyName });
+    if (missingMoat) v2.slide_level_feedback = [...(v2.slide_level_feedback || []), missingMoat.item];
+  } catch (err) {
+    missingMoat = null;
+  }
+
   // Attach dashboard-native feedback (reshaped from the fields above). All
   // existing report_v2 fields are preserved unchanged. dashboard_feedback does
   // NOT consume deck_synthesis in this pass.
   v2.dashboard_feedback = buildDashboardFeedback(v2, { investmentCase });
+
+  // Surface the missing-moat recommendations as explicit bullets on its
+  // dashboard slide_feedback item (recommended_changes is already an array).
+  if (missingMoat) {
+    try {
+      const mf = (v2.dashboard_feedback.slide_feedback || []).find(
+        (s) => s.title === 'Moat / Defensibility'
+      );
+      if (mf) mf.recommended_changes = missingMoat.recommendedBullets;
+    } catch (err) {
+      /* non-fatal */
+    }
+  }
+
+  // Final display-copy pass: strip weak conditional phrasing from user-facing
+  // recommendation/gap text so instructions read as direct actions. Non-fatal;
+  // deck_synthesis is left untouched.
+  try {
+    cleanReportCopy(v2);
+  } catch (err) {
+    // Keep the un-cleaned copy on any failure.
+  }
 
   return v2;
 }
