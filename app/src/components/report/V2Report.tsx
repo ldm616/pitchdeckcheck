@@ -40,7 +40,7 @@ function cardClass(selected: boolean): string {
   // Selection is signalled by a charcoal (near-black) 2px border + subtle shadow,
   // kept independent of the grade rail so it never reads as a grade color (and
   // never red). `relative overflow-hidden` lets the grade rail clip to the card.
-  return `relative overflow-hidden border-2 bg-monarch-card px-3 py-2 text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-ink ${
+  return `relative border-2 bg-monarch-card px-3 py-2 text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-ink ${
     selected
       ? 'border-monarch-ink shadow-[0_2px_8px_rgba(0,0,0,0.10)]'
       : 'border-monarch-border hover:border-monarch-border-strong'
@@ -436,20 +436,27 @@ function TriageCard({
   selected: boolean
   onSelect: () => void
 }) {
+  const letter = grade === 'neutral' ? '–' : grade
   return (
     <button type="button" onClick={onSelect} className={cardClass(selected)}>
-      {/* Grade signal: a 4px colored left rail matching the grade. Always shown,
-          independent of the selection border, so a card list stays readable
-          without a full colored border on every card. */}
-      <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${GRADE_UNDERLINE[grade]}`} />
-      <div className="pl-1.5">
-        <div className="flex items-start justify-between gap-2">
-          <span className="text-[14px] font-medium text-monarch-ink truncate">{title}</span>
-          <GradeMark grade={grade} />
+      {/* Grade signal: a full-height colored left rail. Negative insets let it
+          cover the border on the left so it runs edge-to-edge with no grey cap
+          at top or bottom. Independent of the selection border. */}
+      <span
+        aria-hidden
+        className={`absolute top-[-2px] bottom-[-2px] left-[-2px] w-1 ${GRADE_UNDERLINE[grade]}`}
+      />
+      <div className="flex items-center gap-2.5">
+        {/* Grade letter on the left colored edge, vertically centered. */}
+        <span className="shrink-0 w-4 text-center text-[15px] font-semibold leading-none text-monarch-ink">
+          {letter}
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="block text-[14px] font-medium text-monarch-ink truncate">{title}</span>
+          {status && (
+            <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{status}</p>
+          )}
         </div>
-        {status && (
-          <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{status}</p>
-        )}
       </div>
     </button>
   )
@@ -632,7 +639,7 @@ export function V2Report({ report }: V2ReportProps) {
     <div className="space-y-5">
       {/* Deck Score — one compact selectable summary card */}
       <div>
-        <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck Score</h2>
+        <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Grade</h2>
         <TriageCard
           title={deckScore.title}
           status={deckScore.summary}
@@ -644,7 +651,7 @@ export function V2Report({ report }: V2ReportProps) {
 
       {dims.length > 0 && (
         <div>
-          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck Feedback</h2>
+          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Deck</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {dims.map((d, i) => (
               <TriageCard
@@ -662,7 +669,7 @@ export function V2Report({ report }: V2ReportProps) {
 
       {slides.length > 0 && (
         <div>
-          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slide Feedback</h2>
+          <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slides</h2>
           <div style={SLIDE_GRID_STYLE}>
             {slides.map((s, i) => {
               const heading =
