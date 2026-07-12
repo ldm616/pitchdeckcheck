@@ -40,7 +40,7 @@ function cardClass(selected: boolean): string {
   // Selection is signalled by a charcoal (near-black) 2px border + subtle shadow,
   // kept independent of the grade rail so it never reads as a grade color (and
   // never red). `relative overflow-hidden` lets the grade rail clip to the card.
-  return `relative border-2 bg-monarch-card px-3 py-2 text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-ink ${
+  return `relative border-2 bg-monarch-card text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-ink ${
     selected
       ? 'border-monarch-ink shadow-[0_2px_8px_rgba(0,0,0,0.10)]'
       : 'border-monarch-border hover:border-monarch-border-strong'
@@ -429,12 +429,14 @@ function TriageCard({
   grade,
   selected,
   onSelect,
+  gradeColumnBg = false,
 }: {
   title: string
   status?: string
   grade: Grade
   selected: boolean
   onSelect: () => void
+  gradeColumnBg?: boolean
 }) {
   const letter = grade === 'neutral' ? '–' : grade
   return (
@@ -446,12 +448,17 @@ function TriageCard({
         aria-hidden
         className={`absolute top-[-2px] bottom-[-2px] left-[-2px] w-1 ${GRADE_UNDERLINE[grade]}`}
       />
-      <div className="flex items-center gap-2.5">
-        {/* Grade letter on the left colored edge, vertically centered. */}
-        <span className="shrink-0 w-4 text-center text-[15px] font-semibold leading-none text-monarch-ink">
-          {letter}
-        </span>
-        <div className="min-w-0 flex-1">
+      <div className="flex items-stretch">
+        {/* Grade column: the letter, vertically centered next to the rail, with
+            an optional very-pale-gray fill (used on slide cards). */}
+        <div
+          className={`flex items-center justify-center shrink-0 pl-2.5 pr-2.5 ${
+            gradeColumnBg ? 'bg-gray-100' : ''
+          }`}
+        >
+          <span className="text-[15px] font-semibold leading-none text-monarch-ink">{letter}</span>
+        </div>
+        <div className="min-w-0 flex-1 py-2 pr-3">
           <span className="block text-[14px] font-medium text-monarch-ink truncate">{title}</span>
           {status && (
             <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{status}</p>
@@ -671,22 +678,17 @@ export function V2Report({ report }: V2ReportProps) {
         <div>
           <h2 className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-2.5">Slides</h2>
           <div style={SLIDE_GRID_STYLE}>
-            {slides.map((s, i) => {
-              const heading =
-                typeof s.slide_number === 'number' && s.slide_number > 0
-                  ? `${s.slide_number}: ${s.title}`
-                  : s.title
-              return (
-                <TriageCard
-                  key={i}
-                  title={heading}
-                  status={s.assessment}
-                  grade={s.grade}
-                  selected={selected?.type === 'slide' && selected.index === i}
-                  onSelect={() => select({ type: 'slide', index: i })}
-                />
-              )
-            })}
+            {slides.map((s, i) => (
+              <TriageCard
+                key={i}
+                title={s.title}
+                status={s.assessment}
+                grade={s.grade}
+                selected={selected?.type === 'slide' && selected.index === i}
+                onSelect={() => select({ type: 'slide', index: i })}
+                gradeColumnBg
+              />
+            ))}
           </div>
         </div>
       )}
