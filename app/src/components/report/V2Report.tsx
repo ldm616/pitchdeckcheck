@@ -40,10 +40,13 @@ function cardClass(selected: boolean): string {
   // Selection is signalled by a charcoal (near-black) 2px border + subtle shadow,
   // kept independent of the grade rail so it never reads as a grade color (and
   // never red). `relative overflow-hidden` lets the grade rail clip to the card.
-  return `relative border-2 bg-monarch-card text-left w-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition focus:outline-none focus-visible:border-monarch-ink ${
+  // Selection is signalled by a faint fill + soft shadow (not a heavy outline);
+  // the border stays a plain 1px neutral in both states so the card never
+  // competes with the grade rail.
+  return `relative border text-left w-full transition focus:outline-none focus-visible:border-monarch-ink ${
     selected
-      ? 'border-monarch-ink shadow-[0_2px_8px_rgba(0,0,0,0.10)]'
-      : 'border-monarch-border hover:border-monarch-border-strong'
+      ? 'border-monarch-border bg-monarch-fill shadow-[0_2px_8px_rgba(0,0,0,0.08)]'
+      : 'border-monarch-border bg-monarch-card hover:border-monarch-border-strong shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
   }`
 }
 
@@ -446,7 +449,7 @@ function TriageCard({
           at top or bottom. Independent of the selection border. */}
       <span
         aria-hidden
-        className={`absolute top-[-2px] bottom-[-2px] left-[-2px] w-1 ${GRADE_UNDERLINE[grade]}`}
+        className={`absolute top-[-1px] bottom-[-1px] left-[-1px] w-1 ${GRADE_UNDERLINE[grade]}`}
       />
       <div className="flex items-stretch">
         {/* Grade column: the letter, vertically centered next to the rail, with
