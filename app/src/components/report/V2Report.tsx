@@ -461,7 +461,7 @@ function TriageCard({
         >
           <span className="text-[15px] font-semibold leading-none text-monarch-ink">{letter}</span>
         </div>
-        <div className="min-w-0 flex-1 py-2 pr-3">
+        <div className="min-w-0 flex-1 py-2 pr-3 pl-3">
           <span className="block text-[14px] font-medium text-monarch-ink truncate">{title}</span>
           {status && (
             <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">{status}</p>
@@ -720,11 +720,11 @@ export function V2Report({ report }: V2ReportProps) {
             className="group relative shrink-0 flex items-center justify-center cursor-col-resize select-none touch-none"
             style={{ width: DIVIDER_W }}
           >
-            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-monarch-border group-hover:bg-monarch-accent group-active:bg-monarch-accent transition-colors" />
-            <div className="relative z-10 flex flex-col items-center gap-1 rounded-lg border border-monarch-border-strong bg-monarch-card px-1 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] group-hover:border-monarch-accent group-active:border-monarch-accent transition-colors">
-              <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-monarch-accent" />
-              <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-monarch-accent" />
-              <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-monarch-accent" />
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-monarch-border group-hover:bg-[#333] group-active:bg-[#333] transition-colors" />
+            <div className="relative z-10 flex flex-col items-center gap-1 rounded-lg border border-monarch-border-strong bg-monarch-card px-1 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] group-hover:border-[#333] group-active:border-[#333] transition-colors">
+              <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-[#333] group-active:bg-[#333]" />
+              <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-[#333] group-active:bg-[#333]" />
+              <span className="w-1 h-1 rounded-full bg-monarch-sub group-hover:bg-[#333] group-active:bg-[#333]" />
             </div>
           </div>
           {selected && (
