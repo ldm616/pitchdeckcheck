@@ -1,10 +1,8 @@
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Copy } from 'lucide-react'
 import {
   verifyPassword,
   getReportsList,
-  getReport,
   deleteDeck,
   triggerReportRegeneration,
   getDeckStatus,
@@ -12,13 +10,11 @@ import {
   upsertCalibrationDeck,
   deleteCalibrationDeck,
 } from '../../lib/api'
-import { ROUTES } from '../../lib/routes'
-import { V2Report } from '../../components/report'
+import { ROUTES, getReportPath } from '../../lib/routes'
 import type {
   ReportListItem,
   CalibrationDeck,
   CalibrationFormData,
-  ReportContent,
 } from '../../lib/types'
 import { ARCHETYPES, STAGES, ERAS, GRADES } from '../../lib/types'
 
@@ -59,14 +55,6 @@ export function AdminApp() {
   const [reportsList, setReportsList] = useState<ReportListItem[]>([])
   const [reportsLoading, setReportsLoading] = useState(false)
   const [reportsError, setReportsError] = useState('')
-
-  // Report viewing state
-  const [report, setReport] = useState<ReportContent | null>(null)
-  const [slideCount, setSlideCount] = useState<number | null>(null)
-  const [reportCreatedAt, setReportCreatedAt] = useState<string | null>(null)
-  const [viewingReport, setViewingReport] = useState(false)
-  // Transient "Report copied" toast for the admin copy-report affordance.
-  const [reportCopied, setReportCopied] = useState(false)
 
   // Admin action state
   const [actionDeckId, setActionDeckId] = useState<string | null>(null)
@@ -203,34 +191,14 @@ export function AdminApp() {
     }
   }
 
-  // Copy the entire report content (as JSON) to the clipboard, confirming with
-  // a disappearing "Report copied" toast. Admin-only by virtue of this view.
-  const handleCopyReport = async () => {
-    if (!report) return
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(report, null, 2))
-      setReportCopied(true)
-      setTimeout(() => setReportCopied(false), 2000)
-    } catch (err) {
-      console.error('Copy report failed:', err)
-    }
-  }
-
-  const handleViewReport = async (item: ReportListItem) => {
+  // Open the canonical public report page (single place to view a report)
+  // instead of rendering a separate inline copy in admin.
+  const handleViewReport = (item: ReportListItem) => {
     if (!item.access_token) {
       setReportsError('Missing access token for this report')
       return
     }
-
-    const reportData = await getReport(item.deck_id, item.access_token)
-    if (reportData) {
-      setReport(reportData.content)
-      setReportCreatedAt(reportData.report_created_at || null)
-      setSlideCount(item.slide_count)
-      setViewingReport(true)
-    } else {
-      setReportsError('Failed to load report')
-    }
+    window.open(getReportPath(item.deck_id, item.access_token), '_blank', 'noopener,noreferrer')
   }
 
   const handleDeleteReport = async (deckId: string) => {
@@ -595,133 +563,6 @@ export function AdminApp() {
               </p>
             </div>
           )}
-        </div>
-      </div>
-    )
-  }
-
-  // Viewing a specific report
-  if (viewingReport && report) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          backgroundColor: '#F5F5F3',
-          fontFamily,
-        }}
-      >
-        {/* Admin Header */}
-        <div
-          style={{
-            width: '100%',
-          }}
-        >
-          <div
-            style={{
-              maxWidth: '1536px',
-              margin: '0 auto',
-              padding: '12px 24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button
-                onClick={handleCopyReport}
-                title="Copy report"
-                aria-label="Copy report to clipboard"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  color: '#6b7280',
-                  cursor: 'pointer',
-                }}
-              >
-                <Copy size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Disappearing "Report copied" confirmation toast */}
-        {reportCopied && (
-          <div
-            role="status"
-            style={{
-              position: 'fixed',
-              bottom: '24px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 50,
-              padding: '8px 16px',
-              backgroundColor: '#111827',
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: 500,
-              fontFamily,
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            }}
-          >
-            Report copied
-          </div>
-        )}
-
-        {/* Report Content */}
-        <div style={{ padding: '24px 24px 48px' }}>
-          <div
-            style={{
-              maxWidth: '1536px',
-              margin: '0 auto',
-            }}
-          >
-            {/* Render the full canonical report when present; otherwise fall
-                back to a minimal grade + summary display for older reports. */}
-            {report.report_v2 ? (
-              <V2Report report={report.report_v2} />
-            ) : (
-              <>
-                {(() => {
-                  const grade = report.overall_grade || report.v1_report?.overall.grade || '?'
-                  const gradeColor = grade.startsWith('A') ? '#22c55e'
-                    : grade.startsWith('B') ? '#84cc16'
-                    : grade.startsWith('C') ? '#eab308'
-                    : grade.startsWith('D') ? '#f97316'
-                    : '#ef4444'
-
-                  return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-                      <span
-                        style={{
-                          width: '10px',
-                          height: '10px',
-                          borderRadius: '50%',
-                          backgroundColor: gradeColor,
-                        }}
-                      />
-                      <span style={{ fontSize: '24px', fontWeight: 600, color: '#111827' }}>
-                        {grade}
-                      </span>
-                      <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                        {slideCount || 0} slides
-                        {reportCreatedAt && ` · ${new Date(reportCreatedAt).toLocaleDateString()}`}
-                      </span>
-                    </div>
-                  )
-                })()}
-
-                <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                  <p style={{ margin: 0, fontSize: '15px', color: '#374151', lineHeight: 1.7 }}>
-                    {report.summary || report.v1_report?.overall.synthesis || 'No summary available'}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </div>
     )
