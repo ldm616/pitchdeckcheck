@@ -3,6 +3,23 @@ import type { ReportContent } from './types'
 // Render a report_v2 dashboard as clean Markdown for the admin "Copy report"
 // action. Falls back to a minimal grade/summary block for legacy reports.
 
+// Universal assessment labels — same everywhere (dashboard + export).
+const GRADE_LABEL: Record<string, string> = {
+  A: 'Excellent',
+  B: 'Good',
+  C: 'Needs Work',
+  D: 'Weak',
+  F: 'Missing',
+}
+function gradeLabel(grade?: string): string {
+  const g = (grade || '').trim().toUpperCase()[0] || ''
+  return GRADE_LABEL[g] || ''
+}
+function gradeSuffix(grade?: string): string {
+  const label = gradeLabel(grade)
+  return label ? ` · ${label}` : ''
+}
+
 function mdList(items?: string[]): string {
   const list = (items || []).filter((s) => s && s.trim())
   return list.map((s) => `- ${s.trim()}`).join('\n')
@@ -41,7 +58,7 @@ export function reportToMarkdown(content: ReportContent): string {
       const d = fb[key]
       if (!d) continue
       const name = key.charAt(0).toUpperCase() + key.slice(1)
-      out.push(`\n### ${name} — ${d.grade || ''}${d.assessment ? ` · ${d.assessment}` : ''}`)
+      out.push(`\n### ${name} — ${d.grade || ''}${gradeSuffix(d.grade)}`)
       if (d.what_needs_help) out.push(d.what_needs_help)
       if ((d.recommended_changes || []).length) out.push(mdList(d.recommended_changes))
     }
@@ -52,7 +69,7 @@ export function reportToMarkdown(content: ReportContent): string {
   if (topics.length) {
     out.push(`\n## Investor Topics`)
     for (const t of topics) {
-      out.push(`\n### ${t.title || 'Topic'} — ${t.grade || ''}${t.assessment ? ` · ${t.assessment}` : ''}`)
+      out.push(`\n### ${t.title || 'Topic'} — ${t.grade || ''}${gradeSuffix(t.grade)}`)
       if (t.source_label) {
         const found =
           t.evidence_found_in && t.evidence_found_in.length
@@ -110,7 +127,7 @@ export function reportToPrintableHtml(content: ReportContent): string {
       const d = fb[key]
       if (!d) continue
       const name = key.charAt(0).toUpperCase() + key.slice(1)
-      body.push(`<h3>${name} — <span class="grade">${esc(d.grade)}</span>${d.assessment ? ` · ${esc(d.assessment)}` : ''}</h3>`)
+      body.push(`<h3>${name} — <span class="grade">${esc(d.grade)}</span>${esc(gradeSuffix(d.grade))}</h3>`)
       if (d.what_needs_help) body.push(`<p>${esc(d.what_needs_help)}</p>`)
       body.push(htmlList(d.recommended_changes))
     }
@@ -121,7 +138,7 @@ export function reportToPrintableHtml(content: ReportContent): string {
   if (topics.length) {
     body.push(`<section><h2>Investor Topics</h2>`)
     for (const t of topics) {
-      body.push(`<div class="topic"><h3>${esc(t.title)} — <span class="grade">${esc(t.grade)}</span>${t.assessment ? ` · ${esc(t.assessment)}` : ''}</h3>`)
+      body.push(`<div class="topic"><h3>${esc(t.title)} — <span class="grade">${esc(t.grade)}</span>${esc(gradeSuffix(t.grade))}</h3>`)
       if (t.source_label) {
         const found = t.evidence_found_in && t.evidence_found_in.length ? ` · Evidence in: ${esc(t.evidence_found_in.join(', '))}` : ''
         body.push(`<p class="src"><strong>Source:</strong> ${esc(t.source_label)}${found}</p>`)

@@ -647,6 +647,19 @@ const INVESTOR_TOPICS = [
   { key: 'contact', short: 'Contact', full: 'Contact', types: ['contact'] },
 ];
 const _GRADE_RANK = { A: 5, B: 4, C: 3, D: 2, F: 1 };
+
+// Product-owned investor question shown as "What's the investor thinking for
+// this topic?". Company name and supply-side noun are interpolated (never
+// hardcoded to one deck).
+const TOPIC_INVESTOR_QUESTION = {
+  moat: (c) => `What makes ${c.company} harder to copy as it scales?`,
+  competition: (c) => `Why would customers choose ${c.company} instead of existing alternatives?`,
+  traction: () => 'Is this real demand, or just early signups?',
+  business_model: (c) => `Can ${c.company} turn each transaction into an attractive, scalable business?`,
+  go_to_market: (c) => `Can ${c.company} acquire both consumers and ${c.supplyPlural} repeatedly and efficiently?`,
+  financials: (c) => `What has to be true for ${c.company} to reach these projections?`,
+  ask: (c) => `What does this round buy, and what milestone does it get ${c.company} to?`,
+};
 const _MOAT_WEAK_TEST = new RegExp(MOAT_WEAK_RE.source, 'i');
 const _MOAT_DURABLE_TEST = new RegExp(MOAT_DURABLE_RE.source, 'i');
 
@@ -660,11 +673,51 @@ function _titleToType() {
 }
 const _TITLE_TO_TYPE = _titleToType();
 
+// Build a two-sided (consumer + supply) product-workflow summary from the raw
+// product slide text. Returns null when no workflow evidence is present (so
+// Product can fall back to other proof rather than leading with patents).
+// Generic — the supply-side noun is detected from the deck, not hardcoded.
+function _productWorkflowSummary(slides) {
+  const t = (slides || [])
+    .filter((s) => _normType(s && (s.inferred_type || s.type)) === 'product')
+    .map((s) => String((s && s.extracted_text) || ''))
+    .join('\n');
+  if (!t.trim()) return null;
+
+  const supMatch = t.match(/\b(detailers?|hosts?|providers?|suppliers?|sellers?|drivers?|merchants?|vendors?|renters?|shoppers?)\b/i);
+  const supply = supMatch ? supMatch[1].toLowerCase().replace(/s$/, '') : null;
+
+  // Consumer / demand side.
+  const consumer = [];
+  if (/\b(browse|search|discover|find|explore)\b/i.test(t)) consumer.push(supply ? `browse ${supply}s` : 'browse the marketplace');
+  if (/\b(compare|reviews?|ratings?|prices?|pricing)\b/i.test(t)) consumer.push('compare reviews and prices');
+  const canBook = /\b(book|schedule|reserve|order|request)\b/i.test(t);
+  const canPay = /\b(pay|payment|checkout|charge)\b/i.test(t);
+  if (canBook && canPay) consumer.push('book and pay');
+  else if (canBook) consumer.push('book');
+  else if (canPay) consumer.push('pay');
+
+  // Supply / provider side.
+  const supplyActs = [];
+  if (/\b(profile|manage|onboard|sign\s?up)\b/i.test(t)) supplyActs.push('manage profiles');
+  if (/\b(accept|jobs?|requests?|gigs?)\b/i.test(t)) supplyActs.push('accept jobs');
+  if (/\b(earnings?|payouts?|income|track|revenue)\b/i.test(t)) supplyActs.push('track earnings');
+
+  const parts = [];
+  if (consumer.length) parts.push(`consumers can ${consumer.join(', ')}`);
+  if (supplyActs.length) parts.push(`${supply ? `${supply}s` : 'providers'} can ${_list(supplyActs)}`);
+  if (!parts.length) return null;
+  return parts.length === 2
+    ? `The deck shows both sides of the product: ${parts.join('; ')}.`
+    : `The deck shows the product: ${parts[0]}.`;
+}
+
 function buildInvestorTopics(params = {}) {
   const slideFeedback = Array.isArray(params.slideFeedback) ? params.slideFeedback : [];
   const slides = Array.isArray(params.slides) ? params.slides : [];
   const companyName = params.companyName || (params.investmentCase && params.investmentCase.company_name) || null;
   const isMarketplace = !!(params.investmentCase && params.investmentCase.detected && params.investmentCase.detected.is_marketplace);
+  const supplyLabel = params.supplyLabel || null;
 
   const typeByNum = {};
   for (const s of slides) if (s && s.slide_number != null) typeByNum[s.slide_number] = _normType(s.inferred_type || s.type);
@@ -697,10 +750,34 @@ function buildInvestorTopics(params = {}) {
     if (matches.length) {
       const primary = bestOf(matches);
       const isMoatMissing = topic.key === 'moat' && !nums.length; // synthetic weak-moat item
+
+      // Product leads with workflow/product proof, not defensibility. Prefer a
+      // two-sided (consumer + supply) workflow summary built from the product
+      // slide text; otherwise fall back to the model copy with patent/moat
+      // sentences stripped, so durability language stays in the Moat topic.
+      let whatWorks = primary.what_works;
+      if (topic.key === 'product') {
+        const twoSided = _productWorkflowSummary(slides);
+        if (twoSided) {
+          whatWorks = twoSided;
+        } else {
+          const patentRe = /\b(patent|defensib|moat|proprietary)/i;
+          const stripPatent = (txt) =>
+            String(txt || '')
+              .split(/(?<=[.!?])\s+/)
+              .map((s) => s.trim())
+              .filter((s) => s && !patentRe.test(s))
+              .join(' ');
+          const parts = _uniq(matches.map((m) => stripPatent(m.what_works)).filter(Boolean));
+          if (parts.length) whatWorks = parts.join(' ');
+        }
+      }
+
       topics.push({
         ...primary,
         title: topic.short,
         topic_key: topic.key,
+        what_works: whatWorks,
         source_slides: nums,
         source_label: srcLabel(nums),
         evidence_status: isMoatMissing ? 'missing' : nums.length > 1 ? 'multiple' : 'dedicated',
@@ -750,6 +827,15 @@ function buildInvestorTopics(params = {}) {
   });
 
   // Flow note: compare submitted order to the preferred sequence (concise, one note).
+  // Apply the product-owned investor question per topic (company + supply-side
+  // noun interpolated).
+  const _company = companyName || 'the company';
+  const _supplyPlural = supplyLabel ? (supplyLabel.endsWith('s') ? supplyLabel : `${supplyLabel}s`) : 'providers';
+  for (const t of topics) {
+    const q = TOPIC_INVESTOR_QUESTION[t.topic_key];
+    if (q) t.investor_decision = q({ company: _company, supplyPlural: _supplyPlural });
+  }
+
   const byKey = {};
   for (const t of topics) byKey[t.topic_key] = t;
   let flowNote = null;
@@ -785,6 +871,73 @@ const _ROLE_MOAT_PATTERN =
   'Carry one durability thread across the deck (retention → marketplace liquidity → switching costs) so defensibility reads as a pattern, not a single-slide afterthought.';
 const _ROLE_COMPETITION_DEFAULT =
   'Name the actual competitors and make the head-to-head positioning explicit — the dimensions where you win and why customers choose you.';
+
+// --- near-duplicate recommendation cleanup -----------------------------------
+// _uniq only drops EXACT duplicates; recommendations often repeat with slightly
+// different wording (e.g. two "combine the product walkthroughs …" lines). This
+// collapses near-duplicates within a single section by token overlap, and
+// canonicalizes the product-walkthrough recommendation to one clear version.
+const _REC_STOP = new Set(
+  'the a an and or to of for with that unless each add adds added include includes show shows state states clarify explain its it your you in on at by as is are this these those so not just more into where any e g eg vs versus one two both such don t do not consider'.split(
+    ' '
+  )
+);
+function _recSig(s) {
+  return _uniq(
+    String(s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w && w.length > 2 && !_REC_STOP.has(w))
+  );
+}
+function _jaccard(a, b) {
+  if (!a.length || !b.length) return 0;
+  const B = new Set(b);
+  let inter = 0;
+  for (const x of a) if (B.has(x)) inter++;
+  return inter / (a.length + b.length - inter);
+}
+function _canonicalizeRec(r, supplyLabel) {
+  if (/\bcombine\b[^.]*\bwalkthroughs?\b/i.test(r) || /\bwalkthroughs?\b[^.]*\bcombine\b/i.test(r)) {
+    const supply = (supplyLabel || 'supply-side').replace(/s$/i, ''); // singular adjective
+    return `Combine the consumer and ${supply} product walkthroughs unless each adds distinct investor proof.`;
+  }
+  return r;
+}
+function dedupeRecommendations(arr, supplyLabel) {
+  const out = [];
+  const sigs = [];
+  for (const raw of (arr || []).filter((x) => x && String(x).trim())) {
+    const r = _canonicalizeRec(String(raw).trim(), supplyLabel);
+    const sig = _recSig(r);
+    let dup = false;
+    for (let i = 0; i < out.length; i++) {
+      if (out[i] === r || _jaccard(sigs[i], sig) >= 0.6) { dup = true; break; }
+    }
+    if (!dup) { out.push(r); sigs.push(sig); }
+  }
+  return out;
+}
+
+// Apply near-duplicate cleanup to every user-facing recommendation list.
+function cleanupRecommendations(v2, supplyLabel) {
+  const df = v2 && v2.dashboard_feedback;
+  if (!df) return v2;
+  const deckFb = df.deck_feedback || {};
+  for (const k of ['completeness', 'clarity', 'brevity', 'flow']) {
+    const d = deckFb[k];
+    if (d && Array.isArray(d.recommended_changes)) d.recommended_changes = dedupeRecommendations(d.recommended_changes, supplyLabel);
+  }
+  for (const t of df.slide_feedback || []) {
+    if (Array.isArray(t.recommended_changes)) t.recommended_changes = dedupeRecommendations(t.recommended_changes, supplyLabel);
+  }
+  const ds = df.deck_score || {};
+  for (const key of ['investors_will_like', 'investors_will_question', 'what_could_make_investors_pass']) {
+    if (Array.isArray(ds[key])) ds[key] = dedupeRecommendations(ds[key], supplyLabel);
+  }
+  return v2;
+}
 
 function enforceRecommendationRoles(v2) {
   const df = v2 && v2.dashboard_feedback;
@@ -915,6 +1068,7 @@ module.exports = {
   buildMissingMoatSection,
   buildInvestorTopics,
   enforceRecommendationRoles,
+  cleanupRecommendations,
   INVESTOR_TOPICS,
   cleanReportCopy,
   cleanDisplayCopy,

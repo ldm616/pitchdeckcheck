@@ -58,6 +58,7 @@ const {
   buildMissingMoatSection,
   buildInvestorTopics,
   enforceRecommendationRoles,
+  cleanupRecommendations,
 } = require('./slideFeedbackEnrichment');
 
 const CANONICAL_REPORT_VERSION = 'canonical_v1';
@@ -1537,6 +1538,7 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
       slides,
       investmentCase,
       companyName,
+      supplyLabel,
     });
     v2.dashboard_feedback.slide_feedback = topics;
     if (flowNote && v2.dashboard_feedback.deck_feedback && v2.dashboard_feedback.deck_feedback.flow) {
@@ -1553,6 +1555,13 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
     enforceRecommendationRoles(v2);
   } catch (err) {
     // Non-fatal — keep the un-deduped recommendations on any failure.
+  }
+
+  // Collapse near-duplicate recommendations within each section.
+  try {
+    cleanupRecommendations(v2, supplyLabel);
+  } catch (err) {
+    // Non-fatal.
   }
 
   return v2;
