@@ -49,16 +49,13 @@ const GRADE_CARD_LABEL: Record<Grade, string> = {
 }
 
 function cardClass(selected: boolean): string {
-  // Selection is signalled by a charcoal (near-black) 2px border + subtle shadow,
-  // kept independent of the grade rail so it never reads as a grade color (and
-  // never red). `relative overflow-hidden` lets the grade rail clip to the card.
-  // Selection = a soft 1px charcoal border, very light fill, and a subtle
-  // shadow (never red, never a thick outline). The border is a constant 1px in
-  // both states (neutral vs charcoal) so selecting never shifts layout. Grade
-  // color stays on the rail only, independent of the selection border.
-  return `relative border text-left w-full transition focus:outline-none focus-visible:border-[#1f2937] ${
+  // Selection = a soft 1px NEUTRAL-gray border + a very light fill + a subtle
+  // shadow (never red, never a grade color, never a thick/black outline). The
+  // border is a constant 1px in both states so selecting never shifts layout.
+  // Grade color stays on the rail only, independent of the selection border.
+  return `relative border text-left w-full transition focus:outline-none focus-visible:border-[#6b7280] ${
     selected
-      ? 'border-[#1f2937] bg-[#fafafa] shadow-[0_1px_3px_rgba(0,0,0,0.08)]'
+      ? 'border-[#6b7280] bg-[#fafafa] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'
       : 'border-monarch-border bg-monarch-card hover:border-monarch-border-strong shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
   }`
 }
@@ -456,13 +453,18 @@ function TriageCard({
   grade,
   selected,
   onSelect,
+  dense = false,
 }: {
   title: string
   grade: Grade
   selected: boolean
   onSelect: () => void
+  dense?: boolean
 }) {
   const letter = grade === 'neutral' ? '–' : grade
+  // Dense variant: slightly smaller title + tighter horizontal padding so narrow
+  // Deck Feedback cards fit long titles (e.g. "Completeness") without truncating
+  // — same height, same two-line content.
   return (
     <button type="button" onClick={onSelect} className={cardClass(selected)}>
       {/* Grade signal: a full-height colored left rail. Negative insets let it
@@ -475,12 +477,12 @@ function TriageCard({
       <div className="flex items-stretch">
         {/* Grade column: the letter, vertically centered next to the rail, on a
             subtle gray fill that separates the grade from the title. */}
-        <div className="flex items-center justify-center shrink-0 pl-2.5 pr-2.5 bg-gray-100">
+        <div className={`flex items-center justify-center shrink-0 bg-gray-100 ${dense ? 'pl-2 pr-2' : 'pl-2.5 pr-2.5'}`}>
           <span className="text-[15px] font-semibold leading-none text-monarch-ink">{letter}</span>
         </div>
-        <div className="min-w-0 flex-1 py-2 pr-3 pl-3">
-          <span className="block text-[14px] font-medium text-monarch-ink truncate">{title}</span>
-          <p className="mt-0.5 text-[14px] font-normal text-monarch-sub leading-tight truncate">
+        <div className={`min-w-0 flex-1 py-2 ${dense ? 'pl-2 pr-2' : 'pl-3 pr-3'}`}>
+          <span className={`block font-medium text-monarch-ink truncate ${dense ? 'text-[13px]' : 'text-[14px]'}`}>{title}</span>
+          <p className={`mt-0.5 font-normal text-monarch-sub leading-tight truncate ${dense ? 'text-[13px]' : 'text-[14px]'}`}>
             {GRADE_CARD_LABEL[grade]}
           </p>
         </div>
@@ -684,6 +686,7 @@ export function V2Report({ report }: V2ReportProps) {
                 key={d.key}
                 title={d.label}
                 grade={d.grade}
+                dense
                 selected={selected?.type === 'deck_dim' && selected.index === i}
                 onSelect={() => select({ type: 'deck_dim', index: i })}
               />
@@ -719,6 +722,16 @@ export function V2Report({ report }: V2ReportProps) {
 
   return (
     <div className="font-sans text-monarch-body">
+      {/* Report header band — white bg to separate it from the dashboard below;
+          darker + semibold vs the home-page trust line. */}
+      <header className="bg-white rounded-xl border border-monarch-border px-6 py-5 mb-6 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <span className="text-sm font-semibold text-monarch-ink uppercase tracking-wide">
+          Pitch Deck Check
+        </span>
+        <p className="mt-1 text-[12px] text-monarch-sub">
+          By Malcolm Lewis · Creator of the Sequoia pitch deck template
+        </p>
+      </header>
       {isDesktop ? (
         <div ref={containerRef} className="flex items-stretch">
           <div className="min-w-0 shrink-0" style={{ width: appliedLeft != null ? `${appliedLeft}px` : '50%' }}>
