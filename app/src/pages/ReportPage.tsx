@@ -233,7 +233,21 @@ export function ReportPage() {
   if (reportV2) {
     return (
       <div className="flex flex-col flex-1 bg-monarch-canvas">
-        <FounderHeader />
+        {/* Sticky, full-width report header — same text/link as the home page
+            header, darker + semibold, pinned to the top of the screen. */}
+        <header className="sticky top-0 z-40 w-full bg-white border-b border-monarch-border py-4 text-center">
+          <span className="text-sm font-semibold text-monarch-ink uppercase tracking-wide">
+            Pitch Deck Check
+          </span>
+          <a
+            href="https://pitchdeckcoach.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-1 text-[12px] text-monarch-sub hover:text-monarch-ink transition-colors"
+          >
+            By Malcolm Lewis · Creator of the Sequoia pitch deck template
+          </a>
+        </header>
         <main className="flex-1 px-4 sm:px-6 lg:px-8 pb-16">
           <div className="relative max-w-screen-2xl mx-auto">
             {reportActions}

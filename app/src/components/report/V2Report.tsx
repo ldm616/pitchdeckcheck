@@ -722,16 +722,6 @@ export function V2Report({ report }: V2ReportProps) {
 
   return (
     <div className="font-sans text-monarch-body">
-      {/* Report header band — white bg to separate it from the dashboard below;
-          darker + semibold vs the home-page trust line. */}
-      <header className="bg-white rounded-xl border border-monarch-border px-6 py-5 mb-6 text-center shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-        <span className="text-sm font-semibold text-monarch-ink uppercase tracking-wide">
-          Pitch Deck Check
-        </span>
-        <p className="mt-1 text-[12px] text-monarch-sub">
-          By Malcolm Lewis · Creator of the Sequoia pitch deck template
-        </p>
-      </header>
       {isDesktop ? (
         <div ref={containerRef} className="flex items-stretch">
           <div className="min-w-0 shrink-0" style={{ width: appliedLeft != null ? `${appliedLeft}px` : '50%' }}>
