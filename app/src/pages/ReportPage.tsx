@@ -189,9 +189,43 @@ export function ReportPage() {
   const buttonClass =
     'print:hidden inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors'
 
-  // Actions pinned to the report container's upper-right. The Copy button is
-  // admin-only; Download is available to everyone. Copy confirms via a
-  // disappearing "Report copied" toast (see below).
+  // Header actions (Print for everyone, Copy for admin) — rendered inside the
+  // sticky report header. The Copy confirmation toast lives in the report body.
+  const headerActions = (
+    <div className="print:hidden flex items-center gap-2 shrink-0">
+      {isAdmin() && (
+        <button
+          type="button"
+          onClick={handleCopyReport}
+          className={buttonClass}
+          aria-label="Copy entire report to clipboard"
+          title="Copy report"
+        >
+          <Copy className="w-4 h-4" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleDownload}
+        className={buttonClass}
+        aria-label="Print report"
+        title="Print report"
+      >
+        <Download className="w-4 h-4" />
+        Print
+      </button>
+    </div>
+  )
+  const copiedToast = copied && (
+    <div
+      role="status"
+      className="print:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg shadow-lg"
+    >
+      Report copied
+    </div>
+  )
+
+  // Legacy V1 path keeps its original floating actions (unchanged).
   const reportActions = (
     <>
       <div className="print:hidden absolute top-4 right-4 flex items-center gap-2">
@@ -216,14 +250,7 @@ export function ReportPage() {
           Download
         </button>
       </div>
-      {copied && (
-        <div
-          role="status"
-          className="print:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg shadow-lg"
-        >
-          Report copied
-        </div>
-      )}
+      {copiedToast}
     </>
   )
 
@@ -237,21 +264,24 @@ export function ReportPage() {
             viewport; its inner content is constrained to the same max-width and
             padding as the dashboard, and left-aligned. */}
         <header className="sticky top-0 z-40 w-full bg-white border-b border-monarch-border">
-          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-baseline gap-3">
-            <span className="text-[15px] font-semibold text-monarch-ink">Pitch Deck Check</span>
-            <a
-              href="https://pitchdeckcoach.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[12px] text-monarch-sub hover:text-monarch-ink transition-colors"
-            >
-              By Malcolm Lewis · Creator of the Sequoia pitch deck template
-            </a>
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-baseline gap-3 min-w-0">
+              <span className="text-[15px] font-semibold text-monarch-ink whitespace-nowrap">Pitch Deck Check</span>
+              <a
+                href="https://pitchdeckcoach.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[12px] text-monarch-sub hover:text-monarch-ink transition-colors truncate"
+              >
+                By Malcolm Lewis · Creator of the Sequoia pitch deck template
+              </a>
+            </div>
+            {headerActions}
           </div>
         </header>
         <main className="flex-1 px-4 sm:px-6 lg:px-8 pt-5 pb-16">
           <div className="relative max-w-screen-2xl mx-auto">
-            {reportActions}
+            {copiedToast}
             <V2Report report={reportV2} />
 
             {secureCredentials && (

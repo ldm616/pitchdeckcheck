@@ -764,6 +764,63 @@ function buildInvestorTopics(params = {}) {
   return { topics, flowNote };
 }
 
+// --- distinct roles across Overall / Deck Feedback / Investor Topics ---------
+// The same underlying gap (defensibility / moat) is otherwise surfaced with
+// IDENTICAL copy in the Overall highest-leverage focus, the Deck Feedback
+// Completeness recommendations, and the Competition topic. Keep the gap in each
+// section but rewrite it to the section's role, and keep the topic-specific fix
+// in the Moat topic only.
+//   Overall         = executive diagnosis / highest-leverage priority
+//   Deck Feedback   = the cross-deck pattern
+//   Investor Topics = the topic-specific fix (Moat owns durability; Competition
+//                     stays about competitors + positioning)
+const MOAT_REC_RE =
+  /\b(defensib|moat|network (?:effect|densit)|switching cost|proprietary (?:data|technolog)|supply lock|first[- ]mover|barriers? to entry|durable (?:advantage|defensib|moat)|compounding (?:moat|advantage))/i;
+
+// Company name is interpolated (renders "Gleamr's advantage" for Gleamr) so the
+// line is never hardcoded to one deck.
+const _roleMoatExecutive = (company) =>
+  `Your highest-leverage fix is defensibility: show why ${company}'s advantage compounds with scale — through retention, marketplace liquidity, switching costs, or proprietary data — not just first-mover status.`;
+const _ROLE_MOAT_PATTERN =
+  'Carry one durability thread across the deck (retention → marketplace liquidity → switching costs) so defensibility reads as a pattern, not a single-slide afterthought.';
+const _ROLE_COMPETITION_DEFAULT =
+  'Name the actual competitors and make the head-to-head positioning explicit — the dimensions where you win and why customers choose you.';
+
+function enforceRecommendationRoles(v2) {
+  const df = v2 && v2.dashboard_feedback;
+  if (!df) return v2;
+  const topics = df.slide_feedback || [];
+  const deckFb = df.deck_feedback || {};
+  const ds = df.deck_score || {};
+
+  // OVERALL: the highest-leverage focus, when it's the moat gap, reads as an
+  // executive priority rather than a slide fix.
+  if (ds.highest_leverage_revision_focus && MOAT_REC_RE.test(ds.highest_leverage_revision_focus)) {
+    const company = ds.title && ds.title !== 'Deck Score' ? ds.title : 'the company';
+    ds.highest_leverage_revision_focus = _roleMoatExecutive(company);
+  }
+
+  // DECK FEEDBACK (Completeness): moat-themed recs collapse to one cross-deck
+  // PATTERN line (deduped) instead of repeating the topic fix.
+  const completeness = deckFb.completeness;
+  if (completeness && Array.isArray(completeness.recommended_changes)) {
+    completeness.recommended_changes = _uniq(
+      completeness.recommended_changes.map((r) => (MOAT_REC_RE.test(r) ? _ROLE_MOAT_PATTERN : r))
+    );
+  }
+
+  // INVESTOR TOPICS — Competition stays about competitors/positioning; the moat
+  // fix belongs to the Moat topic, so strip moat-themed recs from Competition.
+  const competition = topics.find((t) => t && (t.topic_key === 'competition' || t.title === 'Competition'));
+  if (competition && Array.isArray(competition.recommended_changes)) {
+    const kept = competition.recommended_changes.filter((r) => !MOAT_REC_RE.test(r));
+    competition.recommended_changes = kept.length ? _uniq(kept) : [_ROLE_COMPETITION_DEFAULT];
+  }
+  // (The Moat topic keeps its topic-specific durability fix unchanged.)
+
+  return v2;
+}
+
 // --- main enrichment ---------------------------------------------------------
 
 /**
@@ -857,6 +914,7 @@ module.exports = {
   enrichSlideLevelFeedback,
   buildMissingMoatSection,
   buildInvestorTopics,
+  enforceRecommendationRoles,
   INVESTOR_TOPICS,
   cleanReportCopy,
   cleanDisplayCopy,

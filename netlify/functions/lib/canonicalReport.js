@@ -57,6 +57,7 @@ const {
   cleanReportCopy,
   buildMissingMoatSection,
   buildInvestorTopics,
+  enforceRecommendationRoles,
 } = require('./slideFeedbackEnrichment');
 
 const CANONICAL_REPORT_VERSION = 'canonical_v1';
@@ -1544,6 +1545,14 @@ function buildCanonicalReportV2Sections(canonical, ctx = {}) {
     }
   } catch (err) {
     // Keep the per-slide feedback on any failure.
+  }
+
+  // Enforce distinct section roles so a shared gap (e.g. defensibility/moat) is
+  // not repeated verbatim across Overall, Deck Feedback, and Investor Topics.
+  try {
+    enforceRecommendationRoles(v2);
+  } catch (err) {
+    // Non-fatal — keep the un-deduped recommendations on any failure.
   }
 
   return v2;
