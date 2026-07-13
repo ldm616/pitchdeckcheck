@@ -25,6 +25,11 @@
 
 'use strict';
 
+const {
+  INVESTOR_TOPIC_CRITERIA,
+  interpolateCompanyName,
+} = require('./investorTopicCriteria');
+
 const TYPE_DISPLAY_NAMES = {
   cover: 'Cover',
   problem: 'Problem',
@@ -651,15 +656,6 @@ const _GRADE_RANK = { A: 5, B: 4, C: 3, D: 2, F: 1 };
 // Product-owned investor question shown as "What's the investor thinking for
 // this topic?". Company name and supply-side noun are interpolated (never
 // hardcoded to one deck).
-const TOPIC_INVESTOR_QUESTION = {
-  moat: (c) => `What makes ${c.company} harder to copy as it scales?`,
-  competition: (c) => `Why would customers choose ${c.company} instead of existing alternatives?`,
-  traction: () => 'Is this real demand, or just early signups?',
-  business_model: (c) => `Can ${c.company} turn each transaction into an attractive, scalable business?`,
-  go_to_market: (c) => `Can ${c.company} acquire both consumers and ${c.supplyPlural} repeatedly and efficiently?`,
-  financials: (c) => `What has to be true for ${c.company} to reach these projections?`,
-  ask: (c) => `What does this round buy, and what milestone does it get ${c.company} to?`,
-};
 const _MOAT_WEAK_TEST = new RegExp(MOAT_WEAK_RE.source, 'i');
 const _MOAT_DURABLE_TEST = new RegExp(MOAT_DURABLE_RE.source, 'i');
 
@@ -827,13 +823,19 @@ function buildInvestorTopics(params = {}) {
   });
 
   // Flow note: compare submitted order to the preferred sequence (concise, one note).
-  // Apply the product-owned investor question per topic (company + supply-side
-  // noun interpolated).
-  const _company = companyName || 'the company';
-  const _supplyPlural = supplyLabel ? (supplyLabel.endsWith('s') ? supplyLabel : `${supplyLabel}s`) : 'providers';
+  // Apply the product-owned criteria artifact per topic. display_question is the
+  // deterministic source for investor_decision; investor_criteria ("What investors
+  // are looking for") is attached as an additive, optional field. {companyName} is
+  // interpolated (detected name where available, else "this company").
   for (const t of topics) {
-    const q = TOPIC_INVESTOR_QUESTION[t.topic_key];
-    if (q) t.investor_decision = q({ company: _company, supplyPlural: _supplyPlural });
+    const c = INVESTOR_TOPIC_CRITERIA[t.topic_key];
+    if (!c) continue;
+    if (c.display_question) {
+      t.investor_decision = interpolateCompanyName(c.display_question, companyName);
+    }
+    if (Array.isArray(c.investor_criteria) && c.investor_criteria.length) {
+      t.investor_criteria = c.investor_criteria.slice();
+    }
   }
 
   const byKey = {};

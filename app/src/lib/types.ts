@@ -382,6 +382,8 @@ export interface DashboardSlideFeedbackV2 {
   evidence_found_in?: string[]
   actual_position?: number | null
   recommended_position?: number
+  // "What investors are looking for" — product-owned criteria bullets.
+  investor_criteria?: string[]
 }
 
 export interface DashboardFeedbackV2 {

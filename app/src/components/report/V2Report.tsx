@@ -197,6 +197,7 @@ interface VMSlide {
   related_deck_issue: string
   source_label?: string
   evidence_found_in?: string[]
+  investor_criteria?: string[]
 }
 interface ViewModel {
   native: boolean
@@ -351,6 +352,7 @@ function buildViewModel(report: PitchDeckCheckReportV2): ViewModel {
         related_deck_issue: s.related_deck_issue || '',
         source_label: s.source_label,
         evidence_found_in: s.evidence_found_in,
+        investor_criteria: s.investor_criteria,
       })),
     }
   }
@@ -916,14 +918,19 @@ function DeckDimDetail({ dim, native }: { dim: VMDim; native: boolean }) {
   )
 }
 
+// Toggle the "What investors are looking for" criteria section. Flip to false to
+// hide it in the UI without removing the stored backend data.
+const SHOW_INVESTOR_CRITERIA = true
+
 function SlideDetail({ slide }: { slide: VMSlide }) {
-  // Topic detail as three investor-facing sections. All content is remapped from
+  // Topic detail as investor-facing sections. All content is remapped from
   // existing fields; source mapping is folded into "What does the deck answer?".
   const foundIn = slide.evidence_found_in && slide.evidence_found_in.length > 0
     ? slide.evidence_found_in.join(', ')
     : ''
   const recs = (slide.recommended_changes || []).filter((r) => r && r.trim())
   const hasMissing = Boolean((slide.what_needs_help && slide.what_needs_help.trim()) || recs.length)
+  const criteria = (slide.investor_criteria || []).filter((c) => c && c.trim())
   return (
     <div>
       <div className="flex items-center gap-4 mb-5">
@@ -945,6 +952,21 @@ function SlideDetail({ slide }: { slide: VMSlide }) {
           <DetailRow label="What's the investor thinking for this topic?">
             {slide.investor_decision}
           </DetailRow>
+        )}
+        {SHOW_INVESTOR_CRITERIA && criteria.length > 0 && (
+          <div>
+            <p className="text-[14px] font-medium text-monarch-sub uppercase tracking-wide mb-1">
+              What investors are looking for
+            </p>
+            <ul className="mt-1 space-y-1">
+              {criteria.map((it, idx) => (
+                <li key={idx} className="flex gap-2">
+                  <span className="text-monarch-border-strong flex-shrink-0">•</span>
+                  <span className="text-[14px] text-monarch-body leading-normal">{it}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         <DetailRow label="What does the deck answer?">
           {slide.source_label ? <span className="font-medium">Source: {slide.source_label}. </span> : null}

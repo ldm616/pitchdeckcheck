@@ -3,6 +3,10 @@ import type { ReportContent } from './types'
 // Render a report_v2 dashboard as clean Markdown for the admin "Copy report"
 // action. Falls back to a minimal grade/summary block for legacy reports.
 
+// Toggle the "What investors are looking for" criteria section in exports. Keep
+// in sync with the same flag in V2Report.tsx.
+const SHOW_INVESTOR_CRITERIA = true
+
 // Universal assessment labels — same everywhere (dashboard + export).
 const GRADE_LABEL: Record<string, string> = {
   A: 'Excellent',
@@ -78,6 +82,8 @@ export function reportToMarkdown(content: ReportContent): string {
         out.push(`**Source:** ${t.source_label}${found}`)
       }
       if (t.investor_decision) out.push(`\n**What's the investor thinking?** ${t.investor_decision}`)
+      if (SHOW_INVESTOR_CRITERIA && (t.investor_criteria || []).length)
+        out.push(`\n**What investors are looking for**\n${mdList(t.investor_criteria)}`)
       if (t.what_works) out.push(`\n**What does the deck answer?** ${t.what_works}`)
       if ((t.what_needs_help && t.what_needs_help.trim()) || (t.recommended_changes || []).length) {
         out.push(`\n**What's missing?**${t.what_needs_help ? ` ${t.what_needs_help}` : ''}`)
@@ -144,6 +150,8 @@ export function reportToPrintableHtml(content: ReportContent): string {
         body.push(`<p class="src"><strong>Source:</strong> ${esc(t.source_label)}${found}</p>`)
       }
       if (t.investor_decision) body.push(`<p><strong>What's the investor thinking?</strong> ${esc(t.investor_decision)}</p>`)
+      if (SHOW_INVESTOR_CRITERIA && (t.investor_criteria || []).length)
+        body.push(`<p><strong>What investors are looking for</strong></p>${htmlList(t.investor_criteria)}`)
       if (t.what_works) body.push(`<p><strong>What does the deck answer?</strong> ${esc(t.what_works)}</p>`)
       if ((t.what_needs_help && t.what_needs_help.trim()) || (t.recommended_changes || []).length) {
         body.push(`<p><strong>What's missing?</strong> ${esc(t.what_needs_help || '')}</p>`)
