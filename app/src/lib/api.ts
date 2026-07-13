@@ -16,10 +16,14 @@ function getAdminPassword(): string {
   return sessionStorage.getItem(SESSION_PASSWORD_KEY) || ''
 }
 
-// True when an admin has verified their password this session (used to show
-// admin-only affordances such as the Admin link on the report page).
+// True when an admin has verified their password (used to show admin-only
+// affordances such as the report Copy button). Checks the persistent admin flag
+// too, so it also holds on the report page opened in a separate tab.
 export function isAdmin(): boolean {
-  return !!sessionStorage.getItem(SESSION_PASSWORD_KEY)
+  return (
+    !!sessionStorage.getItem(SESSION_PASSWORD_KEY) ||
+    localStorage.getItem('pdc_admin_mode') === 'true'
+  )
 }
 
 // Verify admin password

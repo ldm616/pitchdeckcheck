@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { Download, Copy, Loader2 } from 'lucide-react'
 import { getReport, getReportByCode, isAdmin } from '../lib/api'
+import { reportToMarkdown, reportToPrintableHtml } from '../lib/reportMarkdown'
 import { ROUTES } from '../lib/routes'
 import { FounderHeader } from '../components/FounderHeader'
 import { FounderFooter } from '../components/FounderFooter'
@@ -168,17 +169,39 @@ export function ReportPage() {
     )
   }
 
-  // Download the report as a PDF via the browser's native print-to-PDF.
-  // No PDF dependency/backend is required; the report container is styled so
-  // the button itself is hidden from the printed output.
-  const handleDownload = () => window.print()
+  // Download the report as a nicely-formatted PDF: render a clean, print-styled
+  // document off-screen and invoke the browser's print-to-PDF on it (no PDF
+  // dependency; the on-screen dashboard is not what gets printed).
+  const handleDownload = () => {
+    if (!report || !report.report_v2) {
+      window.print()
+      return
+    }
+    const html = reportToPrintableHtml(report)
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
+    document.body.appendChild(iframe)
+    const win = iframe.contentWindow
+    const doc = win?.document
+    if (!win || !doc) {
+      document.body.removeChild(iframe)
+      window.print()
+      return
+    }
+    const cleanup = () => setTimeout(() => { try { document.body.removeChild(iframe) } catch { /* ignore */ } }, 500)
+    win.onafterprint = cleanup
+    doc.open()
+    doc.write(html)
+    doc.close()
+    setTimeout(() => { win.focus(); win.print() }, 200)
+  }
 
-  // Admin-only: copy the entire report content (as JSON) to the clipboard for
-  // inspecting/sharing the artifact-based output.
+  // Admin-only: copy the entire report to the clipboard as Markdown.
   const handleCopyReport = async () => {
     if (!report) return
     try {
-      await navigator.clipboard.writeText(JSON.stringify(report, null, 2))
+      await navigator.clipboard.writeText(reportToMarkdown(report))
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
@@ -208,11 +231,11 @@ export function ReportPage() {
         type="button"
         onClick={handleDownload}
         className={buttonClass}
-        aria-label="Print report"
-        title="Print report"
+        aria-label="Download report as PDF"
+        title="Download report as PDF"
       >
         <Download className="w-4 h-4" />
-        Print
+        Download
       </button>
     </div>
   )
