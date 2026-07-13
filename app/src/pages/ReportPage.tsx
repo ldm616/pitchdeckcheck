@@ -289,7 +289,12 @@ export function ReportPage() {
         <header className="sticky top-0 z-40 w-full bg-white border-b border-monarch-border">
           <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3">
             <div className="flex items-baseline gap-3 min-w-0">
-              <span className="text-[15px] font-semibold text-monarch-ink whitespace-nowrap">Pitch Deck Check</span>
+              <Link
+                to={ROUTES.HOME}
+                className="text-[15px] font-semibold text-monarch-ink whitespace-nowrap hover:text-monarch-sub transition-colors"
+              >
+                Pitch Deck Check
+              </Link>
               <a
                 href="https://pitchdeckcoach.com"
                 target="_blank"
