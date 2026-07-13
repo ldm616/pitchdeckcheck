@@ -722,21 +722,6 @@ export function V2Report({ report }: V2ReportProps) {
 
   return (
     <div className="font-sans text-monarch-body">
-      {/* Single report header — lives in V2Report so every place that renders the
-          report (public link + admin) shows the identical sticky, full-width bar. */}
-      <header className="sticky top-0 z-40 w-full bg-white border-b border-monarch-border py-4 mb-6 text-center">
-        <span className="text-sm font-semibold text-monarch-ink uppercase tracking-wide">
-          Pitch Deck Check
-        </span>
-        <a
-          href="https://pitchdeckcoach.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block mt-1 text-[12px] text-monarch-sub hover:text-monarch-ink transition-colors"
-        >
-          By Malcolm Lewis · Creator of the Sequoia pitch deck template
-        </a>
-      </header>
       {isDesktop ? (
         <div ref={containerRef} className="flex items-stretch">
           <div className="min-w-0 shrink-0" style={{ width: appliedLeft != null ? `${appliedLeft}px` : '50%' }}>

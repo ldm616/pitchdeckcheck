@@ -233,7 +233,23 @@ export function ReportPage() {
   if (reportV2) {
     return (
       <div className="flex flex-col flex-1 bg-monarch-canvas">
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 pb-16">
+        {/* Compact, sticky, full-width utility header. The white bar spans the
+            viewport; its inner content is constrained to the same max-width and
+            padding as the dashboard, and left-aligned. */}
+        <header className="sticky top-0 z-40 w-full bg-white border-b border-monarch-border">
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-baseline gap-3">
+            <span className="text-[15px] font-semibold text-monarch-ink">Pitch Deck Check</span>
+            <a
+              href="https://pitchdeckcoach.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[12px] text-monarch-sub hover:text-monarch-ink transition-colors"
+            >
+              By Malcolm Lewis · Creator of the Sequoia pitch deck template
+            </a>
+          </div>
+        </header>
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 pt-5 pb-16">
           <div className="relative max-w-screen-2xl mx-auto">
             {reportActions}
             <V2Report report={reportV2} />
